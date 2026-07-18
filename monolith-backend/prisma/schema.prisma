@@ -1,0 +1,308 @@
+// ============================================================================
+// FlowPilot — Database Schema (PostgreSQL via Prisma)
+// Generated from: FlowPilot – Database Schema Design Document (v2)
+// Organized by bounded context to mirror the modular-monolith architecture
+// (NFR-01): Identity | Designer | Node Library | Connector | Execution | Logging
+// FlowPilot AI tables intentionally omitted — out of current project scope.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Identity — bảng dùng chung
+// ----------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  DEVELOPER
+  BUSINESS_USER
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  name         String   @db.VarChar(255)
+  role         UserRole @default(DEVELOPER)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  ownedWorkflows       Workflow[]            @relation("WorkflowOwner")
+  publishedVersions    WorkflowVersion[]     @relation("PublishedBy")
+  lockedDrafts         WorkflowDraft[]       @relation("DraftLockedBy")
+  connectorCredentials ConnectorCredential[] @relation("CredentialOwner")
+  triggeredExecutions  Execution[]           @relation("TriggeredBy")
+
+  @@map("users")
+}
+
+// ----------------------------------------------------------------------------
+// Designer Module — FR-WD-*
+// ----------------------------------------------------------------------------
+
+enum WorkflowStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Workflow {
+  id          String         @id @default(uuid()) @db.Uuid
+  name        String         @db.VarChar(255) // FR-WD-01
+  description String?
+  status      WorkflowStatus @default(DRAFT)
+
+  ownerId String @map("owner_id") @db.Uuid
+  owner   User   @relation("WorkflowOwner", fields: [ownerId], references: [id])
+
+  // Version đang publish/thực thi được (FR-WD-07); null nếu chưa publish lần nào.
+  currentVersionId String?          @unique @map("current_version_id") @db.Uuid
+  currentVersion   WorkflowVersion? @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+
+  draft      WorkflowDraft?    // 1:1 — mỗi workflow có đúng 1 draft
+  versions   WorkflowVersion[] @relation("WorkflowVersions")
+  executions Execution[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("workflows")
+}
+
+// Trạng thái đang chỉnh sửa hiện tại của workflow — 1:1 với Workflow, cập nhật
+// liên tục qua autosave, được phép invalid. KHÔNG phải là lịch sử version.
+model WorkflowDraft {
+  workflowId String   @id @map("workflow_id") @db.Uuid
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  // Graph hiện tại (React Flow: { nodes, edges, viewport }) — xem cấu trúc JSON ở cuối module này.
+  definition       Json  @default("{}")
+  validationErrors Json? @map("validation_errors") // kết quả validate lần gần nhất (FR-WD-06)
+
+  // Advisory lock — không enforce ở DB, chỉ để UI hiển thị "X đang chỉnh sửa".
+  lockedById String?   @map("locked_by_id") @db.Uuid
+  lockedBy   User?     @relation("DraftLockedBy", fields: [lockedById], references: [id])
+  lockedAt   DateTime? @map("locked_at") @db.Timestamptz
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz // dùng làm optimistic-concurrency token
+
+  @@map("workflow_drafts")
+}
+
+// Phiên bản đã publish — bất biến, không bao giờ update sau khi insert.
+// Mọi row trong bảng này LUÔN là bản đã publish, không có trạng thái trung gian
+// (không có cờ is_draft — xem workflow-draft-editing-strategy.md).
+model WorkflowVersion {
+  id            String   @id @default(uuid()) @db.Uuid
+  workflowId    String   @map("workflow_id") @db.Uuid
+  workflow      Workflow @relation("WorkflowVersions", fields: [workflowId], references: [id], onDelete: Cascade)
+  versionNumber Int      @map("version_number")
+
+  // Graph tại thời điểm publish (React Flow: { nodes, edges, viewport }) — bất biến.
+  definition Json
+
+  publishedAt   DateTime @default(now()) @map("published_at") @db.Timestamptz // luôn NOT NULL — row chỉ tồn tại khi đã publish
+  publishedById String   @map("published_by_id") @db.Uuid
+  publishedBy   User     @relation("PublishedBy", fields: [publishedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  workflowCurrent Workflow?   @relation("CurrentVersion")
+  executions      Execution[]
+
+  @@unique([workflowId, versionNumber]) // FR-VM-01 — không có 2 version trùng số cho cùng 1 workflow
+  @@index([workflowId])
+  @@map("workflow_versions")
+}
+
+// ----------------------------------------------------------------------------
+// Node Library Module — FR-NL-*
+// ----------------------------------------------------------------------------
+
+enum NodeCategory {
+  TRIGGER
+  LOGIC
+  DATA_PROCESSING
+  INTEGRATION
+}
+
+// Catalog các loại node có sẵn trong palette — KHÁC với instance node nằm
+// trong WorkflowDraft.definition / WorkflowVersion.definition (JSON).
+model NodeTypeDefinition {
+  id           String       @id @default(uuid()) @db.Uuid
+  key          String       @unique @db.VarChar(150) // vd. "trigger.schedule", "integration.slack.postMessage"
+  name         String       @db.VarChar(255)
+  category     NodeCategory // FR-NL-01
+  description  String?      // hiển thị khi tìm kiếm (FR-NL-06)
+  configSchema Json         @map("config_schema") // JSON Schema validate config node (FR-WD-05, FR-WD-06)
+
+  connectorId String?    @map("connector_id") @db.Uuid // chỉ set khi category = INTEGRATION
+  connector   Connector? @relation(fields: [connectorId], references: [id])
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([category])
+  @@map("node_type_definitions")
+}
+
+// ----------------------------------------------------------------------------
+// Connector Framework Module — FR-CF-*
+// ----------------------------------------------------------------------------
+
+enum ConnectorAuthType {
+  NONE
+  API_KEY
+  OAUTH2
+  BASIC
+}
+
+enum ConnectorTestStatus {
+  UNTESTED
+  SUCCESS
+  FAILED
+}
+
+// Catalog cố định ở MVP: HTTP, Webhook, PostgreSQL, Gmail, Google Sheet, Google Drive, Slack, OpenAI
+model Connector {
+  id           String            @id @default(uuid()) @db.Uuid
+  key          String            @unique @db.VarChar(100)
+  name         String            @db.VarChar(255)
+  authType     ConnectorAuthType @map("auth_type")
+  configSchema Json              @map("config_schema") // schema cho field cấu hình credential (FR-CF-03)
+  isActive     Boolean           @default(true) @map("is_active")
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  nodeTypes   NodeTypeDefinition[]
+  credentials ConnectorCredential[]
+
+  @@map("connectors")
+}
+
+model ConnectorCredential {
+  id          String    @id @default(uuid()) @db.Uuid
+  connectorId String    @map("connector_id") @db.Uuid
+  connector   Connector @relation(fields: [connectorId], references: [id])
+
+  ownerId String @map("owner_id") @db.Uuid
+  owner   User   @relation("CredentialOwner", fields: [ownerId], references: [id])
+
+  name            String @db.VarChar(255) // nhãn hiển thị, vd. "Gmail công ty"
+  encryptedSecret String @map("encrypted_secret") // AES-256-GCM, mã hoá ở tầng ứng dụng — không bao giờ plaintext (NFR-04)
+
+  lastTestedAt   DateTime?           @map("last_tested_at") @db.Timestamptz // FR-CF-04
+  lastTestStatus ConnectorTestStatus @default(UNTESTED) @map("last_test_status")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([connectorId, ownerId])
+  @@map("connector_credentials")
+}
+
+// ----------------------------------------------------------------------------
+// Execution Module — FR-EX-*, FR-EM-*
+// ----------------------------------------------------------------------------
+
+enum TriggerType {
+  SCHEDULE
+  WEBHOOK
+  MANUAL
+}
+
+enum ExecutionStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+// Đại diện cho MỘT lần chạy workflow — phục vụ cả Execution Engine lẫn Monitor.
+model Execution {
+  id String @id @default(uuid()) @db.Uuid
+
+  workflowId String   @map("workflow_id") @db.Uuid
+  workflow   Workflow @relation(fields: [workflowId], references: [id])
+
+  // Version cụ thể được thực thi — để tra đúng definition đã publish tại thời
+  // điểm chạy, kể cả khi workflow đã có version mới hơn sau đó.
+  workflowVersionId String          @map("workflow_version_id") @db.Uuid
+  workflowVersion   WorkflowVersion @relation(fields: [workflowVersionId], references: [id])
+
+  triggerType TriggerType     @map("trigger_type") // FR-EX-07
+  status      ExecutionStatus @default(RUNNING) // FR-EM-01
+
+  triggeredById String? @map("triggered_by_id") @db.Uuid // null với schedule/webhook
+  triggeredBy   User?   @relation("TriggeredBy", fields: [triggeredById], references: [id])
+
+  startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz
+  durationMs Int?      @map("duration_ms") // FR-EM-02, tính sẵn khi finish
+
+  nodeLogs ExecutionNodeLog[]
+
+  @@index([workflowId, startedAt(sort: Desc)]) // FR-EM-04 danh sách execution gần nhất
+  @@index([status])
+  @@map("executions")
+}
+
+// ----------------------------------------------------------------------------
+// Logging Module — FR-LG-*
+// ----------------------------------------------------------------------------
+
+enum NodeExecutionStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  SKIPPED
+  TIMEOUT
+}
+
+model ExecutionNodeLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  executionId String    @map("execution_id") @db.Uuid
+  execution   Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  nodeId  String @map("node_id") @db.VarChar(100) // id node instance trong definition JSON — KHÔNG phải FK vật lý
+  nodeKey String @map("node_key") @db.VarChar(150) // copy node_type_definitions.key tại thời điểm chạy (denormalize)
+
+  status NodeExecutionStatus @default(RUNNING)
+
+  input        Json?   // FR-LG-01
+  output       Json?   // FR-LG-01
+  errorMessage String? @map("error_message") // FR-LG-04
+  errorStack   String? @map("error_stack") // FR-LG-04
+  retryCount   Int     @default(0) @map("retry_count") // FR-EM-03, FR-EX-04
+
+  startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz // FR-LG-03
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz // FR-LG-03
+  durationMs Int?      @map("duration_ms")
+
+  @@index([executionId])
+  @@index([executionId, status]) // FR-LG-05 tra cứu/lọc log
+  @@map("execution_node_logs")
+}
+
+// ----------------------------------------------------------------------------
+// Versioning Module — FR-VM-*
+// Không có bảng riêng: WorkflowVersion (Designer section) chính là lịch sử
+// version. @@unique([workflowId, versionNumber]) đảm bảo FR-VM-01. Compare
+// (FR-VM-02) diff 2 row `definition` ở service layer. Rollback (FR-VM-03) tạo
+// version MỚI copy `definition` từ version cũ rồi publish, đồng thời reset
+// WorkflowDraft về version đó — lịch sử không bao giờ bị ghi đè.
+//
+// NFR-07 (tăng trưởng dữ liệu): execution_node_logs là bảng lớn/nhanh nhất —
+// khuyến nghị partition theo started_at (range monthly) và archive log
+// > 6-12 tháng sang cold storage thay vì giữ vĩnh viễn trong Postgres.
+// ----------------------------------------------------------------------------

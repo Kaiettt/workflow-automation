@@ -18,36 +18,36 @@
 
 ```
 flowpilot-backend/
-├── apps/
+├── apps/                             # entrypoint layer — nơi Nest thực sự "chạy", không chứa business logic
 │   └── api/                          # NestJS entrypoint (HTTP)
 │       └── src/
-│           ├── main.ts
+│           ├── main.ts               # bootstrap ứng dụng (NestFactory.create, listen port)
 │           └── app.module.ts         # import tất cả module domain
 │
 ├── libs/                             # dùng nx/monorepo hoặc path alias nếu không dùng nx
 │   ├── shared-kernel/                # value objects, base entities, exceptions dùng chung
 │   │   └── src/
-│   │       ├── domain/
-│   │       ├── errors/
-│   │       └── types/
+│   │       ├── domain/               # base class dùng chung cho mọi entity (vd. AggregateRoot)
+│   │       ├── errors/               # exception thuần domain (vd. InvalidExecutionStateError)
+│   │       └── types/                # type/interface thuần TypeScript dùng xuyên module
 │   │
 │   ├── shared-infra/                 # config, logger, prisma base client, redis client
-│   │   └── src/
+│   │   └── src/                      # code biết framework/DB nhưng không biết business rule
 │   │
-│   └── modules/
-│       ├── designer/
-│       ├── node-library/
-│       ├── connector/
-│       ├── execution/
-│       ├── monitoring/
-│       ├── logging/
-│       └── versioning/
+│   └── modules/                      # nơi chứa toàn bộ bounded context, mỗi thư mục = 1 module độc lập
+│       ├── designer/                 # Designer Module — FR-WD-*
+│       ├── node-library/             # Node Library Module — FR-NL-*
+│       ├── connector/                # Connector Framework Module — FR-CF-*
+│       ├── execution/                # Execution Module — FR-EX-*, FR-EM-* (xem chi tiết bên dưới)
+│       ├── monitoring/               # Monitoring Module — đọc lại execution, không có bảng riêng
+│       ├── logging/                  # Logging Module — FR-LG-*
+│       └── versioning/               # Versioning Module — FR-VM-*, dùng chung workflow_versions
 │
 ├── prisma/
-│   └── schema                 # 1 schema, đặt naming convention theo module
+│   └── schema                        # 1 schema, đặt naming convention theo module
 │
-├── docker-compose.yml
-└── nest-cli.json
+├── docker-compose.yml                # dịch vụ hạ tầng local: Postgres, Redis, (BullMQ dashboard nếu cần)
+└── nest-cli.json                     # cấu hình monorepo/project cho Nest CLI
 ```
 
 ---
@@ -59,49 +59,49 @@ Clean architecture — tách domain khỏi framework:
 ```
 modules/execution/
 ├── src/
-│   ├── domain/
-│   │   ├── entities/
-│   │   │   ├── workflow-execution.entity.ts
-│   │   │   └── node-execution.entity.ts
-│   │   ├── value-objects/
-│   │   │   └── execution-status.vo.ts
-│   │   └── repositories/             # interface only (port)
-│   │       └── execution.repository.ts
+│   ├── domain/                       # lớp trong cùng — không phụ thuộc framework/DB
+│   │   ├── entities/                 # class TypeScript thuần, chứa business rule bất biến
+│   │   │   ├── workflow-execution.entity.ts   # entity đại diện 1 lần chạy workflow
+│   │   │   └── node-execution.entity.ts       # entity đại diện kết quả chạy 1 node trong execution
+│   │   ├── enums/
+│   │   │   └── execution-status.enum.ts       # RUNNING | SUCCESS | FAILED | CANCELLED
+│   │   └── repositories/             # interface only (port) — domain định nghĩa, không implement
+│   │       └── execution.repository.ts        # port lưu/tìm WorkflowExecution
 │   │
-│   ├── application/
-│   │   ├── commands/
+│   ├── application/                  # điều phối use case — biết domain, không biết hạ tầng cụ thể
+│   │   ├── commands/                 # hành động làm thay đổi state (CQRS write side)
 │   │   │   ├── start-execution/
-│   │   │   │   ├── start-execution.command.ts
-│   │   │   │   └── start-execution.handler.ts
-│   │   │   └── retry-node/
-│   │   ├── queries/
-│   │   │   ├── get-execution-status/
-│   │   │   └── list-executions/
-│   │   ├── events/
-│   │   │   ├── execution-completed.event.ts
-│   │   │   └── execution-failed.event.ts
-│   │   └── ports/                    # interface ra module khác (Connector, NodeLibrary)
-│   │       └── connector-invoker.port.ts
+│   │   │   │   ├── start-execution.command.ts   # input thuần data (workflowId, triggerType...)
+│   │   │   │   └── start-execution.handler.ts   # logic điều phối: tạo entity, gọi repo, publish event
+│   │   │   └── retry-node/           # command retry cho 1 node thất bại (FR-EX-04)
+│   │   ├── queries/                  # chỉ đọc, tách khỏi command (CQRS read side)
+│   │   │   ├── get-execution-status/ # phục vụ FR-EM-01 (trạng thái thời gian thực)
+│   │   │   └── list-executions/      # phục vụ FR-EM-04 (danh sách execution gần nhất)
+│   │   ├── events/                   # domain event để module khác subscribe, không gọi thẳng nhau
+│   │   │   ├── execution-completed.event.ts    # Monitoring/Logging module lắng nghe
+│   │   │   └── execution-failed.event.ts       # dùng để trigger alert/log lỗi
+│   │   ├── ports/                    # interface ra module khác (Connector, NodeLibrary)
+│   │   │   └── connector-invoker.port.ts       # port gọi 1 connector khi chạy Integration node
+│   │   └── dtos/
+│   │       └── execution-status.dto.ts         # shape trả về cho query, tách khỏi entity domain
 │   │
-│   ├── infrastructure/
+│   ├── infrastructure/               # lớp duy nhất được phép "bẩn" — biết Prisma, BullMQ, HTTP
 │   │   ├── persistence/
-│   │   │   ├── prisma-execution.repository.ts   # implement domain/repositories
-│   │   │   └── mappers/
+│   │   │   ├── prisma-execution.repository.ts  # implement domain/repositories bằng Prisma
+│   │   │   └── mappers/                        # convert Prisma row ↔ domain entity, tránh leak type
 │   │   ├── queue/
-│   │   │   ├── execution.processor.ts           # BullMQ worker
-│   │   │   └── execution-queue.module.ts
+│   │   │   ├── execution.processor.ts          # BullMQ worker, xử lý job async (parallel execution)
+│   │   │   └── execution-queue.module.ts       # đăng ký queue/connection cho module này
 │   │   └── adapters/
-│   │       └── connector-invoker.adapter.ts      # gọi sang Connector module
+│   │       └── connector-invoker.adapter.ts    # implement port, gọi sang Connector module — chỗ đổi khi tách microservice
 │   │
-│   ├── presentation/
-│   │   ├── http/
-│   │   │   ├── execution.controller.ts
-│   │   │   └── dto/
-│   │   └── graphql/ (nếu cần)
-│   │
-│   └── execution.module.ts
+│   └── presentation/                 # lớp mỏng nhất — chỉ dịch request thành command/query
+│       └── http/
+│           └── execution.controller.ts         # nhận HTTP request, gọi CommandBus/QueryBus, không chứa business logic
 │
-└── index.ts                          # public API: chỉ export service/facade + DTO cần thiết
+│   └── execution.module.ts           # khai báo providers, binding interface ↔ implementation (DI)
+│
+└── index.ts                          # public API: chỉ export service/facade + DTO cần thiết — chặn import sâu vào internal
 ```
 
 Các module còn lại (`designer`, `connector`, `node-library`, `monitoring`, `logging`, `versioning`) đi theo **cùng khuôn** domain/application/infrastructure/presentation, độ phức tạp tùy module (VD `logging` không cần CQRS đầy đủ, chỉ cần command ghi + query đọc đơn giản).
