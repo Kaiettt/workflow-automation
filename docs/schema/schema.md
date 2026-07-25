@@ -214,10 +214,14 @@ Dưới đây là một ví dụ minh hoạ cấu trúc JSON cho một workflow 
 | --- | --- | --- | --- |
 | id | UUID | PK | |
 | key | VARCHAR(150) | UNIQUE, NOT NULL | vd. `trigger.schedule`, `logic.condition`, `integration.slack.postMessage` — instance JSON tham chiếu qua key này |
-| name | VARCHAR(255) | NOT NULL | |
+| display_name | VARCHAR(255) | NOT NULL | tên hiển thị trên UI |
+| icon | VARCHAR(255) | NULL | icon hiển thị trên UI |
+| color | VARCHAR(50) | NULL | màu sắc hiển thị trên UI |
 | category | ENUM(`TRIGGER`, `LOGIC`, `DATA_PROCESSING`, `INTEGRATION`) | NOT NULL | FR-NL-01 |
 | description | TEXT | NULL | hiển thị khi tìm kiếm (FR-NL-06) |
 | config_schema | JSONB | NOT NULL | JSON Schema để validate tham số cấu hình node (FR-WD-05, FR-WD-06) |
+| input_schema | JSONB | NULL | JSON Schema định nghĩa dữ liệu đầu vào |
+| output_schema | JSONB | NULL | JSON Schema định nghĩa dữ liệu trả về |
 | connector_id | UUID | FK → connectors.id, NULL | chỉ set khi `category = INTEGRATION` |
 | is_active | BOOLEAN | DEFAULT true | ẩn node type khỏi palette mà không xoá lịch sử |
 | created_at / updated_at | TIMESTAMPTZ | | |
@@ -277,6 +281,7 @@ Catalog cố định ở MVP: HTTP, Webhook, PostgreSQL, Gmail, Google Sheet, Go
 | started_at | TIMESTAMPTZ | DEFAULT now() | |
 | finished_at | TIMESTAMPTZ | NULL | |
 | duration_ms | INTEGER | NULL | FR-EM-02, tính sẵn khi finish để tránh tính lại mỗi lần hiển thị |
+| context | JSONB | NULL | Biến môi trường hoặc context đầu vào của execution |
 
 **Index:** `(workflow_id, started_at DESC)` — phục vụ danh sách execution gần nhất theo workflow (FR-EM-04); `(status)` — lọc theo trạng thái.
 

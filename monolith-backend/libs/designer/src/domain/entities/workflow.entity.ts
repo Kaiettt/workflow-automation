@@ -13,12 +13,12 @@ export class Workflow {
   ) {}
 
   static create(props: {
-    id: string;
+    id?: string;
     name: string;
     ownerId: string;
   }): Workflow {
     return new Workflow(
-      props.id,
+      props.id || '',
       props.name,
       props.ownerId,
       WorkflowStatus.DRAFT,

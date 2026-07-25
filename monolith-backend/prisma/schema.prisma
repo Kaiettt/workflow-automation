@@ -141,10 +141,14 @@ enum NodeCategory {
 model NodeTypeDefinition {
   id           String       @id @default(uuid()) @db.Uuid
   key          String       @unique @db.VarChar(150) // vd. "trigger.schedule", "integration.slack.postMessage"
-  name         String       @db.VarChar(255)
+  displayName  String       @map("display_name") @db.VarChar(255)
+  icon         String?      @db.VarChar(255)
+  color        String?      @db.VarChar(50)
   category     NodeCategory // FR-NL-01
   description  String?      // hiển thị khi tìm kiếm (FR-NL-06)
   configSchema Json         @map("config_schema") // JSON Schema validate config node (FR-WD-05, FR-WD-06)
+  inputSchema  Json?        @map("input_schema")
+  outputSchema Json?        @map("output_schema")
 
   connectorId String?    @map("connector_id") @db.Uuid // chỉ set khi category = INTEGRATION
   connector   Connector? @relation(fields: [connectorId], references: [id])
@@ -249,6 +253,7 @@ model Execution {
   startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz
   finishedAt DateTime? @map("finished_at") @db.Timestamptz
   durationMs Int?      @map("duration_ms") // FR-EM-02, tính sẵn khi finish
+  context    Json?     // Biến môi trường hoặc context đầu vào của execution
 
   nodeLogs ExecutionNodeLog[]
 

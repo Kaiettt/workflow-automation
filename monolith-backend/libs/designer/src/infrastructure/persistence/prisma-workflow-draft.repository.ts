@@ -1,12 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { WorkflowDraftRepository } from '../../domain/repositories/workflow-draft.repository';
 import { WorkflowDraft } from '../../domain/entities/workflow-draft.entity';
-import { PrismaService } from '../../../../../shared-infra/src/prisma/prisma.service';
+import { PrismaService } from '@app/database/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { WorkflowDraftMapper } from './mappers/workflow-draft.mapper';
 
 @Injectable()
 export class PrismaWorkflowDraftRepository implements WorkflowDraftRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findById(workflowId: string): Promise<WorkflowDraft | null> {
+    const record = await this.prisma.workflowDraft.findUnique({
+      where: { workflowId },
+    });
+    if (!record) return null;
+    return WorkflowDraftMapper.toDomain(record);
+  }
 
   async upsert(draft: WorkflowDraft): Promise<void> {
     await this.prisma.workflowDraft.upsert({

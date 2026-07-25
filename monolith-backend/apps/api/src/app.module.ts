@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { DesignerModule } from '../../../libs/modules/designer/src';
-import { PrismaModule } from '../../../libs/shared-infra/src';
+import { DesignerModule } from '@app/designer';
+import { PrismaModule } from '@app/database';
 
 @Module({
   imports: [DesignerModule, PrismaModule],

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
 import { Workflow } from '../../domain/entities/workflow.entity';
-import { PrismaService } from '../../../../../shared-infra/src/prisma/prisma.service';
+import { PrismaService } from '@app/database/prisma/prisma.service';
 import { WorkflowMapper } from './mappers/workflow.mapper';
 
 @Injectable()
@@ -14,14 +14,15 @@ export class PrismaWorkflowRepository implements WorkflowRepository {
     return WorkflowMapper.toDomain(record);
   }
 
-  async create(workflow: Workflow): Promise<void> {
-    await this.prisma.workflow.create({
+  async create(workflow: Workflow): Promise<string> {
+    const created = await this.prisma.workflow.create({
       data: {
-        id: workflow.id,
+        ...(workflow.id ? { id: workflow.id } : {}),
         name: workflow.name,
         ownerId: workflow.ownerId,
         status: workflow.status,
       },
     });
+    return created.id;
   }
 }
