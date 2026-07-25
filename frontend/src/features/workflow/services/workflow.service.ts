@@ -7,6 +7,7 @@ export const workflowService = {
     if (!response.ok) {
       throw new Error('Failed to create workflow');
     }
+    console.log("good")
     const responseData = await response.json();
     return responseData.data.id;
   },
