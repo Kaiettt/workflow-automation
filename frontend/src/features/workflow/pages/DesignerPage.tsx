@@ -85,7 +85,7 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
     };
   }, [nodes, edges, loading, saveDraft]);
 
-  const handleNodeDataChange = useCallback((nodeId: string, data: any) => {
+  const handleNodeDataChange = useCallback((nodeId: string, data: unknown) => {
     setNodes((nds) =>
       nds.map((n) => {
         if (n.id === nodeId) {

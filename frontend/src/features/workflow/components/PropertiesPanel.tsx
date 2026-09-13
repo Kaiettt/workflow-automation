@@ -1,23 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useDesignerStore } from '../store/designer.store';
 import type { Node } from '@xyflow/react';
 
 interface PropertiesPanelProps {
   nodes: Node[];
-  onNodeDataChange: (nodeId: string, data: any) => void;
+  onNodeDataChange: (nodeId: string, data: unknown) => void;
 }
 
 export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProps) {
   const selectedNodeId = useDesignerStore((state) => state.selectedNodeId);
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
-  const [localConfig, setLocalConfig] = useState<any>({});
+  const [localConfig, setLocalConfig] = useState<Record<string, unknown>>(() => {
+    return (selectedNode?.data?.config as Record<string, unknown>) || {};
+  });
+  const [prevNodeId, setPrevNodeId] = useState<string | null>(selectedNodeId);
 
-  useEffect(() => {
-    if (selectedNode) {
-      setLocalConfig(selectedNode.data?.config || {});
-    }
-  }, [selectedNode]);
+  if (selectedNodeId !== prevNodeId) {
+    setPrevNodeId(selectedNodeId);
+    setLocalConfig((selectedNode?.data?.config as Record<string, unknown>) || {});
+  }
 
   if (!selectedNode) {
     return (
@@ -49,7 +51,7 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
             <input 
               type="text" 
               className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
-              value={localConfig.cron || ''} 
+              value={(localConfig.cron as string) || ''} 
               onChange={(e) => handleConfigChange('cron', e.target.value)} 
               placeholder="0 7 * * *"
             />
@@ -61,7 +63,7 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
             <label className="block text-sm font-medium text-gray-700">Settings</label>
             <textarea 
               className="w-full border border-gray-300 rounded-md p-2 text-sm h-32 focus:ring-blue-500 focus:border-blue-500 font-mono"
-              value={localConfig.settings || ''} 
+              value={(localConfig.settings as string) || ''} 
               onChange={(e) => handleConfigChange('settings', e.target.value)}
               placeholder="{}"
             />

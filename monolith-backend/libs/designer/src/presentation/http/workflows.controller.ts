@@ -1,4 +1,5 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { CommandBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CreateWorkflowCommand } from '../../application/commands/create-workflow.handler';
@@ -12,12 +13,17 @@ export class WorkflowsController {
   @Post()
   @ApiOperation({ summary: 'Create a new workflow' })
   @ApiResponse({ status: 201, description: 'Workflow created successfully' })
-  async createWorkflow(@Body() body: CreateWorkflowDto, @Req() req: any) {
+  async createWorkflow(
+    @Body() body: CreateWorkflowDto,
+    @Req() req: Request & { user?: { id: string } },
+  ) {
     // Hardcoded ownerId for MVP, would normally come from req.user
-    const ownerId = body.ownerId || req.user?.id || '00000000-0000-0000-0000-000000000000';
+    const ownerId =
+      body.ownerId || req.user?.id || '00000000-0000-0000-0000-000000000000';
     const command = new CreateWorkflowCommand(body.name, ownerId);
-    const workflowId = await this.commandBus.execute(command);
-    
+    const result: unknown = await this.commandBus.execute(command);
+    const workflowId = result as string;
+
     return {
       success: true,
       data: {
