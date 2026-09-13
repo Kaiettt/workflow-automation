@@ -10,7 +10,7 @@ interface DesignerLayoutProps {
   onEdgesChange: OnEdgesChange;
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-  onNodeDataChange: (nodeId: string, data: unknown) => void;
+  onNodeDataChange: (nodeId: string, data: Record<string, unknown>) => void;
   onBack: () => void;
   isSaving: boolean;
 }

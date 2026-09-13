@@ -4,7 +4,7 @@ import type { Node } from '@xyflow/react';
 
 interface PropertiesPanelProps {
   nodes: Node[];
-  onNodeDataChange: (nodeId: string, data: unknown) => void;
+  onNodeDataChange: (nodeId: string, data: Record<string, unknown>) => void;
 }
 
 export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProps) {
