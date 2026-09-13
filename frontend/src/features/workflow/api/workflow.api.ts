@@ -15,7 +15,7 @@ export const workflowApi = {
     return fetch(`${API_URL}/workflows/${id}/draft`);
   },
 
-  saveDraft: async (id: string, definition: any): Promise<Response> => {
+  saveDraft: async (id: string, definition: unknown): Promise<Response> => {
     return fetch(`${API_URL}/workflows/${id}/draft`, {
       method: 'PUT',
       headers: {

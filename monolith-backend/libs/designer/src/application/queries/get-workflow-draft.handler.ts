@@ -14,7 +14,9 @@ export class GetWorkflowDraftHandler implements IQueryHandler<GetWorkflowDraftQu
   async execute(query: GetWorkflowDraftQuery): Promise<WorkflowDraft> {
     const draft = await this.workflowDraftRepo.findById(query.workflowId);
     if (!draft) {
-      throw new NotFoundException(`Draft for workflow ID ${query.workflowId} not found.`);
+      throw new NotFoundException(
+        `Draft for workflow ID ${query.workflowId} not found.`,
+      );
     }
     return draft;
   }

@@ -1,7 +1,6 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Workflow } from '../../domain/entities/workflow.entity';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
-import * as crypto from 'crypto';
 
 export class CreateWorkflowCommand {
   constructor(
@@ -19,6 +18,7 @@ export class CreateWorkflowHandler implements ICommandHandler<CreateWorkflowComm
       name: command.name,
       ownerId: command.ownerId,
     });
+    console.log('good');
     // Create workflow doesn't create the draft. The draft will be created when saved or fetched.
     // We should create a draft with empty definition if required.
     // The prompt says "create sucesffullt before user can interact with anything".

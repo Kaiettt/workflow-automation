@@ -14,14 +14,19 @@ export class WorkflowDraftsController {
   ) {}
 
   @Get(':id/draft')
-  @ApiOperation({ summary: 'Get workflow draft', description: 'Retrieves a workflow draft.' })
+  @ApiOperation({
+    summary: 'Get workflow draft',
+    description: 'Retrieves a workflow draft.',
+  })
   @ApiParam({ name: 'id', description: 'The workflow ID' })
-  @ApiResponse({ status: 200, description: 'Workflow draft retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Workflow draft retrieved successfully',
+  })
   @ApiResponse({ status: 404, description: 'Workflow draft not found' })
   async getDraft(@Param('id') id: string) {
     const query = new GetWorkflowDraftQuery(id);
-    const draft = await this.queryBus.execute(query);
-    
+    const draft = (await this.queryBus.execute(query)) as unknown;
     return {
       success: true,
       data: draft,
@@ -29,14 +34,21 @@ export class WorkflowDraftsController {
   }
 
   @Put(':id/draft')
-  @ApiOperation({ summary: 'Save workflow draft', description: 'Upserts a workflow draft. The parent workflow must exist.' })
+  @ApiOperation({
+    summary: 'Save workflow draft',
+    description: 'Upserts a workflow draft. The parent workflow must exist.',
+  })
   @ApiParam({ name: 'id', description: 'The workflow ID' })
-  @ApiResponse({ status: 200, description: 'Workflow draft saved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Workflow draft saved successfully',
+  })
   @ApiResponse({ status: 404, description: 'Workflow not found' })
   async saveDraft(@Param('id') id: string, @Body() body: SaveDraftDto) {
     const command = new SaveDraftCommand(id, body.definition);
-    const workflowId = await this.commandBus.execute(command);
-    
+    const result: unknown = await this.commandBus.execute(command);
+    const workflowId = result as string;
+
     return {
       success: true,
       data: {

@@ -10,6 +10,13 @@ interface DesignerPageProps {
   onBack: () => void;
 }
 
+interface WorkflowDraft {
+  definition?: {
+    nodes?: Node[];
+    edges?: Edge[];
+  };
+}
+
 export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -27,7 +34,7 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
     
     async function loadDraft() {
       try {
-        const draft = await workflowService.getDraft(workflowId);
+        const draft = (await workflowService.getDraft(workflowId)) as WorkflowDraft;
         if (isMounted && draft?.definition) {
           setNodes(draft.definition.nodes || []);
           setEdges(draft.definition.edges || []);
@@ -85,7 +92,7 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
     };
   }, [nodes, edges, loading, saveDraft]);
 
-  const handleNodeDataChange = useCallback((nodeId: string, data: any) => {
+  const handleNodeDataChange = useCallback((nodeId: string, data: Record<string, unknown>) => {
     setNodes((nds) =>
       nds.map((n) => {
         if (n.id === nodeId) {

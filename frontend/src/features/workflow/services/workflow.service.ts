@@ -7,11 +7,12 @@ export const workflowService = {
     if (!response.ok) {
       throw new Error('Failed to create workflow');
     }
+    console.log("good")
     const responseData = await response.json();
     return responseData.data.id;
   },
 
-  async getDraft(id: string): Promise<any> {
+  async getDraft(id: string): Promise<unknown> {
     const response = await workflowApi.getDraft(id);
 
     if (!response.ok) {
@@ -25,7 +26,7 @@ export const workflowService = {
     return responseData.data;
   },
 
-  async saveDraft(id: string, definition: any): Promise<void> {
+  async saveDraft(id: string, definition: unknown): Promise<void> {
     const response = await workflowApi.saveDraft(id, definition);
 
     if (!response.ok) {

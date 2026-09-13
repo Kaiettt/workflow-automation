@@ -8,7 +8,10 @@ export class WorkflowDraft {
     public readonly updatedAt?: Date,
   ) {}
 
-  static create(workflowId: string, definition: Record<string, any>): WorkflowDraft {
+  static create(
+    workflowId: string,
+    definition: Record<string, any>,
+  ): WorkflowDraft {
     return new WorkflowDraft(workflowId, definition);
   }
 }
