@@ -1,6 +1,8 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Workflow } from '../../domain/entities/workflow.entity';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
+import { WorkflowDraftRepository } from '../../domain/repositories/workflow-draft.repository';
+import { WorkflowDraft } from '../../domain/entities/workflow-draft.entity';
 
 export class CreateWorkflowCommand {
   constructor(
@@ -11,17 +13,22 @@ export class CreateWorkflowCommand {
 
 @CommandHandler(CreateWorkflowCommand)
 export class CreateWorkflowHandler implements ICommandHandler<CreateWorkflowCommand> {
-  constructor(private readonly workflowRepo: WorkflowRepository) { }
+  constructor(
+    private readonly workflowRepo: WorkflowRepository,
+    private readonly workflowDraftRepo: WorkflowDraftRepository,
+  ) { }
 
   async execute(command: CreateWorkflowCommand): Promise<string> {
     const workflow = Workflow.create({
       name: command.name,
       ownerId: command.ownerId,
     });
-    // Create workflow doesn't create the draft. The draft will be created when saved or fetched.
-    // We should create a draft with empty definition if required.
-    // The prompt says "create sucesffullt before user can interact with anything".
     const workflowId = await this.workflowRepo.create(workflow);
+
+    // Automatically create an empty draft for the new workflow
+    const emptyDraft = WorkflowDraft.create(workflowId, { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } });
+    await this.workflowDraftRepo.upsert(emptyDraft);
+
     return workflowId;
   }
 }

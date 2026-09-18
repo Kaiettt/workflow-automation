@@ -25,4 +25,17 @@ export class PrismaWorkflowRepository implements WorkflowRepository {
     });
     return created.id;
   }
+
+  async update(workflow: Workflow): Promise<void> {
+    await this.prisma.workflow.update({
+      where: { id: workflow.id },
+      data: {
+        name: workflow.name,
+        ownerId: workflow.ownerId,
+        status: workflow.status,
+        description: workflow.description,
+        currentVersionId: workflow.currentVersionId,
+      },
+    });
+  }
 }
