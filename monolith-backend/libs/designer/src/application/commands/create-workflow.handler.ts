@@ -8,7 +8,7 @@ export class CreateWorkflowCommand {
   constructor(
     public readonly name: string,
     public readonly ownerId: string,
-  ) { }
+  ) {}
 }
 
 @CommandHandler(CreateWorkflowCommand)
@@ -16,7 +16,7 @@ export class CreateWorkflowHandler implements ICommandHandler<CreateWorkflowComm
   constructor(
     private readonly workflowRepo: WorkflowRepository,
     private readonly workflowDraftRepo: WorkflowDraftRepository,
-  ) { }
+  ) {}
 
   async execute(command: CreateWorkflowCommand): Promise<string> {
     const workflow = Workflow.create({
@@ -26,7 +26,11 @@ export class CreateWorkflowHandler implements ICommandHandler<CreateWorkflowComm
     const workflowId = await this.workflowRepo.create(workflow);
 
     // Automatically create an empty draft for the new workflow
-    const emptyDraft = WorkflowDraft.create(workflowId, { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } });
+    const emptyDraft = WorkflowDraft.create(workflowId, {
+      nodes: [],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    });
     await this.workflowDraftRepo.upsert(emptyDraft);
 
     return workflowId;

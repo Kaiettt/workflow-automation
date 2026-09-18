@@ -123,8 +123,12 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
     try {
       await workflowService.publishWorkflow(workflowId);
       alert('Workflow published successfully!'); // Simplistic toast
-    } catch (err: any) {
-      setPublishError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setPublishError(err.message);
+      } else {
+        setPublishError(String(err));
+      }
     } finally {
       setIsPublishing(false);
     }

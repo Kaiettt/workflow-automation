@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Controller, Post, Body, Param, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { CommandBus } from '@nestjs/cqrs';
@@ -21,10 +22,10 @@ export class WorkflowsController {
   ) {
     const ownerId = req.user?.id || '00000000-0000-0000-0000-000000000000';
     const command = new PublishWorkflowCommand(id, ownerId);
-    
+
     // Command handler returns { versionId, versionNumber }
     const result = await this.commandBus.execute(command);
-    
+
     return {
       success: true,
       data: result,

@@ -14,7 +14,11 @@ import { PublishWorkflowHandler } from './application/commands/publish-workflow.
 import { WorkflowVersionRepository } from './domain/repositories/workflow-version.repository';
 import { PrismaWorkflowVersionRepository } from './infrastructure/persistence/prisma-workflow-version.repository';
 
-const CommandHandlers = [SaveDraftHandler, CreateWorkflowHandler, PublishWorkflowHandler];
+const CommandHandlers = [
+  SaveDraftHandler,
+  CreateWorkflowHandler,
+  PublishWorkflowHandler,
+];
 const QueryHandlers = [GetWorkflowDraftHandler];
 const Repositories = [
   {

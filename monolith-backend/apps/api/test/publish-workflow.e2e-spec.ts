@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
@@ -25,7 +26,7 @@ describe('Publish Workflow (e2e)', () => {
       .post('/workflows')
       .send({ name: 'Test Workflow', ownerId: 'user-1' })
       .expect(201);
-    
+
     const workflowId = createRes.body.data.id;
 
     // 2. Save a draft with NO trigger node
@@ -37,11 +38,11 @@ describe('Publish Workflow (e2e)', () => {
             {
               id: 'node-1',
               type: 'action.slack',
-              data: { config: { channel: '#general' } }
-            }
+              data: { config: { channel: '#general' } },
+            },
           ],
-          edges: []
-        }
+          edges: [],
+        },
       })
       .expect(200);
 
@@ -51,14 +52,18 @@ describe('Publish Workflow (e2e)', () => {
       .send()
       .expect(400);
 
-    expect(publishRes.body.message).toContain('Workflow must have exactly one trigger node');
-    
+    expect(publishRes.body.message).toContain(
+      'Workflow must have exactly one trigger node',
+    );
+
     // 4. Verify that the draft now contains the validation errors
     const draftRes = await request(app.getHttpServer())
       .get(`/workflows/${workflowId}/draft`)
       .expect(200);
-      
+
     expect(draftRes.body.data.validationErrors).toBeDefined();
-    expect(draftRes.body.data.validationErrors.message).toContain('Workflow must have exactly one trigger node');
+    expect(draftRes.body.data.validationErrors.message).toContain(
+      'Workflow must have exactly one trigger node',
+    );
   });
 });
