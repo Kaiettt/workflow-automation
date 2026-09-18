@@ -26,6 +26,7 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
   const setIsSaving = useDesignerStore((state) => state.setIsSaving);
   
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstLoad = useRef(true);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
 
