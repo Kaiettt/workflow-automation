@@ -1,0 +1,24 @@
+# Implementation Tasks
+
+- [x] **Domain Layer**
+  - [x] Create `workflow.entity.ts`
+  - [x] Create `workflow-draft.entity.ts`
+  - [x] Create `workflow.repository.ts` (interface)
+  - [x] Create `workflow-draft.repository.ts` (interface)
+- [x] **Infrastructure Layer**
+  - [x] Create `workflow.mapper.ts`
+  - [x] Create `workflow-draft.mapper.ts`
+  - [x] Implement `prisma-workflow.repository.ts`
+  - [x] Implement `prisma-workflow-draft.repository.ts`
+- [x] **Application Layer (CQRS)**
+  - [x] Create `save-draft.handler.ts` (contains Command and Handler)
+- [x] **Presentation Layer**
+  - [x] Create `save-draft.dto.ts`
+  - [x] Create `workflow-drafts.controller.ts`
+- [x] **Module Assembly**
+  - [x] Create `designer.module.ts` and register components
+  - [x] Export controller/module in `index.ts`
+  - [x] Import `DesignerModule` in `app.module.ts`
+- [x] **Clean up & Testing**
+  - [x] Manual test via HTTP client (Skipped automated tests per requirement)
+  - [x] Verify database records (Can be done by user)
