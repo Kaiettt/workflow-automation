@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Workflow } from 'lucide-react';
+import { Plus, Workflow, LogIn } from 'lucide-react';
+import { useAuthStore, UserDropdown } from '@/features/auth';
 
 const GithubIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -11,10 +12,13 @@ const GithubIcon: React.FC<{ className?: string }> = ({ className }) => (
 
 interface NavbarProps {
   onCreateWorkflow: () => void;
+  onOpenAuthModal: (tab?: 'login' | 'register') => void;
   loading?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onCreateWorkflow, loading }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onCreateWorkflow, onOpenAuthModal, loading }) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
       <div className="container mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -54,6 +58,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateWorkflow, loading }) => 
             <GithubIcon className="size-3.5" />
             <span>GitHub</span>
           </a>
+
+          {isAuthenticated ? (
+            <UserDropdown />
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenAuthModal('login')}
+              className="rounded-lg border-border text-xs font-medium px-3 py-1.5 h-8 gap-1.5"
+            >
+              <LogIn className="size-3.5" />
+              <span>Sign In</span>
+            </Button>
+          )}
 
           <Button
             onClick={onCreateWorkflow}

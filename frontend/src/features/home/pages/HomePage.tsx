@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Navbar } from '../components/Navbar';
 import { WorkflowCanvasPreview } from '../components/WorkflowCanvasPreview';
 import { TemplateGrid } from '../components/TemplateGrid';
@@ -6,6 +6,7 @@ import { FeaturesSection } from '../components/FeaturesSection';
 import { Footer } from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight } from 'lucide-react';
+import { AuthModal, useAuthStore } from '@/features/auth';
 
 import type { Node, Edge } from '@xyflow/react';
 
@@ -18,10 +19,31 @@ export const HomePage: React.FC<HomePageProps> = ({
   onCreateWorkflow,
   loading,
 }) => {
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'register'>('login');
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  const openAuthModal = (tab: 'login' | 'register' = 'login') => {
+    setAuthModalTab(tab);
+    setIsAuthModalOpen(true);
+  };
+
+  const handleCreateWorkflow = (templateName?: string, initialDefinition?: { nodes: Node[]; edges: Edge[] }) => {
+    if (!isAuthenticated) {
+      openAuthModal('login');
+      return;
+    }
+    onCreateWorkflow(templateName, initialDefinition);
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* 1. Navbar */}
-      <Navbar onCreateWorkflow={() => onCreateWorkflow()} loading={loading} />
+      <Navbar
+        onCreateWorkflow={() => handleCreateWorkflow()}
+        onOpenAuthModal={openAuthModal}
+        loading={loading}
+      />
 
       {/* 2. Hero Section */}
       <section className="pt-14 pb-16 sm:pt-20 sm:pb-24 border-b border-border bg-gradient-to-b from-muted/20 to-transparent">
@@ -46,7 +68,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Actions */}
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button
-              onClick={() => onCreateWorkflow()}
+              onClick={() => handleCreateWorkflow()}
               disabled={loading}
               className="w-full sm:w-auto rounded-lg bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 px-5 py-2.5 h-10 text-xs font-medium shadow-sm transition-all"
             >
@@ -66,7 +88,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* 3. Interactive Canvas Preview */}
           <div className="mt-12 sm:mt-16">
             <WorkflowCanvasPreview 
-              onOpenInDesigner={(nodes, edges) => onCreateWorkflow('Order Processing Demo', { nodes, edges })}
+              onOpenInDesigner={(nodes, edges) => handleCreateWorkflow('Order Processing Demo', { nodes, edges })}
               loading={loading}
             />
           </div>
@@ -76,7 +98,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* 4. Templates */}
       <TemplateGrid 
-        onSelectTemplate={(name) => onCreateWorkflow(name)} 
+        onSelectTemplate={(name) => handleCreateWorkflow(name)} 
         loading={loading} 
       />
 
@@ -85,6 +107,13 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* 6. Footer */}
       <Footer />
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        defaultTab={authModalTab}
+      />
     </div>
   );
 };
