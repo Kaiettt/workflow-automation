@@ -1,4 +1,8 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
@@ -27,15 +31,21 @@ export class EmailService {
           pass,
         },
       });
-      this.logger.log(`SMTP transport initialized (${host}:${port}, secure=${secure})`);
+      this.logger.log(
+        `SMTP transport initialized (${host}:${port}, secure=${secure})`,
+      );
     } else {
       this.logger.warn(
-        'SMTP configuration is not set in .env. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS to send OTP emails.'
+        'SMTP configuration is not set in .env. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS to send OTP emails.',
       );
     }
   }
 
-  async sendOtpEmail(email: string, otp: string, purpose: 'REGISTER' | 'FORGOT_PASSWORD'): Promise<void> {
+  async sendOtpEmail(
+    email: string,
+    otp: string,
+    purpose: 'REGISTER' | 'FORGOT_PASSWORD',
+  ): Promise<void> {
     // Re-check transporter if env variables were loaded dynamically
     if (!this.transporter) {
       this.initTransporter();
@@ -43,7 +53,7 @@ export class EmailService {
 
     if (!this.transporter) {
       throw new InternalServerErrorException(
-        'SMTP email service is not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env to send OTP emails.'
+        'SMTP email service is not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env to send OTP emails.',
       );
     }
 
@@ -52,12 +62,15 @@ export class EmailService {
       ? 'FlowPilot - Your Registration Verification Code'
       : 'FlowPilot - Your Password Reset Code';
 
-    const title = isRegister ? 'Verify Your Email Address' : 'Reset Your Password';
+    const title = isRegister
+      ? 'Verify Your Email Address'
+      : 'Reset Your Password';
     const description = isRegister
       ? 'Thank you for creating an account with FlowPilot. Please enter the following 6-digit verification code to complete your registration:'
       : 'We received a request to reset your FlowPilot account password. Enter the following 6-digit code to proceed:';
 
-    const fromAddress = process.env.SMTP_FROM || 'FlowPilot <no-reply@flowpilot.io>';
+    const fromAddress =
+      process.env.SMTP_FROM || 'FlowPilot <no-reply@flowpilot.io>';
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -197,8 +210,13 @@ If you did not make this request, please ignore this email.
       });
       this.logger.log(`OTP email sent successfully to ${email}`);
     } catch (error) {
-      this.logger.error(`Failed to send email to ${email}: ${(error as Error).message}`, (error as Error).stack);
-      throw new InternalServerErrorException(`Failed to send verification email: ${(error as Error).message}`);
+      this.logger.error(
+        `Failed to send email to ${email}: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new InternalServerErrorException(
+        `Failed to send verification email: ${(error as Error).message}`,
+      );
     }
   }
 }

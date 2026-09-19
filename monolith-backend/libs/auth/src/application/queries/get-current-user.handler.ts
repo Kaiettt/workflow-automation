@@ -8,7 +8,10 @@ export class GetCurrentUserQuery {
 }
 
 @QueryHandler(GetCurrentUserQuery)
-export class GetCurrentUserHandler implements IQueryHandler<GetCurrentUserQuery, UserResponseDto> {
+export class GetCurrentUserHandler implements IQueryHandler<
+  GetCurrentUserQuery,
+  UserResponseDto
+> {
   constructor(private readonly userRepository: UserRepository) {}
 
   async execute(query: GetCurrentUserQuery): Promise<UserResponseDto> {

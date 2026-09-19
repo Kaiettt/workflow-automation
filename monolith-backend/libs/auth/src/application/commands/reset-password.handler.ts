@@ -19,7 +19,10 @@ export interface ResetPasswordResult {
 }
 
 @CommandHandler(ResetPasswordCommand)
-export class ResetPasswordHandler implements ICommandHandler<ResetPasswordCommand, ResetPasswordResult> {
+export class ResetPasswordHandler implements ICommandHandler<
+  ResetPasswordCommand,
+  ResetPasswordResult
+> {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly otpRepository: OtpRepository,
@@ -29,7 +32,11 @@ export class ResetPasswordHandler implements ICommandHandler<ResetPasswordComman
     const email = command.email.toLowerCase().trim();
 
     // 1. Verify OTP
-    const validOtp = await this.otpRepository.findLatestValid(email, command.otp.trim(), OtpType.FORGOT_PASSWORD);
+    const validOtp = await this.otpRepository.findLatestValid(
+      email,
+      command.otp.trim(),
+      OtpType.FORGOT_PASSWORD,
+    );
     if (!validOtp) {
       throw new BadRequestException('Invalid or expired verification code');
     }
@@ -53,7 +60,8 @@ export class ResetPasswordHandler implements ICommandHandler<ResetPasswordComman
 
     return {
       success: true,
-      message: 'Your password has been successfully reset. You can now sign in with your new password.',
+      message:
+        'Your password has been successfully reset. You can now sign in with your new password.',
     };
   }
 }

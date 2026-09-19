@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { authApi } from '../api/auth.api';
 import { useAuthStore } from '../store/auth.store';
 import type { UserRole } from '../types/auth.types';
-import { PasswordStrengthMeter, getPasswordValidation } from './PasswordStrengthMeter';
+import { PasswordStrengthMeter } from './PasswordStrengthMeter';
+import { getPasswordValidation } from '../utils/password.utils';
 import {
   Loader2,
   Mail,

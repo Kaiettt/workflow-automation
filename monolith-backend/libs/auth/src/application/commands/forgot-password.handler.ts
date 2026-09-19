@@ -15,7 +15,10 @@ export interface ForgotPasswordResult {
 }
 
 @CommandHandler(ForgotPasswordCommand)
-export class ForgotPasswordHandler implements ICommandHandler<ForgotPasswordCommand, ForgotPasswordResult> {
+export class ForgotPasswordHandler implements ICommandHandler<
+  ForgotPasswordCommand,
+  ForgotPasswordResult
+> {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly otpRepository: OtpRepository,
@@ -31,14 +34,21 @@ export class ForgotPasswordHandler implements ICommandHandler<ForgotPasswordComm
     }
 
     if (!user.isActive) {
-      throw new BadRequestException('Account is inactive. Please contact support.');
+      throw new BadRequestException(
+        'Account is inactive. Please contact support.',
+      );
     }
 
     // Generate 6-digit OTP
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    await this.otpRepository.create(email, code, OtpType.FORGOT_PASSWORD, expiresAt);
+    await this.otpRepository.create(
+      email,
+      code,
+      OtpType.FORGOT_PASSWORD,
+      expiresAt,
+    );
     await this.emailService.sendOtpEmail(email, code, 'FORGOT_PASSWORD');
 
     return {

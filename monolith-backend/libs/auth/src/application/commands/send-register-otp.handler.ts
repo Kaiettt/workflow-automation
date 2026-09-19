@@ -15,14 +15,19 @@ export interface SendRegisterOtpResult {
 }
 
 @CommandHandler(SendRegisterOtpCommand)
-export class SendRegisterOtpHandler implements ICommandHandler<SendRegisterOtpCommand, SendRegisterOtpResult> {
+export class SendRegisterOtpHandler implements ICommandHandler<
+  SendRegisterOtpCommand,
+  SendRegisterOtpResult
+> {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly otpRepository: OtpRepository,
     private readonly emailService: EmailService,
   ) {}
 
-  async execute(command: SendRegisterOtpCommand): Promise<SendRegisterOtpResult> {
+  async execute(
+    command: SendRegisterOtpCommand,
+  ): Promise<SendRegisterOtpResult> {
     const email = command.email.toLowerCase().trim();
 
     const existing = await this.userRepository.findByEmail(email);

@@ -16,10 +16,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   defaultTab = 'login',
 }) => {
   const [tab, setTab] = useState<'login' | 'register' | 'forgot-password'>(defaultTab);
+  const [prevDefaultTab, setPrevDefaultTab] = useState(defaultTab);
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
-  useEffect(() => {
+  if (defaultTab !== prevDefaultTab || isOpen !== prevIsOpen) {
+    setPrevDefaultTab(defaultTab);
+    setPrevIsOpen(isOpen);
     setTab(defaultTab);
-  }, [defaultTab, isOpen]);
+  }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

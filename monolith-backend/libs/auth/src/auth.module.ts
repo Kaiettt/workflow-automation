@@ -38,7 +38,9 @@ const QueryHandlers = [GetCurrentUserHandler];
     PrismaModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'flowpilot-secret-key-for-jwt-signing-minimum-32-chars',
+      secret:
+        process.env.JWT_SECRET ||
+        'flowpilot-secret-key-for-jwt-signing-minimum-32-chars',
       signOptions: { expiresIn: '7d' },
     }),
   ],

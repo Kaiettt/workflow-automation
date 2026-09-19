@@ -13,8 +13,12 @@ export class ResetPasswordDto {
 
   @ApiProperty({ example: 'NewSecretPass123!', minLength: 8 })
   @IsString()
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/, {
-    message: 'New password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character',
-  })
+  @Matches(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/,
+    {
+      message:
+        'New password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character',
+    },
+  )
   newPassword: string;
 }

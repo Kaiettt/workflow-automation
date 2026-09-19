@@ -1,6 +1,9 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
-import { OtpRepository, OtpRecord } from '../../domain/repositories/otp.repository';
+import {
+  OtpRepository,
+  OtpRecord,
+} from '../../domain/repositories/otp.repository';
 import { OtpType } from '../../domain/enums/otp-type.enum';
 
 @Injectable()
@@ -21,12 +24,19 @@ export class RedisOtpRepository implements OtpRepository, OnModuleDestroy {
       maxRetriesPerRequest: 3,
     });
 
-    this.redis.connect().then(() => {
-      this.logger.log(`Connected to Redis at ${host}:${port} for OTP storage`);
-    }).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Failed to connect to Redis at ${host}:${port}: ${msg}`);
-    });
+    this.redis
+      .connect()
+      .then(() => {
+        this.logger.log(
+          `Connected to Redis at ${host}:${port} for OTP storage`,
+        );
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(
+          `Failed to connect to Redis at ${host}:${port}: ${msg}`,
+        );
+      });
   }
 
   async onModuleDestroy() {
@@ -37,9 +47,17 @@ export class RedisOtpRepository implements OtpRepository, OnModuleDestroy {
     return `otp:${type.toLowerCase()}:${email.toLowerCase().trim()}`;
   }
 
-  async create(email: string, code: string, type: OtpType, expiresAt: Date): Promise<OtpRecord> {
+  async create(
+    email: string,
+    code: string,
+    type: OtpType,
+    expiresAt: Date,
+  ): Promise<OtpRecord> {
     const key = this.getKey(email, type);
-    const ttlSeconds = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+    const ttlSeconds = Math.max(
+      1,
+      Math.floor((expiresAt.getTime() - Date.now()) / 1000),
+    );
 
     // Store in Redis with TTL in seconds
     await this.redis.set(key, code, 'EX', ttlSeconds);
@@ -55,7 +73,11 @@ export class RedisOtpRepository implements OtpRepository, OnModuleDestroy {
     };
   }
 
-  async findLatestValid(email: string, code: string, type: OtpType): Promise<OtpRecord | null> {
+  async findLatestValid(
+    email: string,
+    code: string,
+    type: OtpType,
+  ): Promise<OtpRecord | null> {
     const key = this.getKey(email, type);
     const storedCode = await this.redis.get(key);
 

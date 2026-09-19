@@ -29,7 +29,7 @@ export class UserMapper {
       email: user.email,
       passwordHash: user.passwordHash,
       name: user.name,
-      role: user.role as unknown as PrismaUserRole,
+      role: user.role,
       isActive: user.isActive,
     };
   }

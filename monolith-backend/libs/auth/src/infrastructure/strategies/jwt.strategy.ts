@@ -18,7 +18,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'flowpilot-secret-key-for-jwt-signing-minimum-32-chars',
+      secretOrKey:
+        process.env.JWT_SECRET ||
+        'flowpilot-secret-key-for-jwt-signing-minimum-32-chars',
     });
   }
 

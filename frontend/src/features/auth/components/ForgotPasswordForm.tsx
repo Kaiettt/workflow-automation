@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { authApi } from '../api/auth.api';
-import { PasswordStrengthMeter, getPasswordValidation } from './PasswordStrengthMeter';
+import { PasswordStrengthMeter } from './PasswordStrengthMeter';
+import { getPasswordValidation } from '../utils/password.utils';
 import {
   Mail,
   Lock,

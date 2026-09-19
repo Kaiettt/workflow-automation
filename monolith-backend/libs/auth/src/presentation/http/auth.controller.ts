@@ -1,6 +1,20 @@
-import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { RegisterDto } from './dtos/register.dto';
 import { LoginDto } from './dtos/login.dto';
 import { ForgotPasswordDto } from './dtos/forgot-password.dto';
@@ -13,7 +27,10 @@ import { ResetPasswordCommand } from '../../application/commands/reset-password.
 import { SendRegisterOtpCommand } from '../../application/commands/send-register-otp.handler';
 import { GetCurrentUserQuery } from '../../application/queries/get-current-user.handler';
 import { JwtAuthGuard } from '../../infrastructure/guards/jwt-auth.guard';
-import { CurrentUser, AuthenticatedUser } from '../../infrastructure/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  AuthenticatedUser,
+} from '../../infrastructure/decorators/current-user.decorator';
 import { Public } from '../../infrastructure/decorators/public.decorator';
 
 @ApiTags('auth')
@@ -27,8 +44,13 @@ export class AuthController {
   @Public()
   @Post('send-register-otp')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send 6-digit OTP code for registration verification' })
-  @ApiResponse({ status: 200, description: 'OTP sent to email if email not taken' })
+  @ApiOperation({
+    summary: 'Send 6-digit OTP code for registration verification',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP sent to email if email not taken',
+  })
   @ApiResponse({ status: 409, description: 'Email already exists' })
   async sendRegisterOtp(@Body() dto: SendRegisterOtpDto) {
     const command = new SendRegisterOtpCommand(dto.email);
@@ -47,7 +69,13 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   @ApiResponse({ status: 409, description: 'Email already exists' })
   async register(@Body() dto: RegisterDto) {
-    const command = new RegisterCommand(dto.email, dto.password, dto.name, dto.otp, dto.role);
+    const command = new RegisterCommand(
+      dto.email,
+      dto.password,
+      dto.name,
+      dto.otp,
+      dto.role,
+    );
     const result = await this.commandBus.execute(command);
     return {
       success: true,
@@ -59,7 +87,10 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email and password' })
-  @ApiResponse({ status: 200, description: 'Login successful, returns JWT accessToken' })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful, returns JWT accessToken',
+  })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() dto: LoginDto) {
     const command = new LoginCommand(dto.email, dto.password);
@@ -74,7 +105,10 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request password reset OTP code via email' })
-  @ApiResponse({ status: 200, description: 'OTP sent to email if account exists' })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP sent to email if account exists',
+  })
   @ApiResponse({ status: 400, description: 'User not found or inactive' })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     const command = new ForgotPasswordCommand(dto.email);
@@ -92,7 +126,11 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Password reset successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   async resetPassword(@Body() dto: ResetPasswordDto) {
-    const command = new ResetPasswordCommand(dto.email, dto.otp, dto.newPassword);
+    const command = new ResetPasswordCommand(
+      dto.email,
+      dto.otp,
+      dto.newPassword,
+    );
     const result = await this.commandBus.execute(command);
     return {
       success: true,

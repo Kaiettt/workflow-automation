@@ -12,7 +12,10 @@ export class LoginCommand {
 }
 
 @CommandHandler(LoginCommand)
-export class LoginHandler implements ICommandHandler<LoginCommand, AuthResultDto> {
+export class LoginHandler implements ICommandHandler<
+  LoginCommand,
+  AuthResultDto
+> {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
