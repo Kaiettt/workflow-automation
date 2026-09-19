@@ -24,4 +24,13 @@ export const workflowApi = {
       body: JSON.stringify({ definition }),
     });
   },
+
+  publishWorkflow: async (id: string): Promise<Response> => {
+    return fetch(`${API_URL}/workflows/${id}/versions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  },
 };

@@ -7,7 +7,7 @@ export class Workflow {
     public readonly ownerId: string,
     public readonly status: WorkflowStatus,
     public readonly description?: string | null,
-    public readonly currentVersionId?: string | null,
+    public currentVersionId?: string | null,
     public readonly createdAt?: Date,
     public readonly updatedAt?: Date,
   ) {}

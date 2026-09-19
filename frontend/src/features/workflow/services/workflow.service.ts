@@ -32,4 +32,13 @@ export const workflowService = {
       throw new Error('Failed to save draft');
     }
   },
+
+  async publishWorkflow(id: string): Promise<void> {
+    const response = await workflowApi.publishWorkflow(id);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to publish workflow');
+    }
+  },
 };
