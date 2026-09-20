@@ -84,7 +84,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchT
         role,
         otp: otp.trim(),
       });
-      login(response.data.accessToken, response.data.user);
+      login(response.data.accessToken, response.data.refreshToken, response.data.user);
       onSuccess?.();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Registration failed';

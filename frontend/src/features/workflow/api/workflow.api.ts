@@ -1,18 +1,8 @@
+import { apiClient } from '../../../shared/api/http-client';
 import { useAuthStore } from '../../auth';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
-
-const getHeaders = (extraHeaders?: Record<string, string>): Record<string, string> => {
-  const token = useAuthStore.getState().token;
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...extraHeaders,
-  };
-};
-
 export const workflowApi = {
-  createWorkflow: async (): Promise<Response> => {
+  createWorkflow: async (): Promise<{ id: string }> => {
     const user = useAuthStore.getState().user;
     const body: { name: string; ownerId?: string } = {
       name: 'New Workflow',
@@ -21,31 +11,25 @@ export const workflowApi = {
       body.ownerId = user.id;
     }
 
-    return fetch(`${API_URL}/workflows`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(body),
-    });
+    const res = await apiClient.post<{ data: { id: string } }>(
+      '/workflows',
+      body,
+    );
+    return res.data.data;
   },
 
-  getDraft: async (id: string): Promise<Response> => {
-    return fetch(`${API_URL}/workflows/${id}/draft`, {
-      headers: getHeaders(),
-    });
+  getDraft: async (id: string): Promise<unknown> => {
+    const res = await apiClient.get<{ data: unknown }>(
+      `/workflows/${id}/draft`,
+    );
+    return res.data.data;
   },
 
-  saveDraft: async (id: string, definition: unknown): Promise<Response> => {
-    return fetch(`${API_URL}/workflows/${id}/draft`, {
-      method: 'PUT',
-      headers: getHeaders(),
-      body: JSON.stringify({ definition }),
-    });
+  saveDraft: async (id: string, definition: unknown): Promise<void> => {
+    await apiClient.put(`/workflows/${id}/draft`, { definition });
   },
 
-  publishWorkflow: async (id: string): Promise<Response> => {
-    return fetch(`${API_URL}/workflows/${id}/versions`, {
-      method: 'POST',
-      headers: getHeaders(),
-    });
+  publishWorkflow: async (id: string): Promise<void> => {
+    await apiClient.post(`/workflows/${id}/versions`);
   },
 };

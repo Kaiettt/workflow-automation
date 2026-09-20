@@ -11,5 +11,11 @@ export interface UserResponseDto {
 
 export interface AuthResultDto {
   accessToken: string;
+  refreshToken: string;
   user: UserResponseDto;
+}
+
+export interface TokenResponseDto {
+  accessToken: string;
+  refreshToken: string;
 }

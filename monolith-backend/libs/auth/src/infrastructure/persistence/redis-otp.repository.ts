@@ -103,4 +103,28 @@ export class RedisOtpRepository implements OtpRepository, OnModuleDestroy {
     // In Redis, deleting the key ensures it can never be used again and frees memory immediately
     await this.redis.del(id);
   }
+
+  private getVerifiedKey(email: string, type: OtpType): string {
+    return `otp:verified:${type.toLowerCase()}:${email.toLowerCase().trim()}`;
+  }
+
+  async markAsVerified(
+    email: string,
+    type: OtpType,
+    ttlSeconds = 900,
+  ): Promise<void> {
+    const key = this.getVerifiedKey(email, type);
+    await this.redis.set(key, '1', 'EX', ttlSeconds);
+  }
+
+  async isVerified(email: string, type: OtpType): Promise<boolean> {
+    const key = this.getVerifiedKey(email, type);
+    const exists = await this.redis.get(key);
+    return exists === '1';
+  }
+
+  async consumeVerified(email: string, type: OtpType): Promise<void> {
+    const key = this.getVerifiedKey(email, type);
+    await this.redis.del(key);
+  }
 }

@@ -38,8 +38,9 @@ export class RegisterDto {
   })
   role?: UserRole;
 
-  @ApiProperty({ example: '123456', minLength: 6, maxLength: 6 })
+  @ApiPropertyOptional({ example: '123456', minLength: 6, maxLength: 6 })
+  @IsOptional()
   @IsString()
   @Length(6, 6, { message: 'Verification code must be exactly 6 digits' })
-  otp: string;
+  otp?: string;
 }

@@ -3,7 +3,7 @@ import { ConflictException } from '@nestjs/common';
 import { UserRepository } from '../../domain/repositories/user.repository';
 import { OtpRepository } from '../../domain/repositories/otp.repository';
 import { OtpType } from '../../domain/enums/otp-type.enum';
-import { EmailService } from '../../infrastructure/services/email.service';
+import { EmailService } from '../../domain/services/email.service';
 
 export class SendRegisterOtpCommand {
   constructor(public readonly email: string) {}

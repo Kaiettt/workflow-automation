@@ -1,3 +1,5 @@
+import { AxiosError } from 'axios';
+import { apiClient } from '../../../shared/api/http-client';
 import type {
   AuthResponse,
   LoginCredentials,
@@ -9,104 +11,138 @@ import type {
   ResetPasswordResponse,
   SendRegisterOtpRequest,
   SendRegisterOtpResponse,
+  VerifyOtpRequest,
+  VerifyOtpResponse,
+  RefreshTokenRequest,
+  RefreshTokenResponse,
 } from '../types/auth.types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (
+    error instanceof AxiosError &&
+    error.response?.data &&
+    typeof error.response.data === 'object' &&
+    'message' in error.response.data
+  ) {
+    return String(error.response.data.message);
+  }
+  return fallback;
+};
 
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    const res = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || 'Login failed');
+    try {
+      const res = await apiClient.post<AuthResponse>('/auth/login', credentials);
+      return res.data;
+    } catch (error: unknown) {
+      throw new Error(extractErrorMessage(error, 'Login failed'), {
+        cause: error,
+      });
     }
-    return data;
   },
 
-  sendRegisterOtp: async (payload: SendRegisterOtpRequest): Promise<SendRegisterOtpResponse> => {
-    const res = await fetch(`${API_URL}/auth/send-register-otp`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || 'Failed to send verification code');
+  sendRegisterOtp: async (
+    payload: SendRegisterOtpRequest,
+  ): Promise<SendRegisterOtpResponse> => {
+    try {
+      const res = await apiClient.post<SendRegisterOtpResponse>(
+        '/auth/send-register-otp',
+        payload,
+      );
+      return res.data;
+    } catch (error: unknown) {
+      throw new Error(
+        extractErrorMessage(error, 'Failed to send verification code'),
+        { cause: error },
+      );
     }
-    return data;
+  },
+
+  verifyOtp: async (
+    payload: VerifyOtpRequest,
+  ): Promise<VerifyOtpResponse> => {
+    try {
+      const res = await apiClient.post<VerifyOtpResponse>(
+        '/auth/verify-otp',
+        payload,
+      );
+      return res.data;
+    } catch (error: unknown) {
+      throw new Error(
+        extractErrorMessage(error, 'Invalid or expired verification code'),
+        { cause: error },
+      );
+    }
   },
 
   register: async (data: RegisterData): Promise<AuthResponse> => {
-    const res = await fetch(`${API_URL}/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    const resData = await res.json();
-    if (!res.ok) {
-      throw new Error(resData.message || 'Registration failed');
+    try {
+      const res = await apiClient.post<AuthResponse>('/auth/register', data);
+      return res.data;
+    } catch (error: unknown) {
+      throw new Error(extractErrorMessage(error, 'Registration failed'), {
+        cause: error,
+      });
     }
-    return resData;
   },
 
-  getMe: async (token: string): Promise<{ success: boolean; data: User }> => {
-    const res = await fetch(`${API_URL}/auth/me`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || 'Failed to fetch user profile');
+  refreshToken: async (
+    payload: RefreshTokenRequest,
+  ): Promise<RefreshTokenResponse> => {
+    try {
+      const res = await apiClient.post<RefreshTokenResponse>(
+        '/auth/refresh',
+        payload,
+      );
+      return res.data;
+    } catch (error: unknown) {
+      throw new Error(extractErrorMessage(error, 'Failed to refresh token'), {
+        cause: error,
+      });
     }
-    return data;
   },
 
-  forgotPassword: async (payload: ForgotPasswordRequest): Promise<ForgotPasswordResponse> => {
-    const res = await fetch(`${API_URL}/auth/forgot-password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || 'Failed to send reset code');
+  getMe: async (): Promise<{ success: boolean; data: User }> => {
+    try {
+      const res = await apiClient.get<{ success: boolean; data: User }>('/auth/me');
+      return res.data;
+    } catch (error: unknown) {
+      throw new Error(extractErrorMessage(error, 'Failed to fetch user profile'), {
+        cause: error,
+      });
     }
-    return data;
   },
 
-  resetPassword: async (payload: ResetPasswordRequest): Promise<ResetPasswordResponse> => {
-    const res = await fetch(`${API_URL}/auth/reset-password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || 'Failed to reset password');
+  forgotPassword: async (
+    payload: ForgotPasswordRequest,
+  ): Promise<ForgotPasswordResponse> => {
+    try {
+      const res = await apiClient.post<ForgotPasswordResponse>(
+        '/auth/forgot-password',
+        payload,
+      );
+      return res.data;
+    } catch (error: unknown) {
+      throw new Error(
+        extractErrorMessage(error, 'Failed to send reset code'),
+        { cause: error },
+      );
     }
-    return data;
+  },
+
+  resetPassword: async (
+    payload: ResetPasswordRequest,
+  ): Promise<ResetPasswordResponse> => {
+    try {
+      const res = await apiClient.post<ResetPasswordResponse>(
+        '/auth/reset-password',
+        payload,
+      );
+      return res.data;
+    } catch (error: unknown) {
+      throw new Error(extractErrorMessage(error, 'Failed to reset password'), {
+        cause: error,
+      });
+    }
   },
 };

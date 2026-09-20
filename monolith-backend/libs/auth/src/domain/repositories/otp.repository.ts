@@ -23,4 +23,11 @@ export abstract class OtpRepository {
     type: OtpType,
   ): Promise<OtpRecord | null>;
   abstract markAsUsed(id: string): Promise<void>;
+  abstract markAsVerified(
+    email: string,
+    type: OtpType,
+    ttlSeconds?: number,
+  ): Promise<void>;
+  abstract isVerified(email: string, type: OtpType): Promise<boolean>;
+  abstract consumeVerified(email: string, type: OtpType): Promise<void>;
 }

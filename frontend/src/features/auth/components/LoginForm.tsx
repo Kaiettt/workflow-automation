@@ -29,7 +29,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
     try {
       const response = await authApi.login({ email, password });
-      login(response.data.accessToken, response.data.user);
+      login(response.data.accessToken, response.data.refreshToken, response.data.user);
       onSuccess?.();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Invalid email or password';

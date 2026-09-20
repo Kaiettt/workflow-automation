@@ -8,7 +8,10 @@ import { UserRepository } from './domain/repositories/user.repository';
 import { PrismaUserRepository } from './infrastructure/persistence/prisma-user.repository';
 import { OtpRepository } from './domain/repositories/otp.repository';
 import { RedisOtpRepository } from './infrastructure/persistence/redis-otp.repository';
-import { EmailService } from './infrastructure/services/email.service';
+import { RefreshTokenRepository } from './domain/repositories/refresh-token.repository';
+import { RedisRefreshTokenRepository } from './infrastructure/persistence/redis-refresh-token.repository';
+import { EmailService } from './domain/services/email.service';
+import { NodemailerEmailService } from './infrastructure/services/email.service';
 
 import { JwtStrategy } from './infrastructure/strategies/jwt.strategy';
 import { JwtAuthGuard } from './infrastructure/guards/jwt-auth.guard';
@@ -19,6 +22,8 @@ import { LoginHandler } from './application/commands/login.handler';
 import { ForgotPasswordHandler } from './application/commands/forgot-password.handler';
 import { ResetPasswordHandler } from './application/commands/reset-password.handler';
 import { SendRegisterOtpHandler } from './application/commands/send-register-otp.handler';
+import { VerifyOtpHandler } from './application/commands/verify-otp.handler';
+import { RefreshTokenHandler } from './application/commands/refresh-token.handler';
 import { GetCurrentUserHandler } from './application/queries/get-current-user.handler';
 
 import { AuthController } from './presentation/http/auth.controller';
@@ -29,6 +34,8 @@ const CommandHandlers = [
   ForgotPasswordHandler,
   ResetPasswordHandler,
   SendRegisterOtpHandler,
+  VerifyOtpHandler,
+  RefreshTokenHandler,
 ];
 const QueryHandlers = [GetCurrentUserHandler];
 
@@ -54,7 +61,14 @@ const QueryHandlers = [GetCurrentUserHandler];
       provide: OtpRepository,
       useClass: RedisOtpRepository,
     },
-    EmailService,
+    {
+      provide: RefreshTokenRepository,
+      useClass: RedisRefreshTokenRepository,
+    },
+    {
+      provide: EmailService,
+      useClass: NodemailerEmailService,
+    },
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
@@ -64,6 +78,7 @@ const QueryHandlers = [GetCurrentUserHandler];
   exports: [
     UserRepository,
     OtpRepository,
+    RefreshTokenRepository,
     EmailService,
     JwtAuthGuard,
     RolesGuard,

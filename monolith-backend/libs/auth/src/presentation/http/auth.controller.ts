@@ -20,11 +20,15 @@ import { LoginDto } from './dtos/login.dto';
 import { ForgotPasswordDto } from './dtos/forgot-password.dto';
 import { ResetPasswordDto } from './dtos/reset-password.dto';
 import { SendRegisterOtpDto } from './dtos/send-register-otp.dto';
+import { VerifyOtpDto } from './dtos/verify-otp.dto';
+import { RefreshTokenDto } from './dtos/refresh-token.dto';
 import { RegisterCommand } from '../../application/commands/register.handler';
 import { LoginCommand } from '../../application/commands/login.handler';
 import { ForgotPasswordCommand } from '../../application/commands/forgot-password.handler';
 import { ResetPasswordCommand } from '../../application/commands/reset-password.handler';
 import { SendRegisterOtpCommand } from '../../application/commands/send-register-otp.handler';
+import { VerifyOtpCommand } from '../../application/commands/verify-otp.handler';
+import { RefreshTokenCommand } from '../../application/commands/refresh-token.handler';
 import { GetCurrentUserQuery } from '../../application/queries/get-current-user.handler';
 import { JwtAuthGuard } from '../../infrastructure/guards/jwt-auth.guard';
 import {
@@ -62,6 +66,23 @@ export class AuthController {
   }
 
   @Public()
+  @Post('verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify OTP code for registration or password reset',
+  })
+  @ApiResponse({ status: 200, description: 'OTP verified successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  async verifyOtp(@Body() dto: VerifyOtpDto) {
+    const command = new VerifyOtpCommand(dto.email, dto.otp, dto.type);
+    const result = await this.commandBus.execute(command);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user with OTP verification' })
@@ -89,11 +110,30 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({
     status: 200,
-    description: 'Login successful, returns JWT accessToken',
+    description: 'Login successful, returns JWT accessToken and refreshToken',
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() dto: LoginDto) {
     const command = new LoginCommand(dto.email, dto.password);
+    const result = await this.commandBus.execute(command);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Public()
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh JWT access token using refresh token' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Token refreshed successfully, returns new access and refresh token pair',
+  })
+  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
+  async refreshToken(@Body() dto: RefreshTokenDto) {
+    const command = new RefreshTokenCommand(dto.refreshToken);
     const result = await this.commandBus.execute(command);
     return {
       success: true,

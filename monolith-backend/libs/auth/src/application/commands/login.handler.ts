@@ -2,6 +2,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserRepository } from '../../domain/repositories/user.repository';
+import { RefreshTokenRepository } from '../../domain/repositories/refresh-token.repository';
 import { AuthResultDto } from '../dtos/auth-result.dto';
 
 export class LoginCommand {
@@ -18,6 +19,7 @@ export class LoginHandler implements ICommandHandler<
 > {
   constructor(
     private readonly userRepository: UserRepository,
+    private readonly refreshTokenRepository: RefreshTokenRepository,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -42,10 +44,23 @@ export class LoginHandler implements ICommandHandler<
       role: user.role,
     };
 
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const refreshToken = this.jwtService.sign(
+      { sub: user.id, type: 'refresh' },
+      { expiresIn: '7d' },
+    );
+
+    // Store in Redis with 7-day TTL
+    const sevenDaysInSeconds = 7 * 24 * 60 * 60;
+    await this.refreshTokenRepository.save(
+      user.id!,
+      refreshToken,
+      sevenDaysInSeconds,
+    );
 
     return {
       accessToken,
+      refreshToken,
       user: {
         id: user.id!,
         email: user.email,

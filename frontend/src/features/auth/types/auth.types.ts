@@ -17,7 +17,7 @@ export interface RegisterData {
   name: string;
   email: string;
   password: string;
-  otp: string;
+  otp?: string;
   role?: UserRole;
 }
 
@@ -33,13 +33,40 @@ export interface SendRegisterOtpResponse {
   };
 }
 
+export interface VerifyOtpRequest {
+  email: string;
+  otp: string;
+  type: 'REGISTER' | 'FORGOT_PASSWORD';
+}
+
+export interface VerifyOtpResponse {
+  success: boolean;
+  data: {
+    success: boolean;
+    message: string;
+  };
+}
+
 export interface AuthResponse {
   success: boolean;
   data: {
     accessToken: string;
+    refreshToken: string;
     user: User;
   };
   message?: string;
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string;
+}
+
+export interface RefreshTokenResponse {
+  success: boolean;
+  data: {
+    accessToken: string;
+    refreshToken: string;
+  };
 }
 
 export interface ForgotPasswordRequest {

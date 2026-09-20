@@ -2,6 +2,7 @@ export * from './auth.module';
 export * from './domain/entities/user.entity';
 export * from './domain/enums/user-role.enum';
 export * from './domain/repositories/user.repository';
+export * from './domain/services/email.service';
 export * from './infrastructure/guards/jwt-auth.guard';
 export * from './infrastructure/guards/roles.guard';
 export * from './infrastructure/decorators/current-user.decorator';
