@@ -1,27 +1,35 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+import { apiClient } from '../../../shared/api/http-client';
+import { useAuthStore } from '../../auth';
 
 export const workflowApi = {
-  createWorkflow: async (): Promise<Response> => {
-    return fetch(`${API_URL}/workflows`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name: 'New Workflow', ownerId: '9f16ce27-4570-4044-89f2-5790b30a5544' }),
-    });
+  createWorkflow: async (): Promise<{ id: string }> => {
+    const user = useAuthStore.getState().user;
+    const body: { name: string; ownerId?: string } = {
+      name: 'New Workflow',
+    };
+    if (user?.id) {
+      body.ownerId = user.id;
+    }
+
+    const res = await apiClient.post<{ data: { id: string } }>(
+      '/workflows',
+      body,
+    );
+    return res.data.data;
   },
 
-  getDraft: async (id: string): Promise<Response> => {
-    return fetch(`${API_URL}/workflows/${id}/draft`);
+  getDraft: async (id: string): Promise<unknown> => {
+    const res = await apiClient.get<{ data: unknown }>(
+      `/workflows/${id}/draft`,
+    );
+    return res.data.data;
   },
 
-  saveDraft: async (id: string, definition: unknown): Promise<Response> => {
-    return fetch(`${API_URL}/workflows/${id}/draft`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ definition }),
-    });
+  saveDraft: async (id: string, definition: unknown): Promise<void> => {
+    await apiClient.put(`/workflows/${id}/draft`, { definition });
+  },
+
+  publishWorkflow: async (id: string): Promise<void> => {
+    await apiClient.post(`/workflows/${id}/versions`);
   },
 };

@@ -1,14 +1,36 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { Controller, Post, Body, Param, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { CommandBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CreateWorkflowCommand } from '../../application/commands/create-workflow.handler';
+import { PublishWorkflowCommand } from '../../application/commands/publish-workflow.handler';
 import { CreateWorkflowDto } from './dtos/create-workflow.dto';
 
 @ApiTags('workflows')
 @Controller('workflows')
 export class WorkflowsController {
   constructor(private readonly commandBus: CommandBus) {}
+
+  @Post(':id/versions')
+  @ApiOperation({ summary: 'Publish a workflow draft to a new version' })
+  @ApiResponse({ status: 201, description: 'Workflow published successfully' })
+  @ApiResponse({ status: 400, description: 'Validation failed' })
+  async publishWorkflow(
+    @Param('id') id: string,
+    @Req() req: Request & { user?: { id: string } },
+  ) {
+    const ownerId = req.user?.id || '00000000-0000-0000-0000-000000000000';
+    const command = new PublishWorkflowCommand(id, ownerId);
+
+    // Command handler returns { versionId, versionNumber }
+    const result = await this.commandBus.execute(command);
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create a new workflow' })

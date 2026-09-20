@@ -1,35 +1,54 @@
+import { AxiosError } from 'axios';
 import { workflowApi } from '../api/workflow.api';
 
 export const workflowService = {
   async createWorkflow(): Promise<string> {
-    const response = await workflowApi.createWorkflow();
-
-    if (!response.ok) {
-      throw new Error('Failed to create workflow');
+    try {
+      const data = await workflowApi.createWorkflow();
+      return data.id;
+    } catch (error: unknown) {
+      throw new Error('Failed to create workflow', { cause: error });
     }
-    const responseData = await response.json();
-    return responseData.data.id;
   },
 
   async getDraft(id: string): Promise<unknown> {
-    const response = await workflowApi.getDraft(id);
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return { definition: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } } };
+    try {
+      return await workflowApi.getDraft(id);
+    } catch (error: unknown) {
+      if (error instanceof AxiosError && error.response?.status === 404) {
+        return {
+          definition: {
+            nodes: [],
+            edges: [],
+            viewport: { x: 0, y: 0, zoom: 1 },
+          },
+        };
       }
-      throw new Error('Failed to get draft');
+      throw new Error('Failed to get draft', { cause: error });
     }
-
-    const responseData = await response.json();
-    return responseData.data;
   },
 
   async saveDraft(id: string, definition: unknown): Promise<void> {
-    const response = await workflowApi.saveDraft(id, definition);
+    try {
+      await workflowApi.saveDraft(id, definition);
+    } catch (error: unknown) {
+      throw new Error('Failed to save draft', { cause: error });
+    }
+  },
 
-    if (!response.ok) {
-      throw new Error('Failed to save draft');
+  async publishWorkflow(id: string): Promise<void> {
+    try {
+      await workflowApi.publishWorkflow(id);
+    } catch (error: unknown) {
+      if (
+        error instanceof AxiosError &&
+        error.response?.data &&
+        typeof error.response.data === 'object' &&
+        'message' in error.response.data
+      ) {
+        throw new Error(String(error.response.data.message), { cause: error });
+      }
+      throw new Error('Failed to publish workflow', { cause: error });
     }
   },
 };
