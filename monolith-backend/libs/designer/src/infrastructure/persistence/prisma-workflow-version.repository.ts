@@ -1,34 +1,55 @@
-/* eslint-disable @typescript-eslint/require-await */
 import { Injectable } from '@nestjs/common';
 import { WorkflowVersionRepository } from '../../domain/repositories/workflow-version.repository';
 import { WorkflowVersion } from '../../domain/entities/workflow-version.entity';
+import { PrismaService } from '@app/database/prisma/prisma.service';
+import { WorkflowVersionMapper } from './mappers/workflow-version.mapper';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PrismaWorkflowVersionRepository implements WorkflowVersionRepository {
-  private versions: WorkflowVersion[] = []; // In-memory mock for MVP until Prisma schema is updated
+  constructor(private readonly prisma: PrismaService) {}
 
   async findById(id: string): Promise<WorkflowVersion | null> {
-    return this.versions.find((v) => v.id === id) || null;
+    const record = await this.prisma.workflowVersion.findUnique({
+      where: { id },
+    });
+    if (!record) return null;
+    return WorkflowVersionMapper.toDomain(record);
   }
 
   async findByWorkflowId(workflowId: string): Promise<WorkflowVersion[]> {
-    return this.versions.filter((v) => v.workflowId === workflowId);
+    const records = await this.prisma.workflowVersion.findMany({
+      where: { workflowId },
+      orderBy: { versionNumber: 'desc' },
+    });
+    return records.map(WorkflowVersionMapper.toDomain);
   }
 
   async findLatestByWorkflowId(
     workflowId: string,
   ): Promise<WorkflowVersion | null> {
-    const wfVersions = await this.findByWorkflowId(workflowId);
-    if (wfVersions.length === 0) return null;
-    return wfVersions.sort((a, b) => b.versionNumber - a.versionNumber)[0];
+    const record = await this.prisma.workflowVersion.findFirst({
+      where: { workflowId },
+      orderBy: { versionNumber: 'desc' },
+    });
+    if (!record) return null;
+    return WorkflowVersionMapper.toDomain(record);
   }
 
   async save(version: WorkflowVersion): Promise<void> {
-    const idx = this.versions.findIndex((v) => v.id === version.id);
-    if (idx >= 0) {
-      this.versions[idx] = version;
-    } else {
-      this.versions.push(version);
-    }
+    await this.prisma.workflowVersion.upsert({
+      where: { id: version.id },
+      update: {
+        definition: version.definition as Prisma.InputJsonValue,
+      },
+      create: {
+        id: version.id,
+        workflowId: version.workflowId,
+        versionNumber: version.versionNumber,
+        definition: version.definition as Prisma.InputJsonValue,
+        publishedById: version.publishedById,
+        publishedAt: version.publishedAt,
+      },
+    });
   }
 }

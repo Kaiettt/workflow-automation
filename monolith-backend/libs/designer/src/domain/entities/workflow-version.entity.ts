@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+
 export class WorkflowVersion {
   constructor(
     public readonly id: string,
@@ -17,7 +19,7 @@ export class WorkflowVersion {
     publishedById: string;
   }): WorkflowVersion {
     return new WorkflowVersion(
-      props.id || '',
+      props.id || randomUUID(),
       props.workflowId,
       props.versionNumber,
       props.definition,

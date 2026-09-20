@@ -25,7 +25,8 @@ A new "Publish" capability inside the Designer. When a user clicks "Publish":
 ## Implementation Decisions
 
 - **Database Schema**: We are adhering strictly to the `docs/schema/schema.md`. The `workflow_drafts` table remains 1:1 with `workflows`. The `workflow_versions` table is used to store the immutable snapshots (using an integer `versionNumber`).
-- **Validation Logic**: Handled at the application layer inside a new `PublishWorkflowCommand`. Validation checks for exactly one node with `type` starting with `trigger.`, at least one node where `type` doesn't start with `trigger.`, and no disconnected nodes.
+- **Validation Logic**: Handled at the application layer inside a new `PublishWorkflowCommand`. Validation checks for exactly one node with `type` starting with `trigger`, at least one node where `type` doesn't start with `action`, and no disconnected nodes.
+- **UUID Generation**: Domain entities (`Workflow`, `WorkflowVersion`) explicitly generate their own valid UUIDs (`crypto.randomUUID()`) upon creation instead of falling back to empty strings. This ensures they are fully valid in-memory and can immediately be referenced by foreign keys (like `currentVersionId`) before they are flushed to the database.
 - **Persistence of Errors**: If publish fails, the backend will return a 400 response with the errors, and save these errors into the `validationErrors` field of the `WorkflowDraft` record.
 - **Draft Auto-save Update**: When the `SaveDraftCommand` runs (which handles autosaves on every user change), it will explicitly set `validationErrors` to `null` to ensure old publish errors don't stick around.
 - **Frontend Changes**: A "Publish" button is added to the `DesignerLayout`. The `DesignerPage` will manage the publish state, invoking the new API endpoint and handling success/error states (via toasts and node highlighting).
@@ -44,4 +45,4 @@ A new "Publish" capability inside the Designer. When a user clicks "Publish":
 
 ## Further Notes
 
-- The `WorkflowVersion` repository will need to be created if it doesn't already exist.
+- The `WorkflowVersion` repository has been fully implemented using `PrismaService`, replacing the MVP in-memory mock. It utilizes `upsert` logic and maps database records to domain entities using a newly created `WorkflowVersionMapper`.

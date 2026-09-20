@@ -6,13 +6,23 @@ async function main() {
   const defaultUserId = '00000000-0000-0000-0000-000000000000';
   const frontendUserId = '9f16ce27-4570-4044-89f2-5790b30a5544';
 
+  // Check if it's already seeded to avoid unnecessary work
+  const existingDefaultUser = await prisma.user.findUnique({
+    where: { id: defaultUserId },
+  });
+
+  if (existingDefaultUser) {
+    console.log('Database is already seeded. Skipping...');
+    return;
+  }
+
   await prisma.user.upsert({
     where: { id: defaultUserId },
     update: {},
     create: {
       id: defaultUserId,
       email: 'system@flowpilot.local',
-      passwordHash: '$2b$10$dummyhashforlocaldevelopmentonly',
+      passwordHash: '$2b$10$qhBGHlAqCdvFzfzIJU5E6uE47odBXUD2pAFD50a6TY85o59vD6mTm',
       name: 'System User',
       role: UserRole.DEVELOPER,
       isActive: true,
@@ -25,7 +35,7 @@ async function main() {
     create: {
       id: frontendUserId,
       email: 'dev@flowpilot.local',
-      passwordHash: '$2b$10$dummyhashforlocaldevelopmentonly',
+      passwordHash: '$2b$10$qhBGHlAqCdvFzfzIJU5E6uE47odBXUD2pAFD50a6TY85o59vD6mTm',
       name: 'Frontend Developer',
       role: UserRole.DEVELOPER,
       isActive: true,
