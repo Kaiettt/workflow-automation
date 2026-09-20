@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { WorkflowStatus } from '../enums/workflow-status.enum';
 
 export class Workflow {
@@ -18,7 +19,7 @@ export class Workflow {
     ownerId: string;
   }): Workflow {
     return new Workflow(
-      props.id || '',
+      props.id || randomUUID(),
       props.name,
       props.ownerId,
       WorkflowStatus.DRAFT,

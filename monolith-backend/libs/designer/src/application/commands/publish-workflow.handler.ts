@@ -10,7 +10,7 @@ export class PublishWorkflowCommand {
   constructor(
     public readonly workflowId: string,
     public readonly publishedById: string,
-  ) {}
+  ) { }
 }
 
 @CommandHandler(PublishWorkflowCommand)
@@ -19,7 +19,7 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     private readonly workflowRepo: WorkflowRepository,
     private readonly workflowDraftRepo: WorkflowDraftRepository,
     private readonly workflowVersionRepo: WorkflowVersionRepository,
-  ) {}
+  ) { }
 
   async execute(
     command: PublishWorkflowCommand,
@@ -36,15 +36,14 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
       throw new BadRequestException('Workflow draft is empty or not found.');
     }
 
-    // Validation
     const nodes = draft.definition.nodes || [];
     const edges = draft.definition.edges || [];
 
     const triggers = nodes.filter(
-      (n: any) => n.type && n.type.startsWith('trigger.'),
+      (n: any) => n.type && n.type.startsWith('trigger'),
     );
     const actions = nodes.filter(
-      (n: any) => n.type && !n.type.startsWith('trigger.'),
+      (n: any) => n.type && !n.type.startsWith('action'),
     );
 
     if (triggers.length !== 1) {
