@@ -30,7 +30,9 @@
       "@app/shared": ["libs/shared/src"],
       "@app/shared/*": ["libs/shared/src/*"],
       "@app/database": ["libs/database/src"],
-      "@app/database/*": ["libs/database/src/*"]
+      "@app/database/*": ["libs/database/src/*"],
+      "@app/auth": ["libs/auth/src"],
+      "@app/auth/*": ["libs/auth/src/*"]
     },
     "incremental": true,
     "skipLibCheck": true,

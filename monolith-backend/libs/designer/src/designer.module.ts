@@ -10,7 +10,15 @@ import { PrismaWorkflowDraftRepository } from './infrastructure/persistence/pris
 import { WorkflowRepository } from './domain/repositories/workflow.repository';
 import { WorkflowDraftRepository } from './domain/repositories/workflow-draft.repository';
 
-const CommandHandlers = [SaveDraftHandler, CreateWorkflowHandler];
+import { PublishWorkflowHandler } from './application/commands/publish-workflow.handler';
+import { WorkflowVersionRepository } from './domain/repositories/workflow-version.repository';
+import { PrismaWorkflowVersionRepository } from './infrastructure/persistence/prisma-workflow-version.repository';
+
+const CommandHandlers = [
+  SaveDraftHandler,
+  CreateWorkflowHandler,
+  PublishWorkflowHandler,
+];
 const QueryHandlers = [GetWorkflowDraftHandler];
 const Repositories = [
   {
@@ -20,6 +28,10 @@ const Repositories = [
   {
     provide: WorkflowDraftRepository,
     useClass: PrismaWorkflowDraftRepository,
+  },
+  {
+    provide: WorkflowVersionRepository,
+    useClass: PrismaWorkflowVersionRepository,
   },
 ];
 

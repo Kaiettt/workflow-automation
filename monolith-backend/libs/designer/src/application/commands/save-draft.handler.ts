@@ -27,6 +27,7 @@ export class SaveDraftHandler implements ICommandHandler<SaveDraftCommand> {
     }
 
     const draft = WorkflowDraft.create(workflowId, definition);
+    draft.validationErrors = null; // Clear previous validation errors
     await this.workflowDraftRepo.upsert(draft);
 
     return workflowId;
