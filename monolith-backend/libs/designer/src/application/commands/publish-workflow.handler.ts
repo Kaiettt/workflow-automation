@@ -10,7 +10,7 @@ export class PublishWorkflowCommand {
   constructor(
     public readonly workflowId: string,
     public readonly publishedById: string,
-  ) { }
+  ) {}
 }
 
 @CommandHandler(PublishWorkflowCommand)
@@ -19,7 +19,7 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     private readonly workflowRepo: WorkflowRepository,
     private readonly workflowDraftRepo: WorkflowDraftRepository,
     private readonly workflowVersionRepo: WorkflowVersionRepository,
-  ) { }
+  ) {}
 
   async execute(
     command: PublishWorkflowCommand,
