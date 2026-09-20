@@ -22,7 +22,7 @@ export class PrismaWorkflowVersionRepository implements WorkflowVersionRepositor
       where: { workflowId },
       orderBy: { versionNumber: 'desc' },
     });
-    return records.map(WorkflowVersionMapper.toDomain);
+    return records.map((record) => WorkflowVersionMapper.toDomain(record));
   }
 
   async findLatestByWorkflowId(

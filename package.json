@@ -1,0 +1,28 @@
+{
+  "name": "workflow-automation",
+  "version": "1.0.0",
+  "description": "Task: https://docs.google.com/spreadsheets/d/1ZECo4COlfuDtmjvwkGNan9uaNtgbZApCclsEtYa5f9w/edit?gid=133855303#gid=133855303",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kaiettt/workflow-automation.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Kaiettt/workflow-automation/issues"
+  },
+  "homepage": "https://github.com/Kaiettt/workflow-automation#readme",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}
