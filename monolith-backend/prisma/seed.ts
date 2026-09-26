@@ -1,4 +1,5 @@
 import { PrismaClient, UserRole } from '@prisma/client';
+import { seedMvp } from './seed-mvp';
 
 const prisma = new PrismaClient();
 
@@ -12,37 +13,39 @@ async function main() {
   });
 
   if (existingDefaultUser) {
-    console.log('Database is already seeded. Skipping...');
-    return;
+    console.log('Database is already seeded with default users. Skipping default user seed...');
+  } else {
+    await prisma.user.upsert({
+      where: { id: defaultUserId },
+      update: {},
+      create: {
+        id: defaultUserId,
+        email: 'system@flowpilot.local',
+        passwordHash: '$2b$10$qhBGHlAqCdvFzfzIJU5E6uE47odBXUD2pAFD50a6TY85o59vD6mTm',
+        name: 'System User',
+        role: UserRole.DEVELOPER,
+        isActive: true,
+      },
+    });
+
+    await prisma.user.upsert({
+      where: { id: frontendUserId },
+      update: {},
+      create: {
+        id: frontendUserId,
+        email: 'dev@flowpilot.local',
+        passwordHash: '$2b$10$qhBGHlAqCdvFzfzIJU5E6uE47odBXUD2pAFD50a6TY85o59vD6mTm',
+        name: 'Frontend Developer',
+        role: UserRole.DEVELOPER,
+        isActive: true,
+      },
+    });
+
+    console.log('Seeded users:', defaultUserId, frontendUserId);
   }
 
-  await prisma.user.upsert({
-    where: { id: defaultUserId },
-    update: {},
-    create: {
-      id: defaultUserId,
-      email: 'system@flowpilot.local',
-      passwordHash: '$2b$10$qhBGHlAqCdvFzfzIJU5E6uE47odBXUD2pAFD50a6TY85o59vD6mTm',
-      name: 'System User',
-      role: UserRole.DEVELOPER,
-      isActive: true,
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { id: frontendUserId },
-    update: {},
-    create: {
-      id: frontendUserId,
-      email: 'dev@flowpilot.local',
-      passwordHash: '$2b$10$qhBGHlAqCdvFzfzIJU5E6uE47odBXUD2pAFD50a6TY85o59vD6mTm',
-      name: 'Frontend Developer',
-      role: UserRole.DEVELOPER,
-      isActive: true,
-    },
-  });
-
-  console.log('Seeded users:', defaultUserId, frontendUserId);
+  // Run MVP execution data seeding
+  await seedMvp(prisma);
 }
 
 main()
