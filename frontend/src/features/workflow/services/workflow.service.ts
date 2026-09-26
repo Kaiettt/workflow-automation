@@ -1,5 +1,6 @@
 import { AxiosError } from 'axios';
 import { workflowApi } from '../api/workflow.api';
+import type { NodeTypeDefinition } from '../models/workflow.model';
 
 export const workflowService = {
   async createWorkflow(): Promise<string> {
@@ -49,6 +50,14 @@ export const workflowService = {
         throw new Error(String(error.response.data.message), { cause: error });
       }
       throw new Error('Failed to publish workflow', { cause: error });
+    }
+  },
+
+  async getNodeTypes(): Promise<NodeTypeDefinition[]> {
+    try {
+      return await workflowApi.getNodeTypes();
+    } catch (error: unknown) {
+      throw new Error('Failed to get node types', { cause: error });
     }
   },
 };

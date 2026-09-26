@@ -1,5 +1,7 @@
 import { apiClient } from '../../../shared/api/http-client';
 import { useAuthStore } from '../../auth';
+import type { NodeTypeDefinition } from '../models/workflow.model';
+
 
 export const workflowApi = {
   createWorkflow: async (): Promise<{ id: string }> => {
@@ -31,5 +33,12 @@ export const workflowApi = {
 
   publishWorkflow: async (id: string): Promise<void> => {
     await apiClient.post(`/workflows/${id}/versions`);
+  },
+
+  getNodeTypes: async (): Promise<NodeTypeDefinition[]> => {
+    const res = await apiClient.get<{ data: NodeTypeDefinition[] }>(
+      '/api/node-types',
+    );
+    return res.data.data;
   },
 };

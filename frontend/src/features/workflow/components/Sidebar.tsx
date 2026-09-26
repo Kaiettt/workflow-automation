@@ -1,14 +1,10 @@
+import { useDesignerStore } from '../store/designer.store';
 
-
-const NODE_TYPES = [
-  { type: 'triggerNode', name: 'Schedule', key: 'trigger.schedule' },
-  { type: 'actionNode', name: 'Google Calendar', key: 'google.calendar.get_events' },
-  { type: 'actionNode', name: 'If', key: 'logic.if' },
-  { type: 'actionNode', name: 'Format Text', key: 'data.format_text' },
-  { type: 'actionNode', name: 'Send Email', key: 'gmail.send_email' },
-];
+import { Play, Settings } from 'lucide-react';
 
 export function Sidebar() {
+  const nodeTypes = useDesignerStore((state) => state.nodeTypes);
+
   const onDragStart = (event: React.DragEvent, nodeType: string, nodeName: string, nodeKey: string) => {
     event.dataTransfer.setData('application/reactflow/type', nodeType);
     event.dataTransfer.setData('application/reactflow/name', nodeName);
@@ -22,14 +18,29 @@ export function Sidebar() {
         Nodes
       </div>
       <div className="p-4 flex flex-col gap-3 overflow-y-auto flex-1">
-        {NODE_TYPES.map((node) => (
+        {nodeTypes.map((node) => (
           <div
             key={node.key}
-            className="p-3 border border-gray-300 rounded-md cursor-grab active:cursor-grabbing hover:bg-gray-50 transition-colors text-sm shadow-sm"
-            onDragStart={(event) => onDragStart(event, node.type, node.name, node.key)}
+            className="p-3 border rounded-md cursor-grab active:cursor-grabbing hover:bg-gray-50 transition-colors text-sm shadow-sm flex items-center gap-3 bg-white"
+            style={{ borderColor: node.color || '#e5e7eb' }}
+            onDragStart={(event) =>
+              onDragStart(
+                event,
+                node.category === 'TRIGGER' ? 'triggerNode' : 'actionNode',
+                node.displayName,
+                node.key,
+              )
+            }
             draggable
           >
-            {node.name}
+            {node.icon?.startsWith('http') ? (
+              <img src={node.icon} alt={node.displayName} className="w-5 h-5 object-contain" />
+            ) : node.icon === 'play' ? (
+              <Play className="w-5 h-5" style={{ color: node.color || '#6b7280' }} />
+            ) : (
+              <Settings className="w-5 h-5 text-gray-500" />
+            )}
+            <span className="font-medium text-gray-700">{node.displayName}</span>
           </div>
         ))}
       </div>

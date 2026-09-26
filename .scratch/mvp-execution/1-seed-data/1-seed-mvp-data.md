@@ -8,7 +8,7 @@ The workflow execution MVP requires a specific set of foundational data to be pr
 
 ## Solution
 
-Create a separate seed script (`seed-mvp.ts`) dedicated to bootstrapping the database with the catalogs and credentials needed specifically for the Google Sheet -> Filter -> Gmail workflow MVP.
+Create a separate seed script (`seed-mvp.ts`) dedicated to bootstrapping the database with the catalogs (node types and connectors) needed specifically for the Google Sheet -> Filter -> Gmail workflow MVP.
 
 ## User Stories
 
@@ -18,7 +18,7 @@ Create a separate seed script (`seed-mvp.ts`) dedicated to bootstrapping the dat
 ## Implementation Decisions
 
 - **Seed Script Location**: Create a new file at `monolith-backend/prisma/seed-mvp.ts`.
-- **Data Source**: Use the JSON payloads defined in `.scratch/mvp-execution/sample-data.md` for `connectors`, `connector_credentials`, `node_type_definitions`, `workflows`, `workflow_drafts`, and `workflow_versions`.
+- **Data Source**: Use the JSON payloads defined in `.scratch/mvp-execution/sample-data.md` for `connectors` and `node_type_definitions`.
 - **Idempotency**: Use Prisma's `upsert` for all records based on their UUIDs to ensure the script can be run multiple times without throwing duplicate key errors.
 - **Run Command**: Update `package.json` with a script to run this specific seed file (e.g., `npm run seed:mvp`).
 
@@ -33,4 +33,4 @@ Create a separate seed script (`seed-mvp.ts`) dedicated to bootstrapping the dat
 
 ## Further Notes
 
-- The seed script should insert the `users` (owner) first, then `connectors`, then `connector_credentials`, then `node_type_definitions`, and finally the `workflows` to respect foreign key constraints.
+- The seed script should insert the `users` (owner) first, then `connectors`, and finally `node_type_definitions`.

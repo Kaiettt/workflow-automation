@@ -21,22 +21,28 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const isSaving = useDesignerStore((state) => state.isSaving);
   const setIsSaving = useDesignerStore((state) => state.setIsSaving);
-  
+
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstLoad = useRef(true);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
 
+  const setNodeTypes = useDesignerStore((state) => state.setNodeTypes);
+
   // Load draft on mount
   useEffect(() => {
     let isMounted = true;
-    
-    async function loadDraft() {
+
+    async function loadData() {
       try {
-        const draft = (await workflowService.getDraft(workflowId)) as WorkflowDraft & { validationErrors?: { message: string } };
+        const [draft, nodeTypes] = await Promise.all([
+          workflowService.getDraft(workflowId) as Promise<WorkflowDraft & { validationErrors?: { message: string } }>,
+          workflowService.getNodeTypes(),
+        ]);
+
         if (isMounted) {
           if (draft?.definition) {
             setNodes(draft.definition.nodes || []);
@@ -45,20 +51,21 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
           if (draft?.validationErrors) {
             setPublishError(draft.validationErrors.message);
           }
+          setNodeTypes(nodeTypes);
         }
       } catch (error) {
-        console.error('Failed to load workflow draft', error);
+        console.error('Failed to load workflow data', error);
       } finally {
         if (isMounted) setLoading(false);
       }
     }
 
-    loadDraft();
+    loadData();
 
     return () => {
       isMounted = false;
     };
-  }, [workflowId, setNodes, setEdges]);
+  }, [workflowId, setNodes, setEdges, setNodeTypes]);
 
   // Auto-save logic (debounced)
   const saveDraft = useCallback(async (currentNodes: Node[], currentEdges: Edge[]) => {
@@ -115,7 +122,7 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
   const handlePublish = async () => {
     setIsPublishing(true);
     setPublishError(null);
-    
+
     // Ensure latest changes are saved first
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     await saveDraft(nodes, edges);
