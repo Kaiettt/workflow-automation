@@ -1,2 +1,0 @@
-npm run lint --prefix monolith-backend
-npm run lint --prefix frontend
