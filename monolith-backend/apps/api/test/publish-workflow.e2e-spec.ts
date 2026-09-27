@@ -23,7 +23,7 @@ describe('Publish Workflow (e2e)', () => {
   it('should reject publish if workflow draft has no trigger', async () => {
     // 1. Create a workflow
     const createRes = await request(app.getHttpServer())
-      .post('/workflows')
+      .post('/api/workflows')
       .send({ name: 'Test Workflow', ownerId: 'user-1' })
       .expect(201);
 
@@ -31,7 +31,7 @@ describe('Publish Workflow (e2e)', () => {
 
     // 2. Save a draft with NO trigger node
     await request(app.getHttpServer())
-      .put(`/workflows/${workflowId}/draft`)
+      .put(`/api/workflows/${workflowId}/draft`)
       .send({
         definition: {
           nodes: [
@@ -48,7 +48,7 @@ describe('Publish Workflow (e2e)', () => {
 
     // 3. Attempt to publish and expect a 400 Bad Request with validation errors
     const publishRes = await request(app.getHttpServer())
-      .post(`/workflows/${workflowId}/versions`)
+      .post(`/api/workflows/${workflowId}/versions`)
       .send()
       .expect(400);
 
@@ -58,7 +58,7 @@ describe('Publish Workflow (e2e)', () => {
 
     // 4. Verify that the draft now contains the validation errors
     const draftRes = await request(app.getHttpServer())
-      .get(`/workflows/${workflowId}/draft`)
+      .get(`/api/workflows/${workflowId}/draft`)
       .expect(200);
 
     expect(draftRes.body.data.validationErrors).toBeDefined();

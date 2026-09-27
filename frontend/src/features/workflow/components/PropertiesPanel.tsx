@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useDesignerStore } from '../store/designer.store';
 import type { Node } from '@xyflow/react';
+import { apiClient } from '../../../shared/api/http-client';
 
 interface PropertiesPanelProps {
   nodes: Node[];
@@ -24,6 +25,29 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
     setLocalConfig((selectedNode?.data?.config as Record<string, unknown>) || {});
   }
 
+  const handleConfigChange = useCallback((key: string, value: string) => {
+    if (!selectedNode) return;
+    const newConfig = { ...localConfig, [key]: value };
+    setLocalConfig(newConfig);
+    onNodeDataChange(selectedNode.id, { ...selectedNode.data, config: newConfig });
+  }, [selectedNode, localConfig, onNodeDataChange]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === 'oauth-success') {
+        const properties = nodeType?.configSchema?.properties as Record<string, unknown> | undefined;
+        const currentKey = Object.keys(properties || {}).find(
+          k => (properties![k] as Record<string, unknown>)['x-connectorKey']
+        );
+        if (currentKey) {
+          handleConfigChange(currentKey, 'google-credential');
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [nodeType, handleConfigChange]);
+
   if (!selectedNode || !nodeType) {
     return (
       <aside className="w-80 bg-white border-l border-gray-200 p-4 h-full shadow-sm z-10 flex flex-col">
@@ -34,10 +58,15 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
     );
   }
 
-  const handleConfigChange = (key: string, value: string) => {
-    const newConfig = { ...localConfig, [key]: value };
-    setLocalConfig(newConfig);
-    onNodeDataChange(selectedNode.id, { ...selectedNode.data, config: newConfig });
+  const handleConnect = async () => {
+    try {
+      const res = await apiClient.get('/api/integrations/google/auth');
+      if (res.data.url) {
+        window.open(res.data.url, 'OAuth', 'width=500,height=600');
+      }
+    } catch (e) {
+      console.error('Failed to initiate OAuth', e);
+    }
   };
 
   const renderField = (key: string, schema: Record<string, unknown>): React.ReactNode => {
@@ -52,7 +81,7 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
           </label>
           <button 
             className="w-full bg-blue-50 text-blue-600 border border-blue-200 rounded-md py-2 text-sm font-medium hover:bg-blue-100 transition-colors"
-            onClick={() => alert('OAuth Popup Flow will be implemented in Ticket 3')}
+            onClick={() => handleConnect()}
           >
             Connect {schema['x-connectorKey'] as string}
           </button>
@@ -107,7 +136,8 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
     );
   };
 
-  const properties = nodeType.configSchema?.properties || {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const properties = (nodeType.configSchema as any)?.properties || {};
 
   return (
     <aside className="w-80 bg-white border-l border-gray-200 h-full shadow-sm z-10 flex flex-col">
@@ -122,7 +152,7 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
         ) : (
           Object.entries(properties)
             .filter(([key]) => key !== 'input_schema' && key !== 'output_schema')
-            .map(([key, schema]) => renderField(key, schema))
+            .map(([key, schema]) => renderField(key, schema as Record<string, unknown>))
         )}
       </div>
     </aside>

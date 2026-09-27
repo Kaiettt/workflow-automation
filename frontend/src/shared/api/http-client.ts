@@ -55,7 +55,7 @@ apiClient.interceptors.response.use(
     ) {
       // Avoid infinite loop on auth endpoints
       const url = originalRequest.url || '';
-      if (url.includes('/auth/login') || url.includes('/auth/refresh')) {
+      if (url.includes('/api/auth/login') || url.includes('/api/auth/refresh')) {
         return Promise.reject(error);
       }
 
@@ -87,7 +87,7 @@ apiClient.interceptors.response.use(
         const refreshResponse = await axios.post<{
           success: boolean;
           data: { accessToken: string; refreshToken: string };
-        }>(`${BASE_URL}/auth/refresh`, {
+        }>(`${BASE_URL}/api/auth/refresh`, {
           refreshToken,
         });
 
