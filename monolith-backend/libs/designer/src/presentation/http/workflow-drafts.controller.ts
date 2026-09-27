@@ -6,7 +6,7 @@ import { GetWorkflowDraftQuery } from '../../application/queries/get-workflow-dr
 import { SaveDraftDto } from './dtos/save-draft.dto';
 
 @ApiTags('workflows')
-@Controller('workflows')
+@Controller('api/workflows')
 export class WorkflowDraftsController {
   constructor(
     private readonly commandBus: CommandBus,

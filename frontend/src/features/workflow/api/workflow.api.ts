@@ -14,7 +14,7 @@ export const workflowApi = {
     }
 
     const res = await apiClient.post<{ data: { id: string } }>(
-      '/workflows',
+      '/api/workflows',
       body,
     );
     return res.data.data;
@@ -22,17 +22,17 @@ export const workflowApi = {
 
   getDraft: async (id: string): Promise<unknown> => {
     const res = await apiClient.get<{ data: unknown }>(
-      `/workflows/${id}/draft`,
+      `/api/workflows/${id}/draft`,
     );
     return res.data.data;
   },
 
   saveDraft: async (id: string, definition: unknown): Promise<void> => {
-    await apiClient.put(`/workflows/${id}/draft`, { definition });
+    await apiClient.put(`/api/workflows/${id}/draft`, { definition });
   },
 
   publishWorkflow: async (id: string): Promise<void> => {
-    await apiClient.post(`/workflows/${id}/versions`);
+    await apiClient.post(`/api/workflows/${id}/versions`);
   },
 
   getNodeTypes: async (): Promise<NodeTypeDefinition[]> => {

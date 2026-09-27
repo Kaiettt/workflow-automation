@@ -8,7 +8,7 @@ import { PublishWorkflowCommand } from '../../application/commands/publish-workf
 import { CreateWorkflowDto } from './dtos/create-workflow.dto';
 
 @ApiTags('workflows')
-@Controller('workflows')
+@Controller('api/workflows')
 export class WorkflowsController {
   constructor(private readonly commandBus: CommandBus) {}
 
