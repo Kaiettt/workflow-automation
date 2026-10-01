@@ -1,0 +1,119 @@
+{
+    "edges": [
+        {
+            "id": "xy-edge__triggerNode-1790870515828right-source-actionNode-1790870519068left-target",
+            "source": "triggerNode-1790870515828",
+            "target": "actionNode-1790870519068",
+            "sourceHandle": "right-source",
+            "targetHandle": "left-target"
+        },
+        {
+            "id": "xy-edge__actionNode-1790870519068right-source-actionNode-1790870520122left-target",
+            "source": "actionNode-1790870519068",
+            "target": "actionNode-1790870520122",
+            "sourceHandle": "right-source",
+            "targetHandle": "left-target"
+        },
+        {
+            "id": "xy-edge__actionNode-1790870520122right-source-actionNode-1790870521463left-target",
+            "source": "actionNode-1790870520122",
+            "target": "actionNode-1790870521463",
+            "sourceHandle": "right-source",
+            "targetHandle": "left-target"
+        }
+    ],
+    "nodes": [
+        {
+            "id": "triggerNode-1790870515828",
+            "data": {
+                "key": "trigger.manual",
+                "name": "Manual Trigger",
+                "config": {}
+            },
+            "type": "triggerNode",
+            "measured": {
+                "width": 192,
+                "height": 76
+            },
+            "position": {
+                "x": 221,
+                "y": 320
+            },
+            "selected": true
+        },
+        {
+            "id": "actionNode-1790870519068",
+            "data": {
+                "key": "integration.google_sheet.readRows",
+                "name": "Read Google Sheet Rows",
+                "config": {
+                    "sheet_name": "hehe",
+                    "credential_id": "4641950c-2e7a-4c9b-adc9-f83601d5de21",
+                    "spreadsheet_id": "1aC2Q3MwjJVF-R1C8nJM8Zb6GpJI2n_5oxuWF7XMRum4"
+                }
+            },
+            "type": "actionNode",
+            "dragging": false,
+            "measured": {
+                "width": 192,
+                "height": 76
+            },
+            "position": {
+                "x": 534.8642722533084,
+                "y": 316.4953665692508
+            },
+            "selected": false
+        },
+        {
+            "id": "actionNode-1790870520122",
+            "data": {
+                "key": "logic.filter",
+                "name": "Filter",
+                "config": {
+                    "field": "status",
+                    "value": "new",
+                    "operator": "equals"
+                }
+            },
+            "type": "actionNode",
+            "dragging": false,
+            "measured": {
+                "width": 192,
+                "height": 76
+            },
+            "position": {
+                "x": 848.4589231674986,
+                "y": 329.1310484742182
+            },
+            "selected": false
+        },
+        {
+            "id": "actionNode-1790870521463",
+            "data": {
+                "key": "integration.gmail.send",
+                "name": "Send Gmail",
+                "config": {
+                    "body": "hello {name}",
+                    "subject": "I'm the boss. hello {name}",
+                    "credential_id": "aff529ee-e283-4ac7-9f86-9d8379e2d7a2"
+                }
+            },
+            "type": "actionNode",
+            "dragging": false,
+            "measured": {
+                "width": 192,
+                "height": 76
+            },
+            "position": {
+                "x": 1117.254338236805,
+                "y": 330.2797468292152
+            },
+            "selected": false
+        }
+    ],
+    "viewport": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+    }
+}

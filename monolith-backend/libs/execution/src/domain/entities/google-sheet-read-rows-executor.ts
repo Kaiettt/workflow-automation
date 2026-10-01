@@ -7,18 +7,47 @@ export interface GoogleSheetReadRowsConfig {
   sheet_name: string;
 }
 
-export type SheetsClientFactory = (credential: unknown) => any;
+export interface GoogleSheetsValuesResponse {
+  data: {
+    values?: unknown[][];
+  };
+}
 
-export class GoogleSheetReadRowsExecutor
-  implements INodeExecutor<GoogleSheetReadRowsConfig, null, Array<Record<string, unknown>>>
-{
+export interface GoogleSheetsClient {
+  spreadsheets: {
+    values: {
+      get: (params: {
+        spreadsheetId: string;
+        range: string;
+      }) => Promise<GoogleSheetsValuesResponse>;
+    };
+  };
+}
+
+export type SheetsClientFactory = (
+  credential: Record<string, unknown>,
+) => GoogleSheetsClient;
+
+export class GoogleSheetReadRowsExecutor implements INodeExecutor<
+  GoogleSheetReadRowsConfig,
+  null,
+  Array<Record<string, unknown>>
+> {
   readonly key = 'integration.google_sheet.readRows';
 
   constructor(
-    private readonly sheetsClientFactory: SheetsClientFactory = (credential) => {
-      const auth = new google.auth.OAuth2();
-      auth.setCredentials(credential as Record<string, unknown>);
-      return google.sheets({ version: 'v4', auth });
+    private readonly sheetsClientFactory: SheetsClientFactory = (
+      credential,
+    ) => {
+      const auth = new google.auth.OAuth2(
+        process.env['google-Client-Id'],
+        process.env['google-Client-secret'],
+      );
+      auth.setCredentials(credential);
+      return google.sheets({
+        version: 'v4',
+        auth,
+      }) as unknown as GoogleSheetsClient;
     },
   ) {}
 
@@ -67,14 +96,13 @@ export class GoogleSheetReadRowsExecutor
       throw new Error('Google Sheets input must be null');
     }
 
-    const googleCredential = params.credential as {
-      access_token?: string;
-      refresh_token?: string;
-    } | null;
+    const googleCredential = params.credential as Record<
+      string,
+      unknown
+    > | null;
     if (!googleCredential || typeof googleCredential !== 'object') {
       throw new Error('Google Sheets credential is missing');
     }
-
     try {
       const sheets = this.sheetsClientFactory(googleCredential);
       const response = await sheets.spreadsheets.values.get({
@@ -82,18 +110,19 @@ export class GoogleSheetReadRowsExecutor
         range: params.config.sheet_name,
       });
 
-      const rows = (response.data.values ?? []) as unknown[][];
+      const rows = response.data.values ?? [];
+
       if (rows.length === 0) {
         return [];
       }
 
       const [headerRow, ...dataRows] = rows;
-      const headers = (headerRow as unknown[]).map((header) => String(header));
+      const headers = headerRow.map((header) => String(header));
 
       return dataRows.map((row) => {
         const item: Record<string, unknown> = {};
         headers.forEach((header, index) => {
-          item[header] = (row[index] ?? '') as unknown;
+          item[header] = row[index] ?? '';
         });
         return item;
       });
@@ -101,7 +130,10 @@ export class GoogleSheetReadRowsExecutor
       const message =
         error instanceof Error ? error.message : 'Google Sheets read failed';
       throw new Error(
-        message.replace(/(access_token|refresh_token|token|Bearer [A-Za-z0-9._~+/=-]+)/gi, '[REDACTED]'),
+        message.replace(
+          /(access_token|refresh_token|token|Bearer [A-Za-z0-9._~+/=-]+)/gi,
+          '[REDACTED]',
+        ),
       );
     }
   }

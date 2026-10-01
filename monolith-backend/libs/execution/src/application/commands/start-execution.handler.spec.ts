@@ -26,17 +26,17 @@ class MemoryExecutionRepository extends ExecutionRepository {
     return Promise.resolve('execution-1');
   }
 
-  async resolveCredential(
-    credentialId: string,
-    ownerId: string,
-  ): Promise<unknown> {
+  resolveCredential(credentialId: string, ownerId: string): Promise<unknown> {
     if (credentialId === 'google-credential') {
       throw new Error('Invalid Google credential id');
     }
-    if (credentialId === '33333333-3333-3333-3333-333333333331' && ownerId === 'actor-1') {
-      return { access_token: 'test-access-token' };
+    if (
+      credentialId === '33333333-3333-3333-3333-333333333331' &&
+      ownerId === 'actor-1'
+    ) {
+      return Promise.resolve({ access_token: 'test-access-token' });
     }
-    return null;
+    return Promise.resolve(null);
   }
 
   saveNodeLog(_executionId: string, log: NodeLogRecord): Promise<void> {
@@ -275,7 +275,10 @@ describe('StartExecutionHandler', () => {
     };
 
     expect(sendMock).toHaveBeenCalledTimes(2);
-    expect(result.nodeLogs.find((log) => log.nodeKey === 'integration.gmail.send')?.output).toEqual({
+    expect(
+      result.nodeLogs.find((log) => log.nodeKey === 'integration.gmail.send')
+        ?.output,
+    ).toEqual({
       sent_count: 2,
       success_count: 2,
       failed_count: 0,

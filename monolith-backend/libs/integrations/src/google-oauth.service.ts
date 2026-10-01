@@ -35,11 +35,12 @@ export class GoogleOauthService {
     });
   }
 
-  async handleCallback(code: string, state: string): Promise<void> {
+  async handleCallback(code: string, state: string): Promise<string> {
     try {
       const decodedState: unknown = JSON.parse(
         Buffer.from(state, 'base64').toString('utf8'),
       );
+
       if (
         typeof decodedState !== 'object' ||
         decodedState === null ||
@@ -49,21 +50,28 @@ export class GoogleOauthService {
       ) {
         throw new BadRequestException('Invalid state: missing userId');
       }
+
       const userId = decodedState.userId;
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const { tokens } = await this.oauth2Client.getToken(code);
+      const tokensRecord = tokens as Record<string, string>;
+
       const encryptionKey = process.env['ENCRYPTION_KEY'];
       if (!encryptionKey) {
         throw new Error('ENCRYPTION_KEY is not defined');
       }
 
+      if (!tokensRecord['refresh_token']) {
+        throw new BadRequestException('No refresh token provided by Google');
+      }
+
       const encryptedSecret = EncryptionUtil.encrypt(
-        JSON.stringify(tokens),
+        tokensRecord['refresh_token'],
         encryptionKey,
       );
 
-      await this.prisma.connectorCredential.create({
+      const credential = await this.prisma.connectorCredential.create({
         data: {
           connectorId: this.connectorId,
           ownerId: userId,
@@ -71,6 +79,8 @@ export class GoogleOauthService {
           encryptedSecret,
         },
       });
+
+      return credential.id;
     } catch {
       throw new BadRequestException(
         'Failed to exchange auth code or save credential',

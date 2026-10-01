@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
@@ -6,6 +6,9 @@ import { AppModule } from './../src/app.module';
 
 describe('Publish Workflow (e2e)', () => {
   let app: INestApplication;
+
+  const getServer = () =>
+    app.getHttpServer() as unknown as Parameters<typeof request>[0];
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -22,7 +25,7 @@ describe('Publish Workflow (e2e)', () => {
 
   it('should reject publish if workflow draft has no trigger', async () => {
     // 1. Create a workflow
-    const createRes = await request(app.getHttpServer())
+    const createRes = await request(getServer())
       .post('/api/workflows')
       .send({ name: 'Test Workflow', ownerId: 'user-1' })
       .expect(201);
@@ -30,7 +33,7 @@ describe('Publish Workflow (e2e)', () => {
     const workflowId = createRes.body.data.id;
 
     // 2. Save a draft with NO trigger node
-    await request(app.getHttpServer())
+    await request(getServer())
       .put(`/api/workflows/${workflowId}/draft`)
       .send({
         definition: {
@@ -47,7 +50,7 @@ describe('Publish Workflow (e2e)', () => {
       .expect(200);
 
     // 3. Attempt to publish and expect a 400 Bad Request with validation errors
-    const publishRes = await request(app.getHttpServer())
+    const publishRes = await request(getServer())
       .post(`/api/workflows/${workflowId}/versions`)
       .send()
       .expect(400);
@@ -57,7 +60,7 @@ describe('Publish Workflow (e2e)', () => {
     );
 
     // 4. Verify that the draft now contains the validation errors
-    const draftRes = await request(app.getHttpServer())
+    const draftRes = await request(getServer())
       .get(`/api/workflows/${workflowId}/draft`)
       .expect(200);
 

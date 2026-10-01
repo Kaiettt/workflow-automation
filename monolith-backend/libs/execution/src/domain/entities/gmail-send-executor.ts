@@ -23,19 +23,19 @@ export type GmailClientFactory = (credential: unknown) => {
   };
 };
 
-export class GmailSendExecutor
-  implements
-    INodeExecutor<
-      GmailSendConfig,
-      GmailRecipient[],
-      { sent_count: number; success_count: number; failed_count: number } | null
-    >
-{
+export class GmailSendExecutor implements INodeExecutor<
+  GmailSendConfig,
+  GmailRecipient[],
+  { sent_count: number; success_count: number; failed_count: number } | null
+> {
   readonly key = 'integration.gmail.send';
 
   constructor(
     private readonly gmailClientFactory: GmailClientFactory = (credential) => {
-      const auth = new google.auth.OAuth2();
+      const auth = new google.auth.OAuth2(
+        process.env['google-Client-Id'],
+        process.env['google-Client-secret'],
+      );
       auth.setCredentials(credential as Record<string, unknown>);
       return google.gmail({ version: 'v1', auth });
     },
@@ -49,7 +49,10 @@ export class GmailSendExecutor
     }
 
     const config = raw as Record<string, unknown>;
-    if (typeof config.credential_id !== 'string' || config.credential_id.length === 0) {
+    if (
+      typeof config.credential_id !== 'string' ||
+      config.credential_id.length === 0
+    ) {
       throw new Error('Gmail config.credential_id is required');
     }
     if (typeof config.subject !== 'string' || config.subject.length === 0) {
@@ -76,10 +79,16 @@ export class GmailSendExecutor
         throw new Error(`Gmail recipient at index ${index} must be an object`);
       }
       const recipient = item as Record<string, unknown>;
-      if (typeof recipient.name !== 'string' || recipient.name.trim().length === 0) {
+      if (
+        typeof recipient.name !== 'string' ||
+        recipient.name.trim().length === 0
+      ) {
         throw new Error(`Gmail recipient at index ${index} is missing name`);
       }
-      if (typeof recipient.email !== 'string' || recipient.email.trim().length === 0) {
+      if (
+        typeof recipient.email !== 'string' ||
+        recipient.email.trim().length === 0
+      ) {
         throw new Error(`Gmail recipient at index ${index} is missing email`);
       }
       return {
@@ -93,9 +102,11 @@ export class GmailSendExecutor
     config: GmailSendConfig;
     input: GmailRecipient[] | null;
     credential: unknown;
-  }): Promise<
-    { sent_count: number; success_count: number; failed_count: number } | null
-  > {
+  }): Promise<{
+    sent_count: number;
+    success_count: number;
+    failed_count: number;
+  } | null> {
     if (!Array.isArray(params.input)) {
       throw new Error('Gmail input must be an array of recipients');
     }
@@ -170,6 +181,9 @@ function renderTemplate(template: string, recipient: GmailRecipient): string {
 
 function sanitizeErrorText(message: string): string {
   return message
-    .replace(/(access_token|refresh_token|token|encrypted_secret|ENCRYPTION_KEY|client_secret|Bearer [A-Za-z0-9._~+/=-]+)/gi, '[REDACTED]')
+    .replace(
+      /(access_token|refresh_token|token|encrypted_secret|ENCRYPTION_KEY|client_secret|Bearer [A-Za-z0-9._~+/=-]+)/gi,
+      '[REDACTED]',
+    )
     .replace(/\b[a-fA-F0-9]{32,}\b/g, '[REDACTED]');
 }

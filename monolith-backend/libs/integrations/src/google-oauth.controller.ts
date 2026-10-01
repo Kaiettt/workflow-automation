@@ -27,11 +27,14 @@ export class GoogleOauthController {
       return res.status(400).send('Code or state is missing');
     }
 
-    await this.googleOauthService.handleCallback(code, state);
+    const credentialId = await this.googleOauthService.handleCallback(
+      code,
+      state,
+    );
 
     res.send(`
       <script>
-        window.opener.postMessage('oauth-success', '*');
+        window.opener.postMessage({ type: 'oauth-success', credentialId: '${credentialId}' }, '*');
         window.close();
       </script>
     `);

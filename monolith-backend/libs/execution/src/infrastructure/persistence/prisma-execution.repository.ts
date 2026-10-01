@@ -47,7 +47,10 @@ export class PrismaExecutionRepository implements ExecutionRepository {
     return row.id;
   }
 
-  async resolveCredential(credentialId: string, ownerId: string): Promise<unknown> {
+  async resolveCredential(
+    credentialId: string,
+    ownerId: string,
+  ): Promise<unknown> {
     const credential = await this.prisma.connectorCredential.findUnique({
       where: { id: credentialId },
       include: { connector: true },
@@ -56,7 +59,9 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       throw new Error('Google credential was not found');
     }
     if (credential.ownerId !== ownerId) {
-      throw new Error('Google credential does not belong to this workflow owner');
+      throw new Error(
+        'Google credential does not belong to this workflow owner',
+      );
     }
     if (credential.connector.key !== 'google') {
       throw new Error('Google credential is not for the Google connector');
@@ -67,11 +72,14 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       throw new Error('Credential decryption key is not configured');
     }
 
-    const plaintext = EncryptionUtil.decrypt(credential.encryptedSecret, encryptionKey);
+    const plaintext = EncryptionUtil.decrypt(
+      credential.encryptedSecret,
+      encryptionKey,
+    );
     try {
       return JSON.parse(plaintext);
     } catch {
-      return plaintext;
+      return { refresh_token: plaintext };
     }
   }
 

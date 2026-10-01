@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -23,7 +24,7 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
 
   constructor(
     private readonly repository: ExecutionRepository,
-    executors: INodeExecutor[],
+    @Inject('NODE_EXECUTORS') executors: INodeExecutor[],
   ) {
     this.executors = new Map(
       executors.map((executor) => [executor.key, executor]),
@@ -33,7 +34,7 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
   private async resolveNodeCredential(
     node: WorkflowDefinition['nodes'][number],
     actorId: string,
-  ): Promise<unknown | null> {
+  ): Promise<unknown> {
     const config = node.data?.config;
     if (!config || typeof config !== 'object' || Array.isArray(config)) {
       return null;
@@ -49,7 +50,11 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
     if (candidate === 'google-credential') {
       throw new BadRequestException('Invalid Google credential id');
     }
-    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(candidate)) {
+    if (
+      !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+        candidate,
+      )
+    ) {
       throw new BadRequestException('Invalid Google credential id');
     }
 
@@ -98,7 +103,10 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
         const parsedInput = executor.parseInput
           ? executor.parseInput(input)
           : input;
-        const credential = await this.resolveNodeCredential(node, command.actorId);
+        const credential = await this.resolveNodeCredential(
+          node,
+          command.actorId,
+        );
         const output = await executor.execute({
           config,
           input: parsedInput,
@@ -149,6 +157,9 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
 
 function sanitizeErrorText(message: string): string {
   return message
-    .replace(/(access_token|refresh_token|token|encrypted_secret|ENCRYPTION_KEY|client_secret|Bearer [A-Za-z0-9._~+/=-]+)/gi, '[REDACTED]')
+    .replace(
+      /(access_token|refresh_token|token|encrypted_secret|ENCRYPTION_KEY|client_secret|Bearer [A-Za-z0-9._~+/=-]+)/gi,
+      '[REDACTED]',
+    )
     .replace(/\b[a-fA-F0-9]{32,}\b/g, '[REDACTED]');
 }
