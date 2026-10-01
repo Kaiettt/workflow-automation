@@ -81,9 +81,11 @@ Concurrent publish requests must not create duplicate version numbers. Version c
 
 ## Execution API and engine
 
-Expose `POST /api/executions` accepting a `workflow_version_id`. The request starts a manual execution of that immutable version. The system must confirm that the version exists and the caller is authorized to run its workflow. The endpoint runs synchronously for this MVP and returns the persisted execution record after traversal finishes.
+Manual runs start only from **`POST /api/executions`** with `workflow_version_id`. The caller must be authorized to run that version’s workflow. The request is synchronous and returns the persisted execution after traversal finishes. Designer-published graphs and handler schemas are specified in `.scratch/mvp-execution/4-execution/contracts.md`.
 
-Before traversal, load the version definition and ensure it contains a `trigger.manual` node. Begin at that trigger and follow directed edges in graph order. The MVP graph is a single linear path; branching behavior is not supported. Resolve each visited node's catalog definition by key and dispatch through a handler registry keyed by node type.
+Before traversal, load `workflow_versions.definition` and require a node with `data.key === "trigger.manual"`. Dispatch handlers on **`data.key`**, not React Flow `type`. Walk the unique linear path trigger → sheet → filter → Gmail (treat edges as undirected so reversed designer handles still run in that order). Branching is not supported.
+
+The product UI lists published versions, opens one version, and has a **Run** button that calls the executions endpoint (ticket 4.4).
 
 Create an `executions` record containing workflow and version IDs, `trigger_type: MANUAL`, triggering user, status, start/finish times, duration, and optional context. Create one `execution_node_logs` record for each node execution with node ID/key, status, actual input/output, error fields, retry count, timestamps, and duration. The four-node demo has one log for each node. Gmail processes each filtered item inside its one node invocation; the node log records the aggregate result, including sent/success/failed counts, rather than requiring one log row per email.
 
@@ -116,6 +118,7 @@ The filter outputs Kiet and Minh. Gmail sends two messages with subjects `Welcom
 7. Gmail template interpolation produces one message per filtered item and reports aggregate success/failure counts.
 8. Google API failures result in failed node/execution status with diagnosable error data, without leaking credentials.
 9. A version's definition remains unchanged if its source draft is later edited or saved.
+10. A versions list and a version detail page load published versions for a workflow; Run on the detail page starts `POST /api/executions` for that version and surfaces the returned status.
 
 ## Verification
 
@@ -125,6 +128,6 @@ The filter outputs Kiet and Minh. Gmail sends two messages with subjects `Welcom
 
 ## Source notes and unresolved contract details
 
-This specification consolidates `.scratch/mvp-execution/1-seed-data/1-seed-mvp-data.md`, `.scratch/publish-workflow-version/issues/02-implement-publish-workflow-command.md`, `.scratch/publish-workflow-version/issues/03-expose-publish-api.md`, `.scratch/mvp-execution/4-execution/4.1-execution-engine-foundation.md`, `.scratch/mvp-execution/4-execution/4.2-execution-node-handlers-core.md`, `.scratch/mvp-execution/4-execution/4.3-execution-integrations.md`, `.scratch/mvp-execution/mvp-example.md`, and `.scratch/mvp-execution/sample-data.md`.
+This specification consolidates `.scratch/mvp-execution/1-seed-data/1-seed-mvp-data.md`, `.scratch/publish-workflow-version/issues/02-implement-publish-workflow-command.md`, `.scratch/publish-workflow-version/issues/03-expose-publish-api.md`, `.scratch/mvp-execution/4-execution/contracts.md`, `.scratch/mvp-execution/4-execution/4.1-execution-engine-foundation.md`, `.scratch/mvp-execution/4-execution/4.2-execution-node-handlers-core.md`, `.scratch/mvp-execution/4-execution/4.3-execution-integrations.md`, `.scratch/mvp-execution/4-execution/4.4-execution-run-ui.md`, `.scratch/mvp-execution/mvp-example.md`, and `.scratch/mvp-execution/sample-data.md`.
 
 The source notes do not specify exact HTTP response DTOs, the existing workflow status enum values, or the spreadsheet's real local fixture/credential provisioning path. Implement these using repository schema and API conventions; do not commit live credential material. The initial execution-engine note describes placeholder node outputs, while later handler notes require actual outputs; this consolidated end-to-end spec takes the actual handler behavior as the MVP target. The sample-data prose also says “2 connectors” and “2 credentials” while its concrete payload defines one unified Google connector and one credential; this spec follows the concrete model of one connector and a shared credential.
