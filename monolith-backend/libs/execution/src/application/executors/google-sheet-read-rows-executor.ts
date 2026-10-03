@@ -19,9 +19,11 @@ export interface GoogleSheetsValuesResponse {
   };
 }
 
-const CredentialSchema = z.object({
-  refresh_token: z.string().min(1),
-}).passthrough();
+const CredentialSchema = z
+  .object({
+    refresh_token: z.string().min(1),
+  })
+  .passthrough();
 
 export interface GoogleSheetsClient {
   spreadsheets: {
@@ -34,9 +36,9 @@ export interface GoogleSheetsClient {
   };
 }
 
-export type SheetsClientFactory = (
-  credential: { refresh_token: string },
-) => GoogleSheetsClient;
+export type SheetsClientFactory = (credential: {
+  refresh_token: string;
+}) => GoogleSheetsClient;
 
 export class GoogleSheetReadRowsExecutor implements INodeExecutor<
   GoogleSheetReadRowsConfig,

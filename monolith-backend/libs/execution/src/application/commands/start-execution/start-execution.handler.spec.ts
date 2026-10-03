@@ -38,7 +38,10 @@ class MemoryExecutionRepository extends ExecutionRepository {
       credentialId === '33333333-3333-3333-3333-333333333331' &&
       ownerId === 'actor-1'
     ) {
-      return Promise.resolve({ refresh_token: 'test-refresh-token', access_token: 'test-access-token' });
+      return Promise.resolve({
+        refresh_token: 'test-refresh-token',
+        access_token: 'test-access-token',
+      });
     }
     return Promise.resolve(null);
   }

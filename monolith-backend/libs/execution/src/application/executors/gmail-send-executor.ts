@@ -20,9 +20,11 @@ const InputSchema = z.array(
 
 export type GmailRecipient = z.infer<typeof InputSchema>[number];
 
-const CredentialSchema = z.object({
-  refresh_token: z.string().min(1),
-}).passthrough();
+const CredentialSchema = z
+  .object({
+    refresh_token: z.string().min(1),
+  })
+  .passthrough();
 
 export type GmailClientFactory = (credential: { refresh_token: string }) => {
   users: {
