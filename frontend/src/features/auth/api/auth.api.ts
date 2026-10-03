@@ -32,7 +32,7 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
-      const res = await apiClient.post<AuthResponse>('/auth/login', credentials);
+      const res = await apiClient.post<AuthResponse>('/api/auth/login', credentials);
       return res.data;
     } catch (error: unknown) {
       throw new Error(extractErrorMessage(error, 'Login failed'), {
@@ -46,7 +46,7 @@ export const authApi = {
   ): Promise<SendRegisterOtpResponse> => {
     try {
       const res = await apiClient.post<SendRegisterOtpResponse>(
-        '/auth/send-register-otp',
+        '/api/auth/send-register-otp',
         payload,
       );
       return res.data;
@@ -63,7 +63,7 @@ export const authApi = {
   ): Promise<VerifyOtpResponse> => {
     try {
       const res = await apiClient.post<VerifyOtpResponse>(
-        '/auth/verify-otp',
+        '/api/auth/verify-otp',
         payload,
       );
       return res.data;
@@ -77,7 +77,7 @@ export const authApi = {
 
   register: async (data: RegisterData): Promise<AuthResponse> => {
     try {
-      const res = await apiClient.post<AuthResponse>('/auth/register', data);
+      const res = await apiClient.post<AuthResponse>('/api/auth/register', data);
       return res.data;
     } catch (error: unknown) {
       throw new Error(extractErrorMessage(error, 'Registration failed'), {
@@ -91,7 +91,7 @@ export const authApi = {
   ): Promise<RefreshTokenResponse> => {
     try {
       const res = await apiClient.post<RefreshTokenResponse>(
-        '/auth/refresh',
+        '/api/auth/refresh',
         payload,
       );
       return res.data;
@@ -104,7 +104,7 @@ export const authApi = {
 
   getMe: async (): Promise<{ success: boolean; data: User }> => {
     try {
-      const res = await apiClient.get<{ success: boolean; data: User }>('/auth/me');
+      const res = await apiClient.get<{ success: boolean; data: User }>('/api/auth/me');
       return res.data;
     } catch (error: unknown) {
       throw new Error(extractErrorMessage(error, 'Failed to fetch user profile'), {
@@ -118,7 +118,7 @@ export const authApi = {
   ): Promise<ForgotPasswordResponse> => {
     try {
       const res = await apiClient.post<ForgotPasswordResponse>(
-        '/auth/forgot-password',
+        '/api/auth/forgot-password',
         payload,
       );
       return res.data;
@@ -135,7 +135,7 @@ export const authApi = {
   ): Promise<ResetPasswordResponse> => {
     try {
       const res = await apiClient.post<ResetPasswordResponse>(
-        '/auth/reset-password',
+        '/api/auth/reset-password',
         payload,
       );
       return res.data;

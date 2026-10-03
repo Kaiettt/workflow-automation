@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useDesignerStore } from '../store/designer.store';
 import type { Node } from '@xyflow/react';
+import { apiClient } from '../../../shared/api/http-client';
 
 interface PropertiesPanelProps {
   nodes: Node[];
@@ -10,7 +11,7 @@ interface PropertiesPanelProps {
 export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProps) {
   const selectedNodeId = useDesignerStore((state) => state.selectedNodeId);
   const nodeTypes = useDesignerStore((state) => state.nodeTypes);
-  
+
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
   const nodeType = selectedNode ? nodeTypes.find((t) => t.key === selectedNode.data?.key) : null;
 
@@ -24,6 +25,29 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
     setLocalConfig((selectedNode?.data?.config as Record<string, unknown>) || {});
   }
 
+  const handleConfigChange = useCallback((key: string, value: string) => {
+    if (!selectedNode) return;
+    const newConfig = { ...localConfig, [key]: value };
+    setLocalConfig(newConfig);
+    onNodeDataChange(selectedNode.id, { ...selectedNode.data, config: newConfig });
+  }, [selectedNode, localConfig, onNodeDataChange]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'oauth-success') {
+        const properties = nodeType?.configSchema?.properties as Record<string, unknown> | undefined;
+        const currentKey = Object.keys(properties || {}).find(
+          k => (properties![k] as Record<string, unknown>)['x-connectorKey']
+        );
+        if (currentKey && event.data.credentialId) {
+          handleConfigChange(currentKey, event.data.credentialId);
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [nodeType, handleConfigChange]);
+
   if (!selectedNode || !nodeType) {
     return (
       <aside className="w-80 bg-white border-l border-gray-200 p-4 h-full shadow-sm z-10 flex flex-col">
@@ -34,15 +58,20 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
     );
   }
 
-  const handleConfigChange = (key: string, value: string) => {
-    const newConfig = { ...localConfig, [key]: value };
-    setLocalConfig(newConfig);
-    onNodeDataChange(selectedNode.id, { ...selectedNode.data, config: newConfig });
+  const handleConnect = async () => {
+    try {
+      const res = await apiClient.get('/api/integrations/google/auth');
+      if (res.data.url) {
+        window.open(res.data.url, 'OAuth', 'width=500,height=600');
+      }
+    } catch (e) {
+      console.error('Failed to initiate OAuth', e);
+    }
   };
 
   const renderField = (key: string, schema: Record<string, unknown>): React.ReactNode => {
     const value = (localConfig[key] as string) || '';
-    
+
     // 1. Connection Button
     if (schema['x-connectorKey']) {
       return (
@@ -50,9 +79,9 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
           <label className="block text-sm font-medium text-gray-700 capitalize">
             {key.replace(/_/g, ' ')}
           </label>
-          <button 
+          <button
             className="w-full bg-blue-50 text-blue-600 border border-blue-200 rounded-md py-2 text-sm font-medium hover:bg-blue-100 transition-colors"
-            onClick={() => alert('OAuth Popup Flow will be implemented in Ticket 3')}
+            onClick={() => handleConnect()}
           >
             Connect {schema['x-connectorKey'] as string}
           </button>
@@ -96,18 +125,19 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
             </span>
           )}
         </div>
-        <input 
-          type="text" 
+        <input
+          type="text"
           className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
-          value={value} 
-          onChange={(e) => handleConfigChange(key, e.target.value)} 
+          value={value}
+          onChange={(e) => handleConfigChange(key, e.target.value)}
           placeholder={isExpression ? "{{nodeId.output}}" : `Enter ${key}`}
         />
       </div>
     );
   };
 
-  const properties = nodeType.configSchema?.properties || {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const properties = (nodeType.configSchema as any)?.properties || {};
 
   return (
     <aside className="w-80 bg-white border-l border-gray-200 h-full shadow-sm z-10 flex flex-col">
@@ -115,14 +145,14 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
         <h3 className="font-semibold text-gray-800 text-lg truncate">{selectedNode.data?.name as string}</h3>
         <p className="text-xs text-gray-500 uppercase tracking-wider">{nodeType.displayName}</p>
       </div>
-      
+
       <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">
         {Object.keys(properties).length === 0 ? (
           <div className="text-sm text-gray-500 italic">No configuration required.</div>
         ) : (
           Object.entries(properties)
             .filter(([key]) => key !== 'input_schema' && key !== 'output_schema')
-            .map(([key, schema]) => renderField(key, schema))
+            .map(([key, schema]) => renderField(key, schema as Record<string, unknown>))
         )}
       </div>
     </aside>

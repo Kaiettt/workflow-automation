@@ -38,7 +38,7 @@ import {
 import { Public } from '../../infrastructure/decorators/public.decorator';
 
 @ApiTags('auth')
-@Controller('auth')
+@Controller('api/auth')
 export class AuthController {
   constructor(
     private readonly commandBus: CommandBus,
