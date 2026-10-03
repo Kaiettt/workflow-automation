@@ -41,22 +41,32 @@ The current designer writes the placeholder `"google-credential"` (see `definiti
 One runtime contract for every catalog key. Name it **`INodeExecutor`** (`I` prefix is allowed for node/connector plugins). The engine never `switch`es on `data.key`; it looks up the registered implementation.
 
 ```typescript
+import { z } from 'zod';
+
 interface INodeExecutor<TConfig = unknown, TInput = unknown, TOutput = unknown> {
   readonly key: string;
+  readonly configSchema?: z.ZodSchema<TConfig>;
+  readonly inputSchema?: z.ZodSchema<TInput>;
+  readonly credentialSchema?: z.ZodSchema<unknown>;
+
+  parseConfig?(raw: unknown): TConfig;
+  parseInput?(raw: unknown): TInput | null;
+  parseCredential?(raw: unknown): unknown;
+
   execute(params: {
     config: TConfig;
     input: TInput | null;
-    credential: unknown | null;
+    credential: unknown;
   }): Promise<TOutput | null>;
 }
 ```
 
 - `key` is the catalog string (`node.data.key`).
-- `config` / `input` are already parsed to that implementation’s models. Skip parse when the schema is null; pass `{}` or `null` as specified in the table below.
-- `credential` is null unless the node uses Google OAuth. The engine resolves and decrypts it; executors must not load `connector_credentials` themselves.
+- `config` / `input` are parsed by the executor's `parseConfig()` and `parseInput()` methods before execution. Executors define these methods internally using Zod schemas.
+- `credential` is loaded by the engine via UUID and decrypted using `EncryptionUtil`. The decrypted plaintext is parsed via `JSON.parse` into an object and passed to the executor. The executor then runs `parseCredential()` to extract only what it needs (e.g. `refresh_token`), maintaining separation of concerns.
 - Return `null` when the output schema is null. The engine still writes a node log (Gmail may put send counts on the log `output` field without changing this return type).
 
-Register every implementation in a map `key → INodeExecutor`. Unknown `data.key` fails that node. File names kebab-case; class names PascalCase; one class per key.
+Register every implementation in a map `key → INodeExecutor`. Unknown `data.key` fails that node. Executors should be located in `application/executors/` (Clean Architecture).
 
 | `data.key` | class | ticket |
 |---|---|---|
