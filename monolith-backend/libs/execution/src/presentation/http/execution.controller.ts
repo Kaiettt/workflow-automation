@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
 import { CurrentUser } from '@app/auth/infrastructure/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@app/auth/infrastructure/decorators/current-user.decorator';
-import { StartExecutionCommand } from '../../application/commands/start-execution.command';
+import { StartExecutionCommand } from '../../application/commands/start-execution/start-execution.command';
 import { StartExecutionDto } from './dtos/start-execution.dto';
 
 @ApiTags('executions')

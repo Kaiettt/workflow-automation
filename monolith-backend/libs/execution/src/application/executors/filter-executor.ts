@@ -1,4 +1,5 @@
-import { INodeExecutor } from './node-executor';
+import { INodeExecutor } from '../../domain/entities/node-executor';
+import { NodeKeys } from '../../domain/constants/execution.constants';
 
 export type FilterOperator = 'equals' | 'not_equals' | 'contains';
 
@@ -17,7 +18,7 @@ export class FilterExecutor implements INodeExecutor<
   FilterRow[],
   FilterRow[]
 > {
-  readonly key = 'logic.filter';
+  readonly key = NodeKeys.LOGIC_FILTER;
 
   parseConfig(raw: unknown): FilterConfig {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {

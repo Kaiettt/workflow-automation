@@ -1,17 +1,27 @@
+import { z } from 'zod';
 import { google } from 'googleapis';
-import { INodeExecutor } from './node-executor';
+import { INodeExecutor } from '../../domain/entities/node-executor';
+import { NodeKeys } from '../../domain/constants/execution.constants';
 
-export interface GoogleSheetReadRowsConfig {
-  credential_id: string;
-  spreadsheet_id: string;
-  sheet_name: string;
-}
+const ConfigSchema = z.object({
+  credential_id: z.string().min(1),
+  spreadsheet_id: z.string().min(1),
+  sheet_name: z.string().min(1),
+});
+
+export type GoogleSheetReadRowsConfig = z.infer<typeof ConfigSchema>;
+
+const InputSchema = z.null();
 
 export interface GoogleSheetsValuesResponse {
   data: {
     values?: unknown[][];
   };
 }
+
+const CredentialSchema = z.object({
+  refresh_token: z.string().min(1),
+}).passthrough();
 
 export interface GoogleSheetsClient {
   spreadsheets: {
@@ -25,7 +35,7 @@ export interface GoogleSheetsClient {
 }
 
 export type SheetsClientFactory = (
-  credential: Record<string, unknown>,
+  credential: { refresh_token: string },
 ) => GoogleSheetsClient;
 
 export class GoogleSheetReadRowsExecutor implements INodeExecutor<
@@ -33,7 +43,10 @@ export class GoogleSheetReadRowsExecutor implements INodeExecutor<
   null,
   Array<Record<string, unknown>>
 > {
-  readonly key = 'integration.google_sheet.readRows';
+  readonly key = NodeKeys.GOOGLE_SHEET_READ_ROWS;
+  readonly configSchema = ConfigSchema;
+  readonly inputSchema = InputSchema;
+  readonly credentialSchema = CredentialSchema;
 
   constructor(
     private readonly sheetsClientFactory: SheetsClientFactory = (
@@ -43,7 +56,9 @@ export class GoogleSheetReadRowsExecutor implements INodeExecutor<
         process.env['google-Client-Id'],
         process.env['google-Client-secret'],
       );
-      auth.setCredentials(credential);
+      auth.setCredentials({
+        refresh_token: credential.refresh_token,
+      });
       return google.sheets({
         version: 'v4',
         auth,
@@ -52,39 +67,15 @@ export class GoogleSheetReadRowsExecutor implements INodeExecutor<
   ) {}
 
   parseConfig(raw: unknown): GoogleSheetReadRowsConfig {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      throw new Error(
-        'Google Sheets config must include credential_id, spreadsheet_id, and sheet_name',
-      );
-    }
-
-    const config = raw as Record<string, unknown>;
-    const credentialId = config.credential_id;
-    const spreadsheetId = config.spreadsheet_id;
-    const sheetName = config.sheet_name;
-
-    if (typeof credentialId !== 'string' || credentialId.length === 0) {
-      throw new Error('Google Sheets config.credential_id is required');
-    }
-    if (typeof spreadsheetId !== 'string' || spreadsheetId.length === 0) {
-      throw new Error('Google Sheets config.spreadsheet_id is required');
-    }
-    if (typeof sheetName !== 'string' || sheetName.length === 0) {
-      throw new Error('Google Sheets config.sheet_name is required');
-    }
-
-    return {
-      credential_id: credentialId,
-      spreadsheet_id: spreadsheetId,
-      sheet_name: sheetName,
-    };
+    return this.configSchema.parse(raw);
   }
 
   parseInput(raw: unknown): null {
-    if (raw !== null) {
-      throw new Error('Google Sheets input must be null');
-    }
-    return null;
+    return this.inputSchema.parse(raw);
+  }
+
+  parseCredential(raw: unknown) {
+    return this.credentialSchema.parse(raw);
   }
 
   async execute(params: {
@@ -96,13 +87,7 @@ export class GoogleSheetReadRowsExecutor implements INodeExecutor<
       throw new Error('Google Sheets input must be null');
     }
 
-    const googleCredential = params.credential as Record<
-      string,
-      unknown
-    > | null;
-    if (!googleCredential || typeof googleCredential !== 'object') {
-      throw new Error('Google Sheets credential is missing');
-    }
+    const googleCredential = this.parseCredential(params.credential);
     try {
       const sheets = this.sheetsClientFactory(googleCredential);
       const response = await sheets.spreadsheets.values.get({

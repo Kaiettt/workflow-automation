@@ -1,11 +1,12 @@
-import { INodeExecutor } from './node-executor';
+import { INodeExecutor } from '../../domain/entities/node-executor';
+import { NodeKeys } from '../../domain/constants/execution.constants';
 
 export class ManualTriggerExecutor implements INodeExecutor<
   Record<string, never>,
   null,
   null
 > {
-  readonly key = 'trigger.manual';
+  readonly key = NodeKeys.TRIGGER_MANUAL;
 
   parseConfig(): Record<string, never> {
     return {};

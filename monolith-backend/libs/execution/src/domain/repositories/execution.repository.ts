@@ -1,28 +1,9 @@
-export interface WorkflowVersionForExecution {
-  id: string;
-  workflowId: string;
-  definition: unknown;
-  workflowOwnerId: string;
-}
-
-export interface ExecutionRecord {
-  id: string;
-  workflowId: string;
-  workflowVersionId: string;
-  triggeredById: string;
-  startedAt: Date;
-}
-
-export interface NodeLogRecord {
-  nodeId: string;
-  nodeKey: string;
-  status: 'SUCCESS' | 'FAILED';
-  input: unknown;
-  output: unknown;
-  errorMessage?: string;
-  startedAt: Date;
-  finishedAt: Date;
-}
+import { ExecutionStatus } from '../constants/execution.constants';
+import {
+  WorkflowVersionForExecution,
+  ExecutionRecord,
+  NodeLogRecord,
+} from '../models/execution.types';
 
 export abstract class ExecutionRepository {
   abstract findVersion(id: string): Promise<WorkflowVersionForExecution | null>;
@@ -34,7 +15,7 @@ export abstract class ExecutionRepository {
   abstract saveNodeLog(executionId: string, log: NodeLogRecord): Promise<void>;
   abstract finishExecution(
     id: string,
-    status: 'SUCCESS' | 'FAILED',
+    status: ExecutionStatus,
     finishedAt: Date,
     durationMs: number,
   ): Promise<void>;

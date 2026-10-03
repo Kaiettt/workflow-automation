@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { EncryptionUtil } from '@app/shared/utils/encryption.util';
+import { ExecutionRepository } from '../../domain/repositories/execution.repository';
+import { ExecutionStatus } from '../../domain/constants/execution.constants';
 import {
   ExecutionRecord,
-  ExecutionRepository,
   NodeLogRecord,
   WorkflowVersionForExecution,
-} from '../../domain/repositories/execution.repository';
+} from '../../domain/models/execution.types';
 
 const jsonValue = (
   value: unknown,
@@ -39,7 +40,7 @@ export class PrismaExecutionRepository implements ExecutionRepository {
         workflowVersionId: input.workflowVersionId,
         triggerType: 'MANUAL',
         triggeredById: input.triggeredById,
-        status: 'RUNNING',
+        status: ExecutionStatus.RUNNING,
         startedAt: input.startedAt,
       },
       select: { id: true },
@@ -56,15 +57,10 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       include: { connector: true },
     });
     if (!credential) {
-      throw new Error('Google credential was not found');
+      throw new Error('credential was not found');
     }
     if (credential.ownerId !== ownerId) {
-      throw new Error(
-        'Google credential does not belong to this workflow owner',
-      );
-    }
-    if (credential.connector.key !== 'google') {
-      throw new Error('Google credential is not for the Google connector');
+      throw new Error('credential does not belong to this workflow owner');
     }
 
     const encryptionKey = process.env['ENCRYPTION_KEY'];
@@ -76,11 +72,7 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       credential.encryptedSecret,
       encryptionKey,
     );
-    try {
-      return JSON.parse(plaintext);
-    } catch {
-      return { refresh_token: plaintext };
-    }
+    return JSON.parse(plaintext);
   }
 
   async saveNodeLog(executionId: string, log: NodeLogRecord): Promise<void> {
@@ -102,7 +94,7 @@ export class PrismaExecutionRepository implements ExecutionRepository {
 
   async finishExecution(
     id: string,
-    status: 'SUCCESS' | 'FAILED',
+    status: ExecutionStatus,
     finishedAt: Date,
     durationMs: number,
   ): Promise<void> {
@@ -128,7 +120,7 @@ export class PrismaExecutionRepository implements ExecutionRepository {
         id: log.id,
         nodeId: log.nodeId,
         nodeKey: log.nodeKey,
-        status: log.status,
+        status: log.status as ExecutionStatus,
         input: log.input,
         output: log.output,
         errorMessage: log.errorMessage,

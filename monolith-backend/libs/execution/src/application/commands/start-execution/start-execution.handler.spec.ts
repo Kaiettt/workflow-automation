@@ -1,18 +1,22 @@
 import { StartExecutionHandler } from './start-execution.handler';
 import { StartExecutionCommand } from './start-execution.command';
+import { ExecutionRepository } from '../../../domain/repositories/execution.repository';
 import {
-  ExecutionRepository,
   NodeLogRecord,
   WorkflowVersionForExecution,
-} from '../../domain/repositories/execution.repository';
-import { ManualTriggerExecutor } from '../../domain/entities/manual-trigger-executor';
-import { GoogleSheetReadRowsExecutor } from '../../domain/entities/google-sheet-read-rows-executor';
-import { FilterExecutor } from '../../domain/entities/filter-executor';
-import { GmailSendExecutor } from '../../domain/entities/gmail-send-executor';
+} from '../../../domain/models/execution.types';
+import {
+  ExecutionStatus,
+  NodeKeys,
+} from '../../../domain/constants/execution.constants';
+import { ManualTriggerExecutor } from '../../executors/manual-trigger-executor';
+import { GoogleSheetReadRowsExecutor } from '../../executors/google-sheet-read-rows-executor';
+import { FilterExecutor } from '../../executors/filter-executor';
+import { GmailSendExecutor } from '../../executors/gmail-send-executor';
 
 class MemoryExecutionRepository extends ExecutionRepository {
   logs: NodeLogRecord[] = [];
-  finishedStatus: 'SUCCESS' | 'FAILED' | null = null;
+  finishedStatus: ExecutionStatus | null = null;
 
   constructor(private readonly version: WorkflowVersionForExecution) {
     super();
@@ -34,7 +38,7 @@ class MemoryExecutionRepository extends ExecutionRepository {
       credentialId === '33333333-3333-3333-3333-333333333331' &&
       ownerId === 'actor-1'
     ) {
-      return Promise.resolve({ access_token: 'test-access-token' });
+      return Promise.resolve({ refresh_token: 'test-refresh-token', access_token: 'test-access-token' });
     }
     return Promise.resolve(null);
   }
@@ -44,7 +48,7 @@ class MemoryExecutionRepository extends ExecutionRepository {
     return Promise.resolve();
   }
 
-  finishExecution(_id: string, status: 'SUCCESS' | 'FAILED'): Promise<void> {
+  finishExecution(_id: string, status: ExecutionStatus): Promise<void> {
     this.finishedStatus = status;
     return Promise.resolve();
   }
@@ -83,11 +87,11 @@ describe('StartExecutionHandler', () => {
       workflowOwnerId: 'actor-1',
       definition: {
         nodes: [
-          { id: 'trigger', data: { key: 'trigger.manual', config: {} } },
+          { id: 'trigger', data: { key: NodeKeys.TRIGGER_MANUAL, config: {} } },
           {
             id: 'sheet',
             data: {
-              key: 'integration.google_sheet.readRows',
+              key: NodeKeys.GOOGLE_SHEET_READ_ROWS,
               config: {
                 credential_id: '33333333-3333-3333-3333-333333333331',
                 spreadsheet_id: 'sheet-1',
@@ -98,7 +102,7 @@ describe('StartExecutionHandler', () => {
           {
             id: 'filter',
             data: {
-              key: 'logic.filter',
+              key: NodeKeys.LOGIC_FILTER,
               config: { field: 'status', operator: 'equals', value: 'new' },
             },
           },
@@ -129,13 +133,13 @@ describe('StartExecutionHandler', () => {
     };
 
     const triggerLog = result.nodeLogs.find(
-      (log) => log.nodeKey === 'trigger.manual',
+      (log) => log.nodeKey === NodeKeys.TRIGGER_MANUAL,
     );
     expect(triggerLog?.input).toBeNull();
     expect(triggerLog?.output).toBeNull();
 
     const filterLog = result.nodeLogs.find(
-      (log) => log.nodeKey === 'logic.filter',
+      (log) => log.nodeKey === NodeKeys.LOGIC_FILTER,
     );
     expect(filterLog?.input).toEqual([
       { name: 'Kiet', email: 'kiet@gmail.com', status: 'new' },
@@ -155,11 +159,11 @@ describe('StartExecutionHandler', () => {
       workflowOwnerId: 'actor-1',
       definition: {
         nodes: [
-          { id: 'trigger', data: { key: 'trigger.manual', config: {} } },
+          { id: 'trigger', data: { key: NodeKeys.TRIGGER_MANUAL, config: {} } },
           {
             id: 'sheet',
             data: {
-              key: 'integration.google_sheet.readRows',
+              key: NodeKeys.GOOGLE_SHEET_READ_ROWS,
               config: {
                 credential_id: 'google-credential',
                 spreadsheet_id: 'sheet-1',
@@ -184,13 +188,13 @@ describe('StartExecutionHandler', () => {
 
     const result = (await handler.execute(
       new StartExecutionCommand('version-1', 'actor-1'),
-    )) as { nodeLogs: NodeLogRecord[]; status: 'SUCCESS' | 'FAILED' };
+    )) as { nodeLogs: NodeLogRecord[]; status: ExecutionStatus };
     const sheetLog = result.nodeLogs.find(
-      (log) => log.nodeKey === 'integration.google_sheet.readRows',
+      (log) => log.nodeKey === NodeKeys.GOOGLE_SHEET_READ_ROWS,
     );
 
-    expect(sheetLog?.status).toBe('FAILED');
-    expect(result.status).toBe('FAILED');
+    expect(sheetLog?.status).toBe(ExecutionStatus.FAILED);
+    expect(result.status).toBe(ExecutionStatus.FAILED);
   });
 
   it('interpolates Gmail templates and records delivery counts', async () => {
@@ -201,11 +205,11 @@ describe('StartExecutionHandler', () => {
       workflowOwnerId: 'actor-1',
       definition: {
         nodes: [
-          { id: 'trigger', data: { key: 'trigger.manual', config: {} } },
+          { id: 'trigger', data: { key: NodeKeys.TRIGGER_MANUAL, config: {} } },
           {
             id: 'sheet',
             data: {
-              key: 'integration.google_sheet.readRows',
+              key: NodeKeys.GOOGLE_SHEET_READ_ROWS,
               config: {
                 credential_id: '33333333-3333-3333-3333-333333333331',
                 spreadsheet_id: 'sheet-1',
@@ -216,14 +220,14 @@ describe('StartExecutionHandler', () => {
           {
             id: 'filter',
             data: {
-              key: 'logic.filter',
+              key: NodeKeys.LOGIC_FILTER,
               config: { field: 'status', operator: 'equals', value: 'new' },
             },
           },
           {
             id: 'gmail',
             data: {
-              key: 'integration.gmail.send',
+              key: NodeKeys.GMAIL_SEND,
               config: {
                 credential_id: '33333333-3333-3333-3333-333333333331',
                 subject: 'Welcome, {{name}}!',
@@ -271,18 +275,18 @@ describe('StartExecutionHandler', () => {
       new StartExecutionCommand('version-1', 'actor-1'),
     )) as {
       nodeLogs: NodeLogRecord[];
-      status: 'SUCCESS' | 'FAILED';
+      status: ExecutionStatus;
     };
 
     expect(sendMock).toHaveBeenCalledTimes(2);
     expect(
-      result.nodeLogs.find((log) => log.nodeKey === 'integration.gmail.send')
+      result.nodeLogs.find((log) => log.nodeKey === NodeKeys.GMAIL_SEND)
         ?.output,
     ).toEqual({
       sent_count: 2,
       success_count: 2,
       failed_count: 0,
     });
-    expect(result.status).toBe('SUCCESS');
+    expect(result.status).toBe(ExecutionStatus.SUCCESS);
   });
 });
