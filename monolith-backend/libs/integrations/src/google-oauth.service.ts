@@ -67,7 +67,7 @@ export class GoogleOauthService {
       }
 
       const encryptedSecret = EncryptionUtil.encrypt(
-        tokensRecord['refresh_token'],
+        JSON.stringify(tokens),
         encryptionKey,
       );
 
@@ -75,7 +75,7 @@ export class GoogleOauthService {
         data: {
           connectorId: this.connectorId,
           ownerId: userId,
-          name: 'Google Account',
+          name: 'google-credential',
           encryptedSecret,
         },
       });

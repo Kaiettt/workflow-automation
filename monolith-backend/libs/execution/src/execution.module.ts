@@ -3,13 +3,13 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { PrismaModule } from '@app/database';
 import { AuthModule } from '@app/auth';
 import { ExecutionController } from './presentation/http/execution.controller';
-import { StartExecutionHandler } from './application/commands/start-execution.handler';
+import { StartExecutionHandler } from './application/commands/start-execution/start-execution.handler';
 import { ExecutionRepository } from './domain/repositories/execution.repository';
 import { PrismaExecutionRepository } from './infrastructure/persistence/prisma-execution.repository';
-import { ManualTriggerExecutor } from './domain/entities/manual-trigger-executor';
-import { GoogleSheetReadRowsExecutor } from './domain/entities/google-sheet-read-rows-executor';
-import { FilterExecutor } from './domain/entities/filter-executor';
-import { GmailSendExecutor } from './domain/entities/gmail-send-executor';
+import { ManualTriggerExecutor } from './application/executors/manual-trigger-executor';
+import { GoogleSheetReadRowsExecutor } from './application/executors/google-sheet-read-rows-executor';
+import { FilterExecutor } from './application/executors/filter-executor';
+import { GmailSendExecutor } from './application/executors/gmail-send-executor';
 import { INodeExecutor } from './domain/entities/node-executor';
 
 @Module({
@@ -28,7 +28,7 @@ import { INodeExecutor } from './domain/entities/node-executor';
         googleSheetReadRowsExecutor: GoogleSheetReadRowsExecutor,
         filterExecutor: FilterExecutor,
         gmailSendExecutor: GmailSendExecutor,
-      ): INodeExecutor[] => [
+      ): INodeExecutor<unknown, unknown, unknown>[] => [
         manualTriggerExecutor,
         googleSheetReadRowsExecutor,
         filterExecutor,

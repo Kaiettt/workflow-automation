@@ -1,18 +1,32 @@
+import { z } from 'zod';
 import { google } from 'googleapis';
-import { INodeExecutor } from './node-executor';
+import { INodeExecutor } from '../../domain/entities/node-executor';
+import { NodeKeys } from '../../domain/constants/execution.constants';
 
-export interface GmailSendConfig {
-  credential_id: string;
-  subject: string;
-  body: string;
-}
+const ConfigSchema = z.object({
+  credential_id: z.string().min(1),
+  subject: z.string().min(1),
+  body: z.string().min(1),
+});
 
-export interface GmailRecipient {
-  name: string;
-  email: string;
-}
+export type GmailSendConfig = z.infer<typeof ConfigSchema>;
 
-export type GmailClientFactory = (credential: unknown) => {
+const InputSchema = z.array(
+  z.object({
+    name: z.string().min(1),
+    email: z.string().min(1),
+  }),
+);
+
+export type GmailRecipient = z.infer<typeof InputSchema>[number];
+
+const CredentialSchema = z
+  .object({
+    refresh_token: z.string().min(1),
+  })
+  .passthrough();
+
+export type GmailClientFactory = (credential: { refresh_token: string }) => {
   users: {
     messages: {
       send: (args: {
@@ -28,7 +42,10 @@ export class GmailSendExecutor implements INodeExecutor<
   GmailRecipient[],
   { sent_count: number; success_count: number; failed_count: number } | null
 > {
-  readonly key = 'integration.gmail.send';
+  readonly key = NodeKeys.GMAIL_SEND;
+  readonly configSchema = ConfigSchema;
+  readonly inputSchema = InputSchema;
+  readonly credentialSchema = CredentialSchema;
 
   constructor(
     private readonly gmailClientFactory: GmailClientFactory = (credential) => {
@@ -36,66 +53,23 @@ export class GmailSendExecutor implements INodeExecutor<
         process.env['google-Client-Id'],
         process.env['google-Client-secret'],
       );
-      auth.setCredentials(credential as Record<string, unknown>);
+      auth.setCredentials({
+        refresh_token: credential.refresh_token,
+      });
       return google.gmail({ version: 'v1', auth });
     },
   ) {}
 
   parseConfig(raw: unknown): GmailSendConfig {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      throw new Error(
-        'Gmail config must include credential_id, subject, and body',
-      );
-    }
-
-    const config = raw as Record<string, unknown>;
-    if (
-      typeof config.credential_id !== 'string' ||
-      config.credential_id.length === 0
-    ) {
-      throw new Error('Gmail config.credential_id is required');
-    }
-    if (typeof config.subject !== 'string' || config.subject.length === 0) {
-      throw new Error('Gmail config.subject is required');
-    }
-    if (typeof config.body !== 'string' || config.body.length === 0) {
-      throw new Error('Gmail config.body is required');
-    }
-
-    return {
-      credential_id: config.credential_id,
-      subject: config.subject,
-      body: config.body,
-    };
+    return this.configSchema.parse(raw);
   }
 
   parseInput(raw: unknown): GmailRecipient[] {
-    if (!Array.isArray(raw)) {
-      throw new Error('Gmail input must be an array of recipients');
-    }
+    return this.inputSchema.parse(raw);
+  }
 
-    return raw.map((item, index) => {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) {
-        throw new Error(`Gmail recipient at index ${index} must be an object`);
-      }
-      const recipient = item as Record<string, unknown>;
-      if (
-        typeof recipient.name !== 'string' ||
-        recipient.name.trim().length === 0
-      ) {
-        throw new Error(`Gmail recipient at index ${index} is missing name`);
-      }
-      if (
-        typeof recipient.email !== 'string' ||
-        recipient.email.trim().length === 0
-      ) {
-        throw new Error(`Gmail recipient at index ${index} is missing email`);
-      }
-      return {
-        name: recipient.name,
-        email: recipient.email,
-      };
-    });
+  parseCredential(raw: unknown) {
+    return this.credentialSchema.parse(raw);
   }
 
   async execute(params: {
@@ -111,13 +85,7 @@ export class GmailSendExecutor implements INodeExecutor<
       throw new Error('Gmail input must be an array of recipients');
     }
 
-    const googleCredential = params.credential as {
-      access_token?: string;
-      refresh_token?: string;
-    } | null;
-    if (!googleCredential || typeof googleCredential !== 'object') {
-      throw new Error('Gmail credential is missing');
-    }
+    const googleCredential = this.parseCredential(params.credential);
 
     let sentCount = 0;
     let successCount = 0;
