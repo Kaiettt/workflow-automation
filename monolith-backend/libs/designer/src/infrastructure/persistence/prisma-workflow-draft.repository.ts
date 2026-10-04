@@ -23,9 +23,17 @@ export class PrismaWorkflowDraftRepository implements WorkflowDraftRepository {
       create: {
         workflowId: draft.workflowId,
         definition: draft.definition as Prisma.InputJsonValue,
+        validationErrors:
+          draft.validationErrors === null
+            ? Prisma.DbNull
+            : (draft.validationErrors as Prisma.InputJsonValue),
       },
       update: {
         definition: draft.definition as Prisma.InputJsonValue,
+        validationErrors:
+          draft.validationErrors === null
+            ? Prisma.DbNull
+            : (draft.validationErrors as Prisma.InputJsonValue),
       },
     });
   }

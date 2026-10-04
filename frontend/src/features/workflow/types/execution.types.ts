@@ -2,6 +2,7 @@ export type NodeExecutionStatus = 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED' |
 export type ExecutionStatus = 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
 
 export interface NodeLogRecord {
+  id?: string;
   nodeId: string;
   nodeKey: string;
   status: NodeExecutionStatus | string;
@@ -10,6 +11,7 @@ export interface NodeLogRecord {
   errorMessage?: string | null;
   startedAt: string;
   finishedAt?: string | null;
+  durationMs?: number | null;
 }
 
 export interface ExecutionResult {

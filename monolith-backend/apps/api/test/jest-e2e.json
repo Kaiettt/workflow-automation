@@ -7,7 +7,7 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!(@nestjs/jwt)/)"
+    "node_modules/(?!(@nestjs/jwt|@nestjs/passport)/)"
   ],
   "moduleNameMapper": {
     "^@app/designer(|/.*)$": "<rootDir>/../../../libs/designer/src/$1",
@@ -16,6 +16,7 @@
     "^@app/execution(|/.*)$": "<rootDir>/../../../libs/execution/src/$1",
     "^@app/shared(|/.*)$": "<rootDir>/../../../libs/shared/src/$1",
     "^@app/connector(|/.*)$": "<rootDir>/../../../libs/connector/src/$1",
-    "^@app/node-library(|/.*)$": "<rootDir>/../../../libs/node-library/src/$1"
+    "^@app/node-library(|/.*)$": "<rootDir>/../../../libs/node-library/src/$1",
+    "^@app/integrations(|/.*)$": "<rootDir>/../../../libs/integrations/src/$1"
   }
 }

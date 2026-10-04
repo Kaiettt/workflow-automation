@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { ExecutionContext, INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { DesignerModule } from '@app/designer';
 import { PrismaModule } from '@app/database';
 import { PrismaService } from '@app/database/prisma/prisma.service';
+import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
 
 describe('Feature 4.4 - Workflow Versions & Execution Run API (e2e)', () => {
   let app: INestApplication;
@@ -16,7 +17,16 @@ describe('Feature 4.4 - Workflow Versions & Execution Run API (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [PrismaModule, DesignerModule],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          const req = context.switchToHttp().getRequest();
+          req.user = { id: ownerId, email: 'test-run-ui@flowpilot.local' };
+          return true;
+        },
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();

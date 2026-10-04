@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
+import { AuthModule } from '@app/auth';
 import { WorkflowDraftsController } from './presentation/http/workflow-drafts.controller';
 import { WorkflowsController } from './presentation/http/workflows.controller';
 import { SaveDraftHandler } from './application/commands/save-draft.handler';
@@ -39,7 +40,7 @@ const Repositories = [
 ];
 
 @Module({
-  imports: [CqrsModule],
+  imports: [CqrsModule, AuthModule],
   controllers: [WorkflowDraftsController, WorkflowsController],
   providers: [...CommandHandlers, ...QueryHandlers, ...Repositories],
 })

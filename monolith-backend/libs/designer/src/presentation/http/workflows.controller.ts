@@ -5,14 +5,18 @@ import {
   Get,
   Body,
   Param,
-  Req,
   NotFoundException,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
+import {
+  CurrentUser,
+  AuthenticatedUser,
+} from '@app/auth/infrastructure/decorators/current-user.decorator';
 import { CreateWorkflowCommand } from '../../application/commands/create-workflow.handler';
 import { PublishWorkflowCommand } from '../../application/commands/publish-workflow.handler';
 import { RestoreVersionCommand } from '../../application/commands/restore-version.handler';
@@ -33,11 +37,12 @@ export class WorkflowsController {
   ) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get list of workflows owned by caller' })
   @ApiResponse({ status: 200, description: 'List of workflows returned' })
-  async getWorkflows(@Req() req: Request & { user?: { id: string } }) {
-    const ownerId = req.user?.id || '00000000-0000-0000-0000-000000000000';
-    const workflows = await this.workflowRepo.findByOwnerId(ownerId);
+  async getWorkflows(@CurrentUser() user: AuthenticatedUser) {
+    const workflows = await this.workflowRepo.findByOwnerId(user.id);
     return {
       success: true,
       data: workflows.map((w) => ({
@@ -51,15 +56,16 @@ export class WorkflowsController {
   }
 
   @Post(':id/versions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Publish a workflow draft to a new version' })
   @ApiResponse({ status: 201, description: 'Workflow published successfully' })
   @ApiResponse({ status: 400, description: 'Validation failed' })
   async publishWorkflow(
     @Param('id') id: string,
-    @Req() req: Request & { user?: { id: string } },
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const ownerId = req.user?.id || '00000000-0000-0000-0000-000000000000';
-    const command = new PublishWorkflowCommand(id, ownerId);
+    const command = new PublishWorkflowCommand(id, user.id);
 
     // Command handler returns { versionId, versionNumber }
     const result = await this.commandBus.execute(command);
@@ -118,6 +124,8 @@ export class WorkflowsController {
   }
 
   @Post(':id/versions/:versionId/restore')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Restore a published version into workflow draft' })
   @ApiParam({ name: 'id', description: 'The workflow ID' })
@@ -129,13 +137,12 @@ export class WorkflowsController {
     @Param('id') id: string,
     @Param('versionId') versionId: string,
     @Body() body: RestoreVersionDto,
-    @Req() req: Request & { user?: { id: string } },
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const userId = req.user?.id || '00000000-0000-0000-0000-000000000000';
     const command = new RestoreVersionCommand(
       id,
       versionId,
-      userId,
+      user.id,
       body.strategy,
       body.backupWorkflowName,
       body.publishComment,
@@ -163,15 +170,15 @@ export class WorkflowsController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new workflow' })
   @ApiResponse({ status: 201, description: 'Workflow created successfully' })
   async createWorkflow(
     @Body() body: CreateWorkflowDto,
-    @Req() req: Request & { user?: { id: string } },
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    // Hardcoded ownerId for MVP, would normally come from req.user
-    const ownerId =
-      body.ownerId || req.user?.id || '00000000-0000-0000-0000-000000000000';
+    const ownerId = body.ownerId || user.id;
     const command = new CreateWorkflowCommand(body.name, ownerId);
     const result: unknown = await this.commandBus.execute(command);
     const workflowId = result as string;
@@ -184,3 +191,4 @@ export class WorkflowsController {
     };
   }
 }
+
