@@ -20,6 +20,13 @@ export const workflowApi = {
     return res.data.data;
   },
 
+  getWorkflows: async (): Promise<import('../types/workflow.types').WorkflowSummary[]> => {
+    const res = await apiClient.get<{ data: import('../types/workflow.types').WorkflowSummary[] }>(
+      '/api/workflows',
+    );
+    return res.data.data;
+  },
+
   getDraft: async (id: string): Promise<unknown> => {
     const res = await apiClient.get<{ data: unknown }>(
       `/api/workflows/${id}/draft`,

@@ -2,15 +2,17 @@ import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
-import { CurrentUser } from '@app/auth/infrastructure/decorators/current-user.decorator';
-import { AuthenticatedUser } from '@app/auth/infrastructure/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  AuthenticatedUser,
+} from '@app/auth/infrastructure/decorators/current-user.decorator';
 import { StartExecutionCommand } from '../../application/commands/start-execution/start-execution.command';
 import { StartExecutionDto } from './dtos/start-execution.dto';
 
 @ApiTags('executions')
 @ApiBearerAuth()
-@Controller('api/executions')
 @UseGuards(JwtAuthGuard)
+@Controller('api/executions')
 export class ExecutionController {
   constructor(private readonly commandBus: CommandBus) {}
 
@@ -20,11 +22,11 @@ export class ExecutionController {
     @Body() body: StartExecutionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const userRecord = user as unknown as { id?: string };
-    const actorId: string = userRecord.id ?? '';
     const result: unknown = await this.commandBus.execute(
-      new StartExecutionCommand(body.workflow_version_id, actorId),
+      new StartExecutionCommand(body.workflow_version_id, user.id),
     );
     return { success: true, data: result };
   }
 }
+
+

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -14,17 +14,13 @@ import type {
   OnNodesChange,
   OnEdgesChange,
   OnConnect,
+  NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { TriggerNode } from './nodes/TriggerNode';
 import { ActionNode } from './nodes/ActionNode';
 import { useDesignerStore } from '../store/designer.store';
-
-const nodeTypes = {
-  triggerNode: TriggerNode,
-  actionNode: ActionNode,
-};
 
 interface CanvasProps {
   nodes: Node[];
@@ -39,6 +35,30 @@ function CanvasContent({ nodes, edges, onNodesChange, onEdgesChange, setNodes, s
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
   const setSelectedNodeId = useDesignerStore((state) => state.setSelectedNodeId);
+  const catalogNodeTypes = useDesignerStore((state) => state.nodeTypes);
+
+  const nodeTypes = useMemo<NodeTypes>(() => {
+    const map: NodeTypes = {
+      default: ActionNode,
+      triggerNode: TriggerNode,
+      actionNode: ActionNode,
+      'trigger.manual': TriggerNode,
+      'logic.filter': ActionNode,
+      'integration.gmail.send': ActionNode,
+      'integration.slack.post_message': ActionNode,
+    };
+
+    if (Array.isArray(catalogNodeTypes)) {
+      for (const nt of catalogNodeTypes) {
+        if (nt.category === 'TRIGGER' || nt.key.startsWith('trigger.')) {
+          map[nt.key] = TriggerNode;
+        } else {
+          map[nt.key] = ActionNode;
+        }
+      }
+    }
+    return map;
+  }, [catalogNodeTypes]);
 
   const onConnect: OnConnect = useCallback(
     (connection) => setEdges((eds) => addEdge(connection, eds)),

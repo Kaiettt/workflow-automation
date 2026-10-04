@@ -1,18 +1,14 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { GetNodeTypesQuery } from '../../application/queries/get-node-types.query';
-import { JwtAuthGuard } from '../../../../auth/src/infrastructure/guards/jwt-auth.guard';
 import type { NodeTypeDefinition } from '@prisma/client';
 
 @ApiTags('Catalog')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('api/node-types')
 export class NodeTypesController {
   constructor(private readonly queryBus: QueryBus) {}

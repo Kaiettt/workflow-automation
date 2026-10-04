@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Plus, Workflow, LogIn } from 'lucide-react';
 import { useAuthStore, UserDropdown } from '@/features/auth';
@@ -35,6 +36,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateWorkflow, onOpenAuthModa
           </a>
 
           <nav className="hidden md:flex items-center gap-5 text-xs font-medium text-muted-foreground">
+            <Link to="/workflows" className="text-foreground font-semibold hover:text-primary transition-colors flex items-center gap-1">
+              <span>Workflows</span>
+            </Link>
             <a href="#templates" className="hover:text-foreground transition-colors">
               Templates
             </a>

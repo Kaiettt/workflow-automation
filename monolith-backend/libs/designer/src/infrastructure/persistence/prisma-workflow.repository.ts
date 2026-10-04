@@ -14,6 +14,14 @@ export class PrismaWorkflowRepository implements WorkflowRepository {
     return WorkflowMapper.toDomain(record);
   }
 
+  async findByOwnerId(ownerId: string): Promise<Workflow[]> {
+    const records = await this.prisma.workflow.findMany({
+      where: { ownerId },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return records.map((record) => WorkflowMapper.toDomain(record));
+  }
+
   async create(workflow: Workflow): Promise<string> {
     const created = await this.prisma.workflow.create({
       data: {

@@ -39,8 +39,11 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
   ): Promise<WorkflowVersionForExecution> {
     const version = await this.repository.findVersion(versionId);
     if (!version) throw new NotFoundException('Workflow version not found');
-    if (version.workflowOwnerId !== actorId)
+
+    const isAllowed = version.workflowOwnerId === actorId;
+    if (!isAllowed) {
       throw new ForbiddenException('You cannot run this workflow');
+    }
     return version;
   }
 

@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { ExecutionContext, INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
+import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
 
 describe('Publish Workflow (e2e)', () => {
   let app: INestApplication;
@@ -10,10 +11,21 @@ describe('Publish Workflow (e2e)', () => {
   const getServer = () =>
     app.getHttpServer() as unknown as Parameters<typeof request>[0];
 
+  const userId = '11111111-1111-1111-1111-111111111111';
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          const req = context.switchToHttp().getRequest();
+          req.user = { id: userId, email: 'test-publish@flowpilot.local' };
+          return true;
+        },
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
@@ -27,7 +39,7 @@ describe('Publish Workflow (e2e)', () => {
     // 1. Create a workflow
     const createRes = await request(getServer())
       .post('/api/workflows')
-      .send({ name: 'Test Workflow', ownerId: 'user-1' })
+      .send({ name: 'Test Workflow', ownerId: userId })
       .expect(201);
 
     const workflowId = createRes.body.data.id;

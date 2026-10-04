@@ -1,13 +1,15 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useNodesState, useEdgesState } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import { workflowService } from '../services/workflow.service';
 import { DesignerLayout } from '../components/DesignerLayout';
+import { VersionHistoryDialog } from '../components/VersionHistoryDialog';
 import { useDesignerStore } from '../store/designer.store';
 
 interface DesignerPageProps {
-  workflowId: string;
-  onBack: () => void;
+  workflowId?: string;
+  onBack?: () => void;
 }
 
 interface WorkflowDraft {
@@ -17,7 +19,12 @@ interface WorkflowDraft {
   };
 }
 
-export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
+export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }: DesignerPageProps) {
+  const { workflowId: paramWorkflowId } = useParams<{ workflowId: string }>();
+  const navigate = useNavigate();
+  const workflowId = propWorkflowId || paramWorkflowId || '';
+  const onBack = propOnBack || (() => navigate('/workflows'));
+
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +36,7 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
   const isFirstLoad = useRef(true);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const setNodeTypes = useDesignerStore((state) => state.setNodeTypes);
 
@@ -45,7 +53,12 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
 
         if (isMounted) {
           if (draft?.definition) {
-            setNodes(draft.definition.nodes || []);
+            const rawNodes = (draft.definition.nodes || []) as Node[];
+            const safeNodes = rawNodes.map((n, idx) => ({
+              ...n,
+              position: n.position || { x: 250, y: 100 + idx * 120 },
+            }));
+            setNodes(safeNodes);
             setEdges(draft.definition.edges || []);
           }
           if (draft?.validationErrors) {
@@ -129,7 +142,13 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
 
     try {
       await workflowService.publishWorkflow(workflowId);
-      alert('Workflow published successfully!'); // Simplistic toast
+      if (
+        window.confirm(
+          'Xuất bản quy trình thành công! Bạn có muốn mở danh sách phiên bản để xem chi tiết và chạy thực thi (Run UI) không?',
+        )
+      ) {
+        navigate(`/workflows/${workflowId}/versions`);
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setPublishError(err.message);
@@ -140,6 +159,22 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
       setIsPublishing(false);
     }
   };
+
+  const handleRestoreSuccess = useCallback(
+    (definition: { nodes?: Node[]; edges?: Edge[] } | unknown) => {
+      const def = definition as { nodes?: Node[]; edges?: Edge[] };
+      if (def?.nodes) {
+        const safeNodes = def.nodes.map((n, idx) => ({
+          ...n,
+          position: n.position || { x: 250, y: 100 + idx * 120 },
+        }));
+        setNodes(safeNodes);
+      }
+      if (def?.edges) setEdges(def.edges);
+      setPublishError(null);
+    },
+    [setNodes, setEdges],
+  );
 
   if (loading) {
     return (
@@ -169,6 +204,14 @@ export function DesignerPage({ workflowId, onBack }: DesignerPageProps) {
         isSaving={isSaving}
         onPublish={handlePublish}
         isPublishing={isPublishing}
+        onOpenHistory={() => setHistoryOpen(true)}
+        onViewVersions={() => navigate(`/workflows/${workflowId}/versions`)}
+      />
+      <VersionHistoryDialog
+        workflowId={workflowId}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        onRestoreSuccess={handleRestoreSuccess}
       />
     </>
   );
