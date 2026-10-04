@@ -12,6 +12,14 @@ export const workflowService = {
     }
   },
 
+  async getWorkflows(): Promise<import('../types/workflow.types').WorkflowSummary[]> {
+    try {
+      return await workflowApi.getWorkflows();
+    } catch (error: unknown) {
+      throw new Error('Failed to get workflows', { cause: error });
+    }
+  },
+
   async getDraft(id: string): Promise<unknown> {
     try {
       return await workflowApi.getDraft(id);
@@ -57,7 +65,8 @@ export const workflowService = {
     try {
       return await workflowApi.getNodeTypes();
     } catch (error: unknown) {
-      throw new Error('Failed to get node types', { cause: error });
+      console.warn('Failed to get node types, returning empty array fallback:', error);
+      return [];
     }
   },
 };

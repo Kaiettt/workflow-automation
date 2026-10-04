@@ -27,6 +27,8 @@ You must follow these rules when developing the frontend:
 - Components DO NOT call APIs directly. Use React Query hooks which call a service layer.
 - Move business logic to services, not components.
 
-## 5. Styling
-- Use Tailwind utility classes (`className="flex items-center"`).
-- Always prefer `shadcn/ui` components over building custom ones from scratch. Extend them as needed.
+## 5. Styling & UI Components (shadcn/ui)
+- **Mandatory shadcn/ui**: Always use `shadcn/ui` components (`@/components/ui/*`). Never build raw custom buttons, inputs, dialogs, dropdowns, tables, cards, etc. from scratch.
+- **Install missing components**: Run `npx shadcn@latest add <component-name>` inside `frontend/` whenever a UI component is needed and not yet present in `src/components/ui`.
+- **Customization**: Extend shadcn components using Tailwind utility classes (`className="..."`) and `cn()` from `@/lib/utils`.
+- Follow the color system and theme tokens defined in `src/App.css` and `components.json`.

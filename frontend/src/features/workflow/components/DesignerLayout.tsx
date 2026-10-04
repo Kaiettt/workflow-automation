@@ -1,6 +1,8 @@
 import { Sidebar } from './Sidebar';
 import { PropertiesPanel } from './PropertiesPanel';
 import { Canvas } from './Canvas';
+import { Button } from '@/components/ui/button';
+import { History, ArrowLeft, GitBranch } from 'lucide-react';
 import type { Node, Edge, OnNodesChange, OnEdgesChange } from '@xyflow/react';
 
 interface DesignerLayoutProps {
@@ -15,6 +17,8 @@ interface DesignerLayoutProps {
   isSaving: boolean;
   onPublish: () => void;
   isPublishing: boolean;
+  onOpenHistory?: () => void;
+  onViewVersions?: () => void;
 }
 
 export function DesignerLayout({
@@ -29,32 +33,62 @@ export function DesignerLayout({
   isSaving,
   onPublish,
   isPublishing,
+  onOpenHistory,
+  onViewVersions,
 }: DesignerLayoutProps) {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
       <header className="h-14 border-b border-gray-200 bg-white px-4 flex items-center justify-between shadow-sm z-20">
-        <div className="flex items-center gap-4">
-          <button 
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="sm"
             onClick={onBack}
-            className="text-gray-500 hover:text-gray-800 transition-colors"
+            className="text-muted-foreground hover:text-foreground gap-1.5"
           >
-            ← Back
-          </button>
-          <h1 className="font-bold text-gray-800 text-lg">Workflow Designer</h1>
+            <ArrowLeft className="size-4" />
+            Quay lại
+          </Button>
+          <div className="h-4 w-px bg-border" />
+          <h1 className="font-semibold text-foreground text-base">Workflow Designer</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {isSaving ? (
-            <span className="text-sm text-gray-400 italic">Saving...</span>
+            <span className="text-xs text-muted-foreground italic">Đang lưu...</span>
           ) : (
-            <span className="text-sm text-green-600">Saved</span>
+            <span className="text-xs text-emerald-600 font-medium">Đã lưu nháp</span>
           )}
-          <button
+          {onOpenHistory && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenHistory}
+              className="gap-1.5 text-xs"
+            >
+              <History className="size-3.5" />
+              Lịch sử phiên bản
+            </Button>
+          )}
+          {onViewVersions && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onViewVersions}
+              className="gap-1.5 text-xs text-primary border-primary/20 hover:bg-primary/5"
+            >
+              <GitBranch className="size-3.5" />
+              Phiên bản (Run UI)
+            </Button>
+          )}
+          <Button
+            variant="default"
+            size="sm"
             onClick={onPublish}
             disabled={isPublishing || isSaving}
-            className="px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="gap-1.5 text-xs font-medium"
           >
-            {isPublishing ? 'Publishing...' : 'Publish'}
-          </button>
+            {isPublishing ? 'Đang xuất bản...' : 'Xuất bản'}
+          </Button>
         </div>
       </header>
       
