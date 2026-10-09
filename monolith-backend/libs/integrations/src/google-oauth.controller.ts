@@ -1,19 +1,26 @@
 import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
-import { GoogleOauthService } from './google-oauth.service';
+import { QueryBus, CommandBus } from '@nestjs/cqrs';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
+import { GetGoogleAuthUrlQuery } from './application/queries/get-google-auth-url.query';
+import { HandleGoogleCallbackCommand } from './application/commands/handle-google-callback.command';
 
 @Controller('api/integrations/google')
 export class GoogleOauthController {
-  constructor(private googleOauthService: GoogleOauthService) {}
+  constructor(
+    private readonly queryBus: QueryBus,
+    private readonly commandBus: CommandBus,
+  ) {}
 
   @Get('auth')
   @UseGuards(JwtAuthGuard)
-  auth(@Req() req: any) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+  async auth(@Req() req: Request & { user?: { id?: string } }) {
     const userId = req.user?.id || 'unknown';
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const url = this.googleOauthService.getAuthUrl(userId);
+
+    const url = String(
+      await this.queryBus.execute(new GetGoogleAuthUrlQuery(userId)),
+    );
+
     return { url };
   }
 
@@ -27,9 +34,10 @@ export class GoogleOauthController {
       return res.status(400).send('Code or state is missing');
     }
 
-    const credentialId = await this.googleOauthService.handleCallback(
-      code,
-      state,
+    const credentialId = String(
+      await this.commandBus.execute(
+        new HandleGoogleCallbackCommand(code, state),
+      ),
     );
 
     res.send(`

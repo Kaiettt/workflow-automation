@@ -11,16 +11,22 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
 import {
   CurrentUser,
   AuthenticatedUser,
 } from '@app/auth/infrastructure/decorators/current-user.decorator';
-import { CreateWorkflowCommand } from '../../application/commands/create-workflow.handler';
-import { PublishWorkflowCommand } from '../../application/commands/publish-workflow.handler';
-import { RestoreVersionCommand } from '../../application/commands/restore-version.handler';
-import { GetDraftStatusQuery } from '../../application/queries/get-draft-status.handler';
+import { CreateWorkflowCommand } from '../../application/commands/create-workflow.command';
+import { PublishWorkflowCommand } from '../../application/commands/publish-workflow.command';
+import { RestoreVersionCommand } from '../../application/commands/restore-version.command';
+import { GetDraftStatusQuery } from '../../application/queries/get-draft-status.query';
 import { CreateWorkflowDto } from './dtos/create-workflow.dto';
 import { RestoreVersionDto } from './dtos/restore-version.dto';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
@@ -191,4 +197,3 @@ export class WorkflowsController {
     };
   }
 }
-

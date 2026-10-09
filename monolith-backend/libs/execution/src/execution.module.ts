@@ -3,7 +3,7 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { PrismaModule } from '@app/database';
 import { AuthModule } from '@app/auth';
 import { ExecutionController } from './presentation/http/execution.controller';
-import { StartExecutionHandler } from './application/commands/start-execution/start-execution.handler';
+import { StartExecutionHandler } from './application/commands/start-execution/start-execution.command';
 import { ExecutionRepository } from './domain/repositories/execution.repository';
 import { PrismaExecutionRepository } from './infrastructure/persistence/prisma-execution.repository';
 import { ManualTriggerExecutor } from './application/executors/manual-trigger-executor';

@@ -3,14 +3,29 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { PrismaModule } from '@app/database';
 import { AuthModule } from '@app/auth';
 import { ConnectorsController } from './presentation/http/connectors.controller';
-import { GetConnectorsHandler } from './application/queries/get-connectors.handler';
+import { GetConnectorsHandler } from './application/queries/get-connectors.query';
+import { ConnectorRepository } from './domain/repositories/connector.repository';
+import { PrismaConnectorRepository } from './infrastructure/persistence/prisma-connector.repository';
+import { ConnectorCredentialRepository } from './domain/repositories/connector-credential.repository';
+import { PrismaConnectorCredentialRepository } from './infrastructure/persistence/prisma-connector-credential.repository';
 
 const QueryHandlers = [GetConnectorsHandler];
+
+const Repositories = [
+  {
+    provide: ConnectorRepository,
+    useClass: PrismaConnectorRepository,
+  },
+  {
+    provide: ConnectorCredentialRepository,
+    useClass: PrismaConnectorCredentialRepository,
+  },
+];
 
 @Module({
   imports: [CqrsModule, PrismaModule, AuthModule],
   controllers: [ConnectorsController],
-  providers: [...QueryHandlers],
-  exports: [],
+  providers: [...QueryHandlers, ...Repositories],
+  exports: [...Repositories],
 })
 export class ConnectorModule {}

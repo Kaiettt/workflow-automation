@@ -1,0 +1,6 @@
+export enum NodeCategory {
+  TRIGGER = 'TRIGGER',
+  LOGIC = 'LOGIC',
+  DATA_PROCESSING = 'DATA_PROCESSING',
+  INTEGRATION = 'INTEGRATION',
+}

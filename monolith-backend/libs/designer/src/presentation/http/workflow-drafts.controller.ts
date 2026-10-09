@@ -1,8 +1,8 @@
 import { Body, Controller, Param, Put, Get } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { SaveDraftCommand } from '../../application/commands/save-draft.handler';
-import { GetWorkflowDraftQuery } from '../../application/queries/get-workflow-draft.handler';
+import { SaveDraftCommand } from '../../application/commands/save-draft.command';
+import { GetWorkflowDraftQuery } from '../../application/queries/get-workflow-draft.query';
 import { SaveDraftDto } from './dtos/save-draft.dto';
 
 @ApiTags('workflows')

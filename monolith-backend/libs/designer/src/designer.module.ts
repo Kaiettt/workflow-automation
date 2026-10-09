@@ -3,17 +3,17 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { AuthModule } from '@app/auth';
 import { WorkflowDraftsController } from './presentation/http/workflow-drafts.controller';
 import { WorkflowsController } from './presentation/http/workflows.controller';
-import { SaveDraftHandler } from './application/commands/save-draft.handler';
-import { CreateWorkflowHandler } from './application/commands/create-workflow.handler';
-import { GetWorkflowDraftHandler } from './application/queries/get-workflow-draft.handler';
+import { SaveDraftHandler } from './application/commands/save-draft.command';
+import { CreateWorkflowHandler } from './application/commands/create-workflow.command';
+import { GetWorkflowDraftHandler } from './application/queries/get-workflow-draft.query';
 import { PrismaWorkflowRepository } from './infrastructure/persistence/prisma-workflow.repository';
 import { PrismaWorkflowDraftRepository } from './infrastructure/persistence/prisma-workflow-draft.repository';
 import { WorkflowRepository } from './domain/repositories/workflow.repository';
 import { WorkflowDraftRepository } from './domain/repositories/workflow-draft.repository';
 
-import { PublishWorkflowHandler } from './application/commands/publish-workflow.handler';
-import { RestoreVersionHandler } from './application/commands/restore-version.handler';
-import { GetDraftStatusHandler } from './application/queries/get-draft-status.handler';
+import { PublishWorkflowHandler } from './application/commands/publish-workflow.command';
+import { RestoreVersionHandler } from './application/commands/restore-version.command';
+import { GetDraftStatusHandler } from './application/queries/get-draft-status.query';
 import { WorkflowVersionRepository } from './domain/repositories/workflow-version.repository';
 import { PrismaWorkflowVersionRepository } from './infrastructure/persistence/prisma-workflow-version.repository';
 

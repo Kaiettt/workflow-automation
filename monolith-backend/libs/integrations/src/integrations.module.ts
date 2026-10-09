@@ -1,11 +1,16 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
+import { ConnectorModule } from '@app/connector';
 import { GoogleOauthController } from './google-oauth.controller';
-import { GoogleOauthService } from './google-oauth.service';
-import { PrismaModule } from '@app/database';
+import { GoogleOauthService } from './infrastructure/services/google-oauth.service';
+import { GetGoogleAuthUrlHandler } from './application/queries/get-google-auth-url.query';
+import { HandleGoogleCallbackHandler } from './application/commands/handle-google-callback.command';
+
+const Handlers = [GetGoogleAuthUrlHandler, HandleGoogleCallbackHandler];
 
 @Module({
-  imports: [PrismaModule],
+  imports: [CqrsModule, ConnectorModule],
   controllers: [GoogleOauthController],
-  providers: [GoogleOauthService],
+  providers: [GoogleOauthService, ...Handlers],
 })
 export class IntegrationsModule {}
