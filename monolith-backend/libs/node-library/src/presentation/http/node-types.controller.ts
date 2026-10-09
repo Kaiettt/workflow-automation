@@ -23,7 +23,7 @@ export class NodeTypesController {
     );
     return {
       success: true,
-      data: result.map(NodeTypeDefinitionResponseDto.fromDomain),
+      data: result.map((n) => NodeTypeDefinitionResponseDto.fromDomain(n)),
     };
   }
 }

@@ -14,11 +14,13 @@ export class GoogleOauthController {
 
   @Get('auth')
   @UseGuards(JwtAuthGuard)
-  async auth(@Req() req: any) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+  async auth(@Req() req: Request & { user?: { id?: string } }) {
     const userId = req.user?.id || 'unknown';
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const url = await this.queryBus.execute(new GetGoogleAuthUrlQuery(userId));
+
+    const url = String(
+      await this.queryBus.execute(new GetGoogleAuthUrlQuery(userId)),
+    );
+
     return { url };
   }
 
@@ -32,13 +34,15 @@ export class GoogleOauthController {
       return res.status(400).send('Code or state is missing');
     }
 
-    const credentialId = await this.commandBus.execute(
-      new HandleGoogleCallbackCommand(code, state),
+    const credentialId = String(
+      await this.commandBus.execute(
+        new HandleGoogleCallbackCommand(code, state),
+      ),
     );
 
     res.send(`
       <script>
-        window.opener.postMessage({ type: 'oauth-success', credentialId: '${credentialId as string}' }, '*');
+        window.opener.postMessage({ type: 'oauth-success', credentialId: '${credentialId}' }, '*');
         window.close();
       </script>
     `);

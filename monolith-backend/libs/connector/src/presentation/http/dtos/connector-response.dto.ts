@@ -16,7 +16,7 @@ export class ConnectorResponseDto {
   authType: ConnectorAuthType;
 
   @ApiProperty()
-  configSchema: any;
+  configSchema: unknown;
 
   @ApiProperty()
   isActive: boolean;

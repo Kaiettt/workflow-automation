@@ -31,7 +31,7 @@ export class ConnectorsController {
     );
     return {
       success: true,
-      data: result.map(ConnectorResponseDto.fromDomain),
+      data: result.map((c) => ConnectorResponseDto.fromDomain(c)),
     };
   }
 }

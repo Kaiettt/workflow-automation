@@ -25,13 +25,13 @@ export class NodeTypeDefinitionResponseDto {
   description?: string | null;
 
   @ApiProperty()
-  configSchema: any;
+  configSchema: unknown;
 
   @ApiPropertyOptional()
-  inputSchema?: any | null;
+  inputSchema?: unknown;
 
   @ApiPropertyOptional()
-  outputSchema?: any | null;
+  outputSchema?: unknown;
 
   @ApiPropertyOptional()
   connectorId?: string | null;

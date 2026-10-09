@@ -5,6 +5,8 @@ import {
 import { ConnectorCredential } from '../../../domain/entities/connector-credential.entity';
 import { ConnectorTestStatus } from '../../../domain/enums/connector-test-status.enum';
 
+import { Prisma } from '@prisma/client';
+
 export class ConnectorCredentialMapper {
   static toDomain(raw: PrismaConnectorCredential): ConnectorCredential {
     return new ConnectorCredential(
@@ -20,7 +22,9 @@ export class ConnectorCredentialMapper {
     );
   }
 
-  static toPersistence(entity: ConnectorCredential): any {
+  static toPersistence(
+    entity: ConnectorCredential,
+  ): Prisma.ConnectorCredentialUncheckedCreateInput {
     return {
       ...(entity.id ? { id: entity.id } : {}),
       connectorId: entity.connectorId,
