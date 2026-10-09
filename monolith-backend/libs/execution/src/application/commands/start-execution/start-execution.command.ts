@@ -25,7 +25,6 @@ import {
 } from '../../../domain/entities/workflow-execution.entity';
 import { INodeExecutor } from '../../../domain/entities/node-executor';
 
-
 @Injectable()
 @CommandHandler(StartExecutionCommand)
 export class StartExecutionHandler implements ICommandHandler<StartExecutionCommand> {

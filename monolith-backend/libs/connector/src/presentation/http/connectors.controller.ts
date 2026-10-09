@@ -20,7 +20,11 @@ export class ConnectorsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all available connectors' })
-  @ApiResponse({ status: 200, description: 'Return all active connectors', type: [ConnectorResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all active connectors',
+    type: [ConnectorResponseDto],
+  })
   async getConnectors() {
     const result: Connector[] = await this.queryBus.execute(
       new GetConnectorsQuery(),

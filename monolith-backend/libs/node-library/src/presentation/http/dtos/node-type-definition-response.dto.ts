@@ -45,9 +45,7 @@ export class NodeTypeDefinitionResponseDto {
   @ApiProperty()
   updatedAt: Date;
 
-  static fromDomain(
-    entity: NodeTypeDefinition,
-  ): NodeTypeDefinitionResponseDto {
+  static fromDomain(entity: NodeTypeDefinition): NodeTypeDefinitionResponseDto {
     const dto = new NodeTypeDefinitionResponseDto();
     dto.id = entity.id;
     dto.key = entity.key;

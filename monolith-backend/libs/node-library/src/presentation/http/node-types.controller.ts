@@ -12,7 +12,11 @@ export class NodeTypesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all available node types' })
-  @ApiResponse({ status: 200, description: 'Return all active node types', type: [NodeTypeDefinitionResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all active node types',
+    type: [NodeTypeDefinitionResponseDto],
+  })
   async getNodeTypes() {
     const result: NodeTypeDefinition[] = await this.queryBus.execute(
       new GetNodeTypesQuery(),

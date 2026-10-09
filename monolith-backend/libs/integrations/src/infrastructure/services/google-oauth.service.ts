@@ -97,7 +97,6 @@ export class GoogleOauthService {
 
       const savedCredential = await this.credentialRepo.create(credential);
 
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       return savedCredential.id!;
     } catch {
       throw new BadRequestException(
