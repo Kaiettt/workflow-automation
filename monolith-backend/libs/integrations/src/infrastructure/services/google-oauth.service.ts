@@ -1,19 +1,33 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { google } from 'googleapis';
-import { PrismaService } from '@app/database';
 import { EncryptionUtil } from '@app/shared/utils/encryption.util';
+import { ConnectorCredentialRepository } from '@app/connector/domain/repositories/connector-credential.repository';
+import { ConnectorRepository } from '@app/connector/domain/repositories/connector.repository';
+import { ConnectorCredential } from '@app/connector/domain/entities/connector-credential.entity';
 
 @Injectable()
 export class GoogleOauthService {
   private oauth2Client: any;
-  private readonly connectorId = '22222222-2222-2222-2222-222222222221';
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private credentialRepo: ConnectorCredentialRepository,
+    private connectorRepo: ConnectorRepository,
+  ) {
     this.oauth2Client = new google.auth.OAuth2(
       process.env['google-Client-Id'],
       process.env['google-Client-secret'],
       process.env['GOOGLE_REDIRECT_URI'],
     );
+  }
+
+  private async getGoogleConnectorId(): Promise<string> {
+    const connector = await this.connectorRepo.findByKey('google');
+    if (!connector) {
+      // In case we have gmail/google_sheet etc, maybe we should fetch gmail?
+      // User specifically requested key = 'google'
+      throw new BadRequestException('Google connector not found in database');
+    }
+    return connector.id;
   }
 
   getAuthUrl(userId: string): string {
@@ -71,16 +85,20 @@ export class GoogleOauthService {
         encryptionKey,
       );
 
-      const credential = await this.prisma.connectorCredential.create({
-        data: {
-          connectorId: this.connectorId,
-          ownerId: userId,
-          name: 'google-credential',
-          encryptedSecret,
-        },
-      });
+      const connectorId = await this.getGoogleConnectorId();
 
-      return credential.id;
+      const credential = new ConnectorCredential(
+        undefined,
+        connectorId,
+        userId,
+        'google-credential',
+        encryptedSecret,
+      );
+
+      const savedCredential = await this.credentialRepo.create(credential);
+
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      return savedCredential.id!;
     } catch {
       throw new BadRequestException(
         'Failed to exchange auth code or save credential',

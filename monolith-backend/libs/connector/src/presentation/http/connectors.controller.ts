@@ -8,7 +8,8 @@ import {
 } from '@nestjs/swagger';
 import { GetConnectorsQuery } from '../../application/queries/get-connectors.query';
 import { JwtAuthGuard } from '../../../../auth/src/infrastructure/guards/jwt-auth.guard';
-import type { Connector } from '@prisma/client';
+import { Connector } from '../../domain/entities/connector.entity';
+import { ConnectorResponseDto } from './dtos/connector-response.dto';
 
 @ApiTags('Catalog')
 @ApiBearerAuth()
@@ -19,14 +20,14 @@ export class ConnectorsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all available connectors' })
-  @ApiResponse({ status: 200, description: 'Return all active connectors' })
+  @ApiResponse({ status: 200, description: 'Return all active connectors', type: [ConnectorResponseDto] })
   async getConnectors() {
-    const result: unknown = await this.queryBus.execute(
+    const result: Connector[] = await this.queryBus.execute(
       new GetConnectorsQuery(),
     );
     return {
       success: true,
-      data: result as Connector[],
+      data: result.map(ConnectorResponseDto.fromDomain),
     };
   }
 }

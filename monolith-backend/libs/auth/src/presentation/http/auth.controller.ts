@@ -22,14 +22,14 @@ import { ResetPasswordDto } from './dtos/reset-password.dto';
 import { SendRegisterOtpDto } from './dtos/send-register-otp.dto';
 import { VerifyOtpDto } from './dtos/verify-otp.dto';
 import { RefreshTokenDto } from './dtos/refresh-token.dto';
-import { RegisterCommand } from '../../application/commands/register.handler';
-import { LoginCommand } from '../../application/commands/login.handler';
-import { ForgotPasswordCommand } from '../../application/commands/forgot-password.handler';
-import { ResetPasswordCommand } from '../../application/commands/reset-password.handler';
-import { SendRegisterOtpCommand } from '../../application/commands/send-register-otp.handler';
-import { VerifyOtpCommand } from '../../application/commands/verify-otp.handler';
-import { RefreshTokenCommand } from '../../application/commands/refresh-token.handler';
-import { GetCurrentUserQuery } from '../../application/queries/get-current-user.handler';
+import { RegisterCommand } from '../../application/commands/register.command';
+import { LoginCommand } from '../../application/commands/login.command';
+import { ForgotPasswordCommand } from '../../application/commands/forgot-password.command';
+import { ResetPasswordCommand } from '../../application/commands/reset-password.command';
+import { SendRegisterOtpCommand } from '../../application/commands/send-register-otp.command';
+import { VerifyOtpCommand } from '../../application/commands/verify-otp.command';
+import { RefreshTokenCommand } from '../../application/commands/refresh-token.command';
+import { GetCurrentUserQuery } from '../../application/queries/get-current-user.query';
 import { JwtAuthGuard } from '../../infrastructure/guards/jwt-auth.guard';
 import {
   CurrentUser,

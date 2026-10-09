@@ -71,8 +71,7 @@ modules/execution/
 │   ├── application/                  # điều phối use case — biết domain, không biết hạ tầng cụ thể
 │   │   ├── commands/                 # hành động làm thay đổi state (CQRS write side)
 │   │   │   ├── start-execution/
-│   │   │   │   ├── start-execution.command.ts   # input thuần data (workflowId, triggerType...)
-│   │   │   │   └── start-execution.handler.ts   # logic điều phối: tạo entity, gọi repo, publish event
+│   │   │   │   └── start-execution.command.ts   # chứa cả command (input) và handler (logic điều phối)
 │   │   │   └── retry-node/           # command retry cho 1 node thất bại (FR-EX-04)
 │   │   ├── queries/                  # chỉ đọc, tách khỏi command (CQRS read side)
 │   │   │   ├── get-execution-status/ # phục vụ FR-EM-01 (trạng thái thời gian thực)

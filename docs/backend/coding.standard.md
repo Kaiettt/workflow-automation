@@ -31,6 +31,7 @@ infrastructure → application, domain
 ```
 
 - **`domain/`**: KHÔNG import bất cứ gì từ NestJS (`@nestjs/*`), Prisma, hay thư viện HTTP. Chỉ pure TypeScript (entity, value object, domain service, repository interface).
+  - **Reference by Identity**: Các Domain Entities KHÔNG tham chiếu trực tiếp đến object của domain khác (VD: `connector: Connector` trong `NodeTypeDefinition`), mà CHỈ dùng ID (VD: `connectorId: string`). Điều này đảm bảo Bounded Context lỏng lẻo và chuẩn bị cho việc tách microservices.
 - **`application/`**: chứa command/query handler, orchestration logic. Được phép dùng `@nestjs/cqrs`, nhưng KHÔNG import trực tiếp Prisma client hay class từ `infrastructure/`.
 - **`infrastructure/`**: implement interface định nghĩa ở `domain/repositories` và `application/ports`. Đây là nơi duy nhất được import Prisma, BullMQ, HTTP client...
 - **`presentation/`**: controller/resolver, chỉ gọi vào `application/` (dispatch command/query qua `CommandBus`/`QueryBus`), không chứa business logic.
@@ -60,7 +61,7 @@ infrastructure → application, domain
 
 ## 4. CQRS Convention
 
-- 1 Command/Query = 1 file riêng, đặt cùng folder với Handler tương ứng (`start-execution/start-execution.command.ts` + `start-execution.handler.ts`).
+- Đặt Command và Handler của nó vào chung một file duy nhất với tên `{action}.command.ts`. Tương tự với Query là `{action}.query.ts`. (VD: `start-execution/start-execution.command.ts` chứa cả `StartExecutionCommand` và `StartExecutionHandler`).
 - Command/Query object là **immutable** (dùng `readonly` cho toàn bộ property).
 - Handler chỉ chứa **1 orchestration flow duy nhất**, không nhét thêm business rule phức tạp — business rule thuộc về domain entity/domain service, Handler chỉ gọi.
 - Handler không return domain entity trực tiếp ra `presentation/` — map qua DTO/ViewModel trước khi trả về controller.

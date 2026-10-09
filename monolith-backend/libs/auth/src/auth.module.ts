@@ -17,14 +17,14 @@ import { JwtStrategy } from './infrastructure/strategies/jwt.strategy';
 import { JwtAuthGuard } from './infrastructure/guards/jwt-auth.guard';
 import { RolesGuard } from './infrastructure/guards/roles.guard';
 
-import { RegisterHandler } from './application/commands/register.handler';
-import { LoginHandler } from './application/commands/login.handler';
-import { ForgotPasswordHandler } from './application/commands/forgot-password.handler';
-import { ResetPasswordHandler } from './application/commands/reset-password.handler';
-import { SendRegisterOtpHandler } from './application/commands/send-register-otp.handler';
-import { VerifyOtpHandler } from './application/commands/verify-otp.handler';
-import { RefreshTokenHandler } from './application/commands/refresh-token.handler';
-import { GetCurrentUserHandler } from './application/queries/get-current-user.handler';
+import { RegisterHandler } from './application/commands/register.command';
+import { LoginHandler } from './application/commands/login.command';
+import { ForgotPasswordHandler } from './application/commands/forgot-password.command';
+import { ResetPasswordHandler } from './application/commands/reset-password.command';
+import { SendRegisterOtpHandler } from './application/commands/send-register-otp.command';
+import { VerifyOtpHandler } from './application/commands/verify-otp.command';
+import { RefreshTokenHandler } from './application/commands/refresh-token.command';
+import { GetCurrentUserHandler } from './application/queries/get-current-user.query';
 
 import { AuthController } from './presentation/http/auth.controller';
 
