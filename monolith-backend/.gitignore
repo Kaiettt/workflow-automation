@@ -43,3 +43,108 @@ lerna-debug.log*
 !.env.example
 .vercel
 .output
+
+
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+.next/
+out/
+storybook-static/
+
+# NestJS
+uploads/
+tmp/
+temp/
+
+# React
+.eslintcache
+.parcel-cache/
+.cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+jest-report/
+playwright-report/
+test-results/
+
+# Environment
+.env
+.env.*
+!.env.example
+!.env.development.example
+!.env.production.example
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Uncomment if your team does NOT commit lock files
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Docker
+.docker/
+docker-data/
+postgres-data/
+
+# Local databases
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Cache
+.cache/
+.turbo/
+.nx/
+.swc/
+
+# Misc
+.vercel/
+.output/
+tmp/
+temp/
+
+# Generated files
+*.tgz
+*.pid
+*.seed
+
+# Secrets
+*.pem
+*.key
+*.p12
+*.crt
