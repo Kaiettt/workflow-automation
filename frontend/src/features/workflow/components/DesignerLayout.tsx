@@ -1,6 +1,7 @@
 import { Sidebar } from './Sidebar';
 import { PropertiesPanel } from './PropertiesPanel';
 import { Canvas } from './Canvas';
+import { useDesignerStore } from '../store/designer.store';
 import { Button } from '@/components/ui/button';
 import { History, ArrowLeft, GitBranch } from 'lucide-react';
 import type { Node, Edge, OnNodesChange, OnEdgesChange } from '@xyflow/react';
@@ -36,6 +37,15 @@ export function DesignerLayout({
   onOpenHistory,
   onViewVersions,
 }: DesignerLayoutProps) {
+  const setSelectedNodeId = useDesignerStore((state) => state.setSelectedNodeId);
+
+  // Removes the node together with the edges attached to it.
+  const handleDeleteNode = (nodeId: string) => {
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    setSelectedNodeId(null);
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
       <header className="h-14 border-b border-gray-200 bg-white px-4 flex items-center justify-between shadow-sm z-20">
@@ -102,7 +112,11 @@ export function DesignerLayout({
           setNodes={setNodes} 
           setEdges={setEdges} 
         />
-        <PropertiesPanel nodes={nodes} onNodeDataChange={onNodeDataChange} />
+        <PropertiesPanel
+          nodes={nodes}
+          onNodeDataChange={onNodeDataChange}
+          onDeleteNode={handleDeleteNode}
+        />
       </main>
     </div>
   );

@@ -59,6 +59,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useWorkflowVersion } from '../hooks/useWorkflowVersions';
 import { useStartExecution } from '../hooks/useStartExecution';
 import type { ExecutionResult } from '../types/execution.types';
+import { countItems } from '../utils/node-config';
 
 // --- Custom Interactive Canvas Node ---
 interface RunnerNodeData extends Record<string, unknown> {
@@ -689,6 +690,13 @@ export const VersionDetailPage: React.FC = () => {
                                     </span>
                                     <span>{log.nodeId}</span>
                                   </div>
+                                  {countItems(log.input) !== null && (
+                                    <div className="mt-0.5 ml-7 text-[11px] font-normal text-muted-foreground">
+                                      {countItems(log.input)} in
+                                      {countItems(log.output) !== null &&
+                                        ` → ${countItems(log.output)} out`}
+                                    </div>
+                                  )}
                                 </TableCell>
 
                                 <TableCell className="font-mono text-xs text-muted-foreground">

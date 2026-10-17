@@ -4,12 +4,16 @@ import { PrismaModule } from '@app/database';
 import { AuthModule } from '@app/auth';
 import { ConnectorsController } from './presentation/http/connectors.controller';
 import { GetConnectorsHandler } from './application/queries/get-connectors.query';
+import { ListCredentialsHandler } from './application/queries/list-credentials.query';
+import { CreateApiKeyCredentialHandler } from './application/commands/create-api-key-credential.command';
 import { ConnectorRepository } from './domain/repositories/connector.repository';
 import { PrismaConnectorRepository } from './infrastructure/persistence/prisma-connector.repository';
 import { ConnectorCredentialRepository } from './domain/repositories/connector-credential.repository';
 import { PrismaConnectorCredentialRepository } from './infrastructure/persistence/prisma-connector-credential.repository';
 
-const QueryHandlers = [GetConnectorsHandler];
+const QueryHandlers = [GetConnectorsHandler, ListCredentialsHandler];
+
+const CommandHandlers = [CreateApiKeyCredentialHandler];
 
 const Repositories = [
   {
@@ -25,7 +29,7 @@ const Repositories = [
 @Module({
   imports: [CqrsModule, PrismaModule, AuthModule],
   controllers: [ConnectorsController],
-  providers: [...QueryHandlers, ...Repositories],
+  providers: [...QueryHandlers, ...CommandHandlers, ...Repositories],
   exports: [...Repositories],
 })
 export class ConnectorModule {}

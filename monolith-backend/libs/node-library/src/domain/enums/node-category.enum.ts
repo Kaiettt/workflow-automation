@@ -3,4 +3,5 @@ export enum NodeCategory {
   LOGIC = 'LOGIC',
   DATA_PROCESSING = 'DATA_PROCESSING',
   INTEGRATION = 'INTEGRATION',
+  AI = 'AI',
 }

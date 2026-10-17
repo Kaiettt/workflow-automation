@@ -24,4 +24,15 @@ export class PrismaConnectorCredentialRepository implements ConnectorCredentialR
     });
     return ConnectorCredentialMapper.toDomain(created);
   }
+
+  async findByOwnerAndConnector(
+    ownerId: string,
+    connectorId: string,
+  ): Promise<ConnectorCredential[]> {
+    const rows = await this.prisma.connectorCredential.findMany({
+      where: { ownerId, connectorId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map((row) => ConnectorCredentialMapper.toDomain(row));
+  }
 }

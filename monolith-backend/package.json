@@ -21,6 +21,8 @@
     "test:e2e": "jest --config ./apps/api/test/jest-e2e.json"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "@google/genai": "^2.30.0",
     "@hookform/resolvers": "^5.4.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
@@ -42,6 +44,7 @@
     "ioredis": "^5.4.2",
     "lucide-react": "^1.25.0",
     "nodemailer": "^10.0.10",
+    "openai": "^7.36.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "react-hook-form": "^7.81.0",
@@ -98,6 +101,16 @@
     ],
     "coverageDirectory": "./coverage",
     "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@app/designer(|/.*)$": "<rootDir>/libs/designer/src/$1",
+      "^@app/database(|/.*)$": "<rootDir>/libs/database/src/$1",
+      "^@app/auth(|/.*)$": "<rootDir>/libs/auth/src/$1",
+      "^@app/execution(|/.*)$": "<rootDir>/libs/execution/src/$1",
+      "^@app/shared(|/.*)$": "<rootDir>/libs/shared/src/$1",
+      "^@app/connector(|/.*)$": "<rootDir>/libs/connector/src/$1",
+      "^@app/node-library(|/.*)$": "<rootDir>/libs/node-library/src/$1",
+      "^@app/integrations(|/.*)$": "<rootDir>/libs/integrations/src/$1"
+    },
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/dist/"

@@ -6,10 +6,22 @@ import { ExecutionController } from './presentation/http/execution.controller';
 import { StartExecutionHandler } from './application/commands/start-execution/start-execution.command';
 import { ExecutionRepository } from './domain/repositories/execution.repository';
 import { PrismaExecutionRepository } from './infrastructure/persistence/prisma-execution.repository';
+import { NodeCatalogPort } from './application/ports/node-catalog.port';
+import { NodeCatalogAdapter } from './infrastructure/adapters/node-catalog.adapter';
+import { LlmProvider } from './application/ports/llm-provider.port';
+import { LlmProviderRegistry } from './application/services/llm-provider.registry';
+import { AnthropicLlmAdapter } from './infrastructure/llm/anthropic-llm.adapter';
+import { OpenAiLlmAdapter } from './infrastructure/llm/openai-llm.adapter';
+import { GeminiLlmAdapter } from './infrastructure/llm/gemini-llm.adapter';
 import { ManualTriggerExecutor } from './application/executors/manual-trigger-executor';
 import { GoogleSheetReadRowsExecutor } from './application/executors/google-sheet-read-rows-executor';
 import { FilterExecutor } from './application/executors/filter-executor';
 import { GmailSendExecutor } from './application/executors/gmail-send-executor';
+import { AggregateExecutor } from './application/executors/aggregate-executor';
+import {
+  LlmGenerateExecutor,
+  parseMaxItemsCeiling,
+} from './application/executors/llm-generate-executor';
 import { INodeExecutor } from './domain/entities/node-executor';
 
 @Module({
@@ -20,7 +32,36 @@ import { INodeExecutor } from './domain/entities/node-executor';
     GoogleSheetReadRowsExecutor,
     FilterExecutor,
     GmailSendExecutor,
+    AggregateExecutor,
+    AnthropicLlmAdapter,
+    OpenAiLlmAdapter,
+    GeminiLlmAdapter,
+    {
+      provide: 'LLM_PROVIDERS',
+      useFactory: (
+        anthropic: AnthropicLlmAdapter,
+        openai: OpenAiLlmAdapter,
+        gemini: GeminiLlmAdapter,
+      ): LlmProvider[] => [anthropic, openai, gemini],
+      inject: [AnthropicLlmAdapter, OpenAiLlmAdapter, GeminiLlmAdapter],
+    },
+    {
+      provide: LlmProviderRegistry,
+      useFactory: (providers: LlmProvider[]) =>
+        new LlmProviderRegistry(providers),
+      inject: ['LLM_PROVIDERS'],
+    },
+    {
+      provide: LlmGenerateExecutor,
+      useFactory: (registry: LlmProviderRegistry) =>
+        new LlmGenerateExecutor(
+          registry,
+          parseMaxItemsCeiling(process.env['LLM_MAX_ITEMS']),
+        ),
+      inject: [LlmProviderRegistry],
+    },
     { provide: ExecutionRepository, useClass: PrismaExecutionRepository },
+    { provide: NodeCatalogPort, useClass: NodeCatalogAdapter },
     {
       provide: 'NODE_EXECUTORS',
       useFactory: (
@@ -28,17 +69,23 @@ import { INodeExecutor } from './domain/entities/node-executor';
         googleSheetReadRowsExecutor: GoogleSheetReadRowsExecutor,
         filterExecutor: FilterExecutor,
         gmailSendExecutor: GmailSendExecutor,
-      ): INodeExecutor<unknown, unknown, unknown>[] => [
+        aggregateExecutor: AggregateExecutor,
+        llmGenerateExecutor: LlmGenerateExecutor,
+      ): INodeExecutor[] => [
         manualTriggerExecutor,
         googleSheetReadRowsExecutor,
         filterExecutor,
         gmailSendExecutor,
+        aggregateExecutor,
+        llmGenerateExecutor,
       ],
       inject: [
         ManualTriggerExecutor,
         GoogleSheetReadRowsExecutor,
         FilterExecutor,
         GmailSendExecutor,
+        AggregateExecutor,
+        LlmGenerateExecutor,
       ],
     },
     StartExecutionHandler,

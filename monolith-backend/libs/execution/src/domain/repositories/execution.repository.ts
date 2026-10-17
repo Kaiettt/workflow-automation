@@ -3,6 +3,7 @@ import {
   WorkflowVersionForExecution,
   ExecutionRecord,
   NodeLogRecord,
+  ResolvedCredential,
 } from '../models/execution.types';
 
 export abstract class ExecutionRepository {
@@ -11,7 +12,7 @@ export abstract class ExecutionRepository {
   abstract resolveCredential(
     credentialId: string,
     ownerId: string,
-  ): Promise<unknown>;
+  ): Promise<ResolvedCredential>;
   abstract saveNodeLog(executionId: string, log: NodeLogRecord): Promise<void>;
   abstract finishExecution(
     id: string,

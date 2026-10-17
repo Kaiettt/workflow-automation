@@ -1,19 +1,35 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDesignerStore } from '../store/designer.store';
 import type { Node } from '@xyflow/react';
 import { apiClient } from '../../../shared/api/http-client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  dependentKeys,
+  getProperties,
+  isDuplicateNodeName,
+  orderedProperties,
+} from '../utils/node-config';
+import { ConfigField } from './config-fields/ConfigField';
 
 interface PropertiesPanelProps {
   nodes: Node[];
   onNodeDataChange: (nodeId: string, data: Record<string, unknown>) => void;
+  onDeleteNode: (nodeId: string) => void;
 }
 
-export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProps) {
+const PANEL_CLASS =
+  'w-80 bg-white border-l border-gray-200 h-full shadow-sm z-10 flex flex-col';
+
+export function PropertiesPanel({ nodes, onNodeDataChange, onDeleteNode }: PropertiesPanelProps) {
   const selectedNodeId = useDesignerStore((state) => state.selectedNodeId);
   const nodeTypes = useDesignerStore((state) => state.nodeTypes);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
   const nodeType = selectedNode ? nodeTypes.find((t) => t.key === selectedNode.data?.key) : null;
+  // Stable between renders so the OAuth message listener is not re-attached each time.
+  const properties = useMemo(() => getProperties(nodeType?.configSchema), [nodeType]);
 
   const [localConfig, setLocalConfig] = useState<Record<string, unknown>>(() => {
     return (selectedNode?.data?.config as Record<string, unknown>) || {};
@@ -25,20 +41,29 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
     setLocalConfig((selectedNode?.data?.config as Record<string, unknown>) || {});
   }
 
-  const handleConfigChange = useCallback((key: string, value: string) => {
-    if (!selectedNode) return;
-    const newConfig = { ...localConfig, [key]: value };
-    setLocalConfig(newConfig);
-    onNodeDataChange(selectedNode.id, { ...selectedNode.data, config: newConfig });
-  }, [selectedNode, localConfig, onNodeDataChange]);
+  // `undefined` removes the key. Fields that depend on this one (a credential
+  // picked for a provider) are cleared, as their old value no longer applies.
+  const handleConfigChange = useCallback(
+    (key: string, value: unknown) => {
+      if (!selectedNode) return;
+      const newConfig = { ...localConfig };
+      if (value === undefined) delete newConfig[key];
+      else newConfig[key] = value;
+      if (value !== localConfig[key]) {
+        for (const dependent of dependentKeys(nodeType?.configSchema, key)) {
+          delete newConfig[dependent];
+        }
+      }
+      setLocalConfig(newConfig);
+      onNodeDataChange(selectedNode.id, { ...selectedNode.data, config: newConfig });
+    },
+    [selectedNode, localConfig, nodeType, onNodeDataChange],
+  );
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'oauth-success') {
-        const properties = nodeType?.configSchema?.properties as Record<string, unknown> | undefined;
-        const currentKey = Object.keys(properties || {}).find(
-          k => (properties![k] as Record<string, unknown>)['x-connectorKey']
-        );
+        const currentKey = Object.keys(properties).find((k) => properties[k]['x-connectorKey']);
         if (currentKey && event.data.credentialId) {
           handleConfigChange(currentKey, event.data.credentialId);
         }
@@ -46,17 +71,20 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [nodeType, handleConfigChange]);
+  }, [properties, handleConfigChange]);
 
   if (!selectedNode || !nodeType) {
     return (
-      <aside className="w-80 bg-white border-l border-gray-200 p-4 h-full shadow-sm z-10 flex flex-col">
+      <aside className={`${PANEL_CLASS} p-4`}>
         <div className="text-gray-500 text-sm italic text-center mt-10">
           Select a node to view its properties.
         </div>
       </aside>
     );
   }
+
+  const nodeName = String(selectedNode.data?.name ?? '');
+  const nameIsDuplicate = isDuplicateNodeName(nodes, selectedNode.id, nodeName);
 
   const handleConnect = async () => {
     try {
@@ -69,91 +97,60 @@ export function PropertiesPanel({ nodes, onNodeDataChange }: PropertiesPanelProp
     }
   };
 
-  const renderField = (key: string, schema: Record<string, unknown>): React.ReactNode => {
-    const value = (localConfig[key] as string) || '';
 
-    // 1. Connection Button
-    if (schema['x-connectorKey']) {
-      return (
-        <div key={key} className="space-y-1.5">
-          <label className="block text-sm font-medium text-gray-700 capitalize">
-            {key.replace(/_/g, ' ')}
-          </label>
-          <button
-            className="w-full bg-blue-50 text-blue-600 border border-blue-200 rounded-md py-2 text-sm font-medium hover:bg-blue-100 transition-colors"
-            onClick={() => handleConnect()}
-          >
-            Connect {schema['x-connectorKey'] as string}
-          </button>
-          {value && <div className="text-xs text-green-600 mt-1">✓ Connected</div>}
-        </div>
-      );
-    }
-
-    // 2. Enum Dropdown
-    if (schema.enum && Array.isArray(schema.enum)) {
-      return (
-        <div key={key} className="space-y-1.5">
-          <label className="block text-sm font-medium text-gray-700 capitalize">
-            {key.replace(/_/g, ' ')}
-          </label>
-          <select
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
-            value={value}
-            onChange={(e) => handleConfigChange(key, e.target.value)}
-          >
-            <option value="" disabled>Select {key}</option>
-            {schema.enum.map((opt: string) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        </div>
-      );
-    }
-
-    // 3. Standard Text Input (with Expression support)
-    const isExpression = schema['x-allowExpression'] === true;
-    return (
-      <div key={key} className="space-y-1.5">
-        <div className="flex justify-between items-center">
-          <label className="block text-sm font-medium text-gray-700 capitalize">
-            {key.replace(/_/g, ' ')}
-          </label>
-          {isExpression && (
-            <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-mono border border-purple-200">
-              fx
-            </span>
-          )}
-        </div>
-        <input
-          type="text"
-          className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
-          value={value}
-          onChange={(e) => handleConfigChange(key, e.target.value)}
-          placeholder={isExpression ? "{{nodeId.output}}" : `Enter ${key}`}
-        />
-      </div>
-    );
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const properties = (nodeType.configSchema as any)?.properties || {};
+  const fields = orderedProperties(nodeType.configSchema).filter(
+    ([key]) => key !== 'input_schema' && key !== 'output_schema',
+  );
 
   return (
-    <aside className="w-80 bg-white border-l border-gray-200 h-full shadow-sm z-10 flex flex-col">
+    <aside className={PANEL_CLASS}>
       <div className="p-4 border-b border-gray-200">
-        <h3 className="font-semibold text-gray-800 text-lg truncate">{selectedNode.data?.name as string}</h3>
         <p className="text-xs text-gray-500 uppercase tracking-wider">{nodeType.displayName}</p>
+        <Label htmlFor="node-name" className="mt-2 mb-1.5">
+          Name
+        </Label>
+        <Input
+          id="node-name"
+          value={nodeName}
+          onChange={(e) =>
+            onNodeDataChange(selectedNode.id, { ...selectedNode.data, name: e.target.value })
+          }
+          aria-invalid={nameIsDuplicate}
+        />
+        {nameIsDuplicate && (
+          <p className="text-xs text-amber-600 mt-1.5">
+            Another node already uses this name, so {'$node["' + nodeName + '"]'} is ambiguous.
+            Rename one of them.
+          </p>
+        )}
       </div>
 
       <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">
-        {Object.keys(properties).length === 0 ? (
+        {fields.length === 0 ? (
           <div className="text-sm text-gray-500 italic">No configuration required.</div>
         ) : (
-          Object.entries(properties)
-            .filter(([key]) => key !== 'input_schema' && key !== 'output_schema')
-            .map(([key, schema]) => renderField(key, schema as Record<string, unknown>))
+          fields.map(([key, schema]) => (
+            <ConfigField
+              key={key}
+              fieldKey={key}
+              schema={schema}
+              config={localConfig}
+              onChange={handleConfigChange}
+              onConnectOAuth={() => void handleConnect()}
+            />
+          ))
         )}
+      </div>
+
+      <div className="p-4 border-t border-gray-200">
+        <Button
+          type="button"
+          variant="destructive"
+          className="w-full"
+          onClick={() => onDeleteNode(selectedNode.id)}
+        >
+          Delete node
+        </Button>
       </div>
     </aside>
   );

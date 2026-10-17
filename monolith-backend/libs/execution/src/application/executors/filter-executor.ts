@@ -1,24 +1,22 @@
-import { INodeExecutor } from '../../domain/entities/node-executor';
+import { IPerItemExecutor } from '../../domain/entities/node-executor';
 import { NodeKeys } from '../../domain/constants/execution.constants';
+import { Item, ItemJson } from '../../domain/models/item';
+import { readField } from '../../domain/expression/path';
 
 export type FilterOperator = 'equals' | 'not_equals' | 'contains';
 
 export interface FilterConfig {
+  // Path inside the item, e.g. "status" or "data.label".
   field: string;
   operator: FilterOperator;
   value: unknown;
 }
 
-export type FilterRow = Record<string, unknown>;
-
 const OPERATORS = new Set<FilterOperator>(['equals', 'not_equals', 'contains']);
 
-export class FilterExecutor implements INodeExecutor<
-  FilterConfig,
-  FilterRow[],
-  FilterRow[]
-> {
+export class FilterExecutor implements IPerItemExecutor<FilterConfig> {
   readonly key = NodeKeys.LOGIC_FILTER;
+  readonly runMode = 'per_item' as const;
 
   parseConfig(raw: unknown): FilterConfig {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -48,30 +46,14 @@ export class FilterExecutor implements INodeExecutor<
     };
   }
 
-  parseInput(raw: unknown): FilterRow[] {
-    if (!Array.isArray(raw)) {
-      throw new Error('Filter input must be an array of objects');
-    }
-    return raw.map((item, index) => {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) {
-        throw new Error(
-          `Filter input item at index ${index} must be an object`,
-        );
-      }
-      return item as FilterRow;
-    });
-  }
-
-  execute(params: {
+  // Keeps the item unchanged when it matches, drops it otherwise.
+  executeItem(params: {
     config: FilterConfig;
-    input: FilterRow[] | null;
+    item: Item;
     credential: unknown;
-  }): Promise<FilterRow[]> {
-    if (params.input === null) {
-      throw new Error('Filter input must be an array of objects');
-    }
+  }): Promise<ItemJson | null> {
     return Promise.resolve(
-      params.input.filter((row) => matches(row, params.config)),
+      matches(params.item.json, params.config) ? params.item.json : null,
     );
   }
 }
@@ -85,8 +67,8 @@ function toComparableText(value: unknown): string {
   return JSON.stringify(value) ?? '';
 }
 
-function matches(row: FilterRow, config: FilterConfig): boolean {
-  const actual = row[config.field];
+function matches(json: ItemJson, config: FilterConfig): boolean {
+  const actual = readField(json, config.field);
   if (config.operator === 'equals') return actual === config.value;
   if (config.operator === 'not_equals') return actual !== config.value;
   return toComparableText(actual).includes(toComparableText(config.value));
