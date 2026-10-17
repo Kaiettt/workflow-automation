@@ -1,13 +1,4 @@
-import { PrismaClient, UserRole, ConnectorAuthType, NodeCategory } from '@prisma/client';
-import {
-  AGGREGATE_CONFIG_SCHEMA,
-  API_KEY_CONNECTOR_CONFIG_SCHEMA,
-  FILTER_CONFIG_SCHEMA,
-  GMAIL_SEND_CONFIG_SCHEMA,
-  GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA,
-  LLM_GENERATE_CONFIG_SCHEMA,
-  MANUAL_TRIGGER_CONFIG_SCHEMA,
-} from './mvp-node-schemas';
+import { PrismaClient, UserRole, ConnectorAuthType, NodeCategory, Prisma } from '@prisma/client';
 
 export async function seedMvp(prisma: PrismaClient) {
   // Define constants for UUIDs used in sample-data
@@ -29,52 +20,34 @@ export async function seedMvp(prisma: PrismaClient) {
     },
   });
 
-  // 2. Seed Connector (catalog data: kept in sync on every run)
+  // 2. Seed Connector
   console.log('Seeding Connector...');
-  const googleConnector = {
-    key: 'google',
-    name: 'Google',
-    authType: ConnectorAuthType.OAUTH2,
-    configSchema: {
-      type: 'object',
-      properties: {
-        client_id: { type: 'string' },
-      },
-    },
-    isActive: true,
-  };
   await prisma.connector.upsert({
     where: { id: googleConnectorId },
-    update: googleConnector,
-    create: { id: googleConnectorId, ...googleConnector },
+    update: {},
+    create: {
+      id: googleConnectorId,
+      key: 'google',
+      name: 'Google',
+      authType: ConnectorAuthType.OAUTH2,
+      configSchema: {
+        type: 'object',
+        properties: {
+          client_id: { type: 'string' }
+        }
+      },
+      isActive: true,
+    },
   });
 
-  // LLM vendors: the user brings an API key (stored encrypted as a credential).
-  const llmConnectors = [
-    { id: '22222222-2222-2222-2222-222222222222', key: 'anthropic', name: 'Anthropic' },
-    { id: '22222222-2222-2222-2222-222222222223', key: 'openai', name: 'OpenAI' },
-    { id: '22222222-2222-2222-2222-222222222224', key: 'gemini', name: 'Google Gemini' },
-  ];
-  for (const { id, ...llmConnector } of llmConnectors) {
-    const data = {
-      ...llmConnector,
-      authType: ConnectorAuthType.API_KEY,
-      configSchema: API_KEY_CONNECTOR_CONFIG_SCHEMA,
-      isActive: true,
-    };
-    await prisma.connector.upsert({
-      where: { key: llmConnector.key },
-      update: data,
-      create: { id, ...data },
-    });
-  }
-
-  // 3. Seed Node Type Definitions (catalog data: kept in sync on every run,
-  // otherwise databases seeded earlier would keep an outdated config_schema)
+  // 3. Seed Node Type Definitions
   console.log('Seeding Node Type Definitions...');
 
-  const nodeTypes = [
-    {
+  // 3.1 Trigger Manual
+  await prisma.nodeTypeDefinition.upsert({
+    where: { key: 'trigger.manual' },
+    update: {},
+    create: {
       id: '44444444-4444-4444-4444-444444444441',
       key: 'trigger.manual',
       displayName: 'Manual Trigger',
@@ -82,10 +55,19 @@ export async function seedMvp(prisma: PrismaClient) {
       color: '#6B7280',
       category: NodeCategory.TRIGGER,
       description: 'Manually start a workflow',
-      configSchema: MANUAL_TRIGGER_CONFIG_SCHEMA,
+      configSchema: { type: 'object', properties: {} },
+      inputSchema: { type: 'object' },
+      outputSchema: { type: 'object' },
       connectorId: null,
+      isActive: true,
     },
-    {
+  });
+
+  // 3.2 Google Sheet Read Rows
+  await prisma.nodeTypeDefinition.upsert({
+    where: { key: 'integration.google_sheet.readRows' },
+    update: {},
+    create: {
       id: '44444444-4444-4444-4444-444444444442',
       key: 'integration.google_sheet.readRows',
       displayName: 'Read Google Sheet Rows',
@@ -93,10 +75,27 @@ export async function seedMvp(prisma: PrismaClient) {
       color: '#34A853',
       category: NodeCategory.INTEGRATION,
       description: 'Read rows from a Google Sheet',
-      configSchema: GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA,
+      configSchema: {
+        type: 'object',
+        required: ['credential_id', 'spreadsheet_id', 'sheet_name'],
+        properties: {
+          credential_id: { type: 'string', 'x-connectorKey': 'google' },
+          spreadsheet_id: { type: 'string' },
+          sheet_name: { type: 'string' }
+        }
+      },
+      inputSchema: { type: 'object' },
+      outputSchema: { type: 'object' },
       connectorId: googleConnectorId,
+      isActive: true,
     },
-    {
+  });
+
+  // 3.3 Logic Filter
+  await prisma.nodeTypeDefinition.upsert({
+    where: { key: 'logic.filter' },
+    update: {},
+    create: {
       id: '44444444-4444-4444-4444-444444444443',
       key: 'logic.filter',
       displayName: 'Filter',
@@ -104,10 +103,27 @@ export async function seedMvp(prisma: PrismaClient) {
       color: '#8B5CF6',
       category: NodeCategory.LOGIC,
       description: 'Filter items based on a condition',
-      configSchema: FILTER_CONFIG_SCHEMA,
+      configSchema: {
+        type: 'object',
+        required: ['field', 'operator', 'value'],
+        properties: {
+          field: { type: 'string', 'x-allowExpression': true },
+          operator: { type: 'string', enum: ['equals', 'not_equals', 'contains'] },
+          value: { type: 'string', 'x-allowExpression': true }
+        }
+      },
+      inputSchema: { type: 'object' },
+      outputSchema: { type: 'object' },
       connectorId: null,
+      isActive: true,
     },
-    {
+  });
+
+  // 3.4 Gmail Send
+  await prisma.nodeTypeDefinition.upsert({
+    where: { key: 'integration.gmail.send' },
+    update: {},
+    create: {
       id: '44444444-4444-4444-4444-444444444444',
       key: 'integration.gmail.send',
       displayName: 'Send Gmail',
@@ -115,47 +131,23 @@ export async function seedMvp(prisma: PrismaClient) {
       color: '#EA4335',
       category: NodeCategory.INTEGRATION,
       description: 'Send an email using Gmail',
-      configSchema: GMAIL_SEND_CONFIG_SCHEMA,
-      connectorId: googleConnectorId,
-    },
-    {
-      id: '44444444-4444-4444-4444-444444444445',
-      key: 'data.aggregate',
-      displayName: 'Aggregate',
-      icon: 'layers',
-      color: '#F59E0B',
-      category: NodeCategory.DATA_PROCESSING,
-      description: 'Combine all items into a single item',
-      configSchema: AGGREGATE_CONFIG_SCHEMA,
-      connectorId: null,
-    },
-    {
-      id: '44444444-4444-4444-4444-444444444446',
-      key: 'ai.llm.generate',
-      displayName: 'LLM',
-      icon: 'sparkles',
-      color: '#0EA5E9',
-      category: NodeCategory.AI,
-      description: 'Send a prompt to a language model and get its answer',
-      configSchema: LLM_GENERATE_CONFIG_SCHEMA,
-      // Not tied to one connector: the provider is chosen on the node.
-      connectorId: null,
-    },
-  ];
-
-  for (const { id, ...nodeType } of nodeTypes) {
-    const data = {
-      ...nodeType,
+      configSchema: {
+        type: 'object',
+        required: ['credential_id', 'subject', 'body'],
+        properties: {
+          credential_id: { type: 'string', 'x-connectorKey': 'google' },
+          subject: { type: 'string', 'x-allowExpression': true },
+          body: { type: 'string', 'x-allowExpression': true }
+        }
+      },
       inputSchema: { type: 'object' },
       outputSchema: { type: 'object' },
+      connectorId: googleConnectorId,
       isActive: true,
-    };
-    await prisma.nodeTypeDefinition.upsert({
-      where: { key: nodeType.key },
-      update: data,
-      create: { id, ...data },
-    });
-  }
+    },
+  });
 
   console.log('Seeded MVP catalogs successfully!');
 }
+
+

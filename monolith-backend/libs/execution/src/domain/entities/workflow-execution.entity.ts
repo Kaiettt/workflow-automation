@@ -16,6 +16,8 @@ export interface WorkflowDefinition {
   [key: string]: unknown;
 }
 
+// The edges may be stored in any order (the designer appends them as the user
+// draws them), so the chain is rebuilt by following source -> target.
 export function getExecutionOrder(definition: unknown): string[] {
   if (!definition || typeof definition !== 'object')
     throw new Error('Workflow definition is invalid');
@@ -24,23 +26,39 @@ export function getExecutionOrder(definition: unknown): string[] {
     throw new Error('Workflow definition must contain a non-empty edge chain');
   if (!Array.isArray(graph.nodes))
     throw new Error('Workflow definition must contain nodes');
-  const order = [graph.edges[0].source];
-  for (let index = 0; index < graph.edges.length; index += 1) {
-    const edge = graph.edges[index];
+
+  const nextOf = new Map<string, string>();
+  const targets = new Set<string>();
+  for (const edge of graph.edges) {
     if (
       !edge ||
       typeof edge.source !== 'string' ||
       typeof edge.target !== 'string' ||
-      (index > 0 && edge.source !== graph.edges[index - 1].target)
+      nextOf.has(edge.source) ||
+      targets.has(edge.target)
     ) {
       throw new Error('Workflow edges must form a single directed chain');
     }
-    order.push(edge.target);
+    nextOf.set(edge.source, edge.target);
+    targets.add(edge.target);
   }
+
+  const starts = [...nextOf.keys()].filter((id) => !targets.has(id));
+  if (starts.length !== 1) {
+    throw new Error('Workflow edges must form a single directed chain');
+  }
+  const order = [starts[0]];
+  for (let next = nextOf.get(starts[0]); next; next = nextOf.get(next)) {
+    order.push(next);
+  }
+  if (order.length !== graph.edges.length + 1) {
+    throw new Error('Workflow edges must form a single directed chain');
+  }
+
   const nodesById = new Map(graph.nodes.map((node) => [node.id, node]));
   for (const id of order) {
-    if (typeof id !== 'string' || !nodesById.has(id))
-      throw new Error(`Workflow edge references missing node: ${String(id)}`);
+    if (!nodesById.has(id))
+      throw new Error(`Workflow edge references missing node: ${id}`);
   }
   return order;
 }
