@@ -37,8 +37,14 @@ export class NodeTypeDefinitionMapper {
         return NodeCategory.DATA_PROCESSING;
       case PrismaNodeCategory.INTEGRATION:
         return NodeCategory.INTEGRATION;
-      default:
-        return NodeCategory.LOGIC;
+      case PrismaNodeCategory.AI:
+        return NodeCategory.AI;
+      default: {
+        // A new database value must be mapped here; the compiler flags it
+        // instead of quietly filing the node under another category.
+        const unmapped: never = category;
+        throw new Error(`Unknown node category: ${String(unmapped)}`);
+      }
     }
   }
 }

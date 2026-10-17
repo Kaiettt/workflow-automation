@@ -25,3 +25,8 @@ export interface NodeLogRecord {
   startedAt: Date;
   finishedAt: Date;
 }
+
+export interface ResolvedCredential {
+  connectorKey: string;
+  secret: unknown;
+}

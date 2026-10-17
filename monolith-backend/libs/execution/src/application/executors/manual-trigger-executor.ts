@@ -1,22 +1,19 @@
-import { INodeExecutor } from '../../domain/entities/node-executor';
+import { IOnceExecutor } from '../../domain/entities/node-executor';
 import { NodeKeys } from '../../domain/constants/execution.constants';
+import { Item } from '../../domain/models/item';
 
-export class ManualTriggerExecutor implements INodeExecutor<
-  Record<string, never>,
-  null,
-  null
+export class ManualTriggerExecutor implements IOnceExecutor<
+  Record<string, never>
 > {
   readonly key = NodeKeys.TRIGGER_MANUAL;
+  readonly runMode = 'once' as const;
 
   parseConfig(): Record<string, never> {
     return {};
   }
 
-  parseInput(): null {
-    return null;
-  }
-
-  execute(): Promise<null> {
-    return Promise.resolve(null);
+  // A single empty item starts the flow for the nodes that follow.
+  execute(): Promise<Item[]> {
+    return Promise.resolve([{ json: {} }]);
   }
 }

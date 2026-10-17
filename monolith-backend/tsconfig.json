@@ -33,8 +33,11 @@
       "@app/database/*": ["libs/database/src/*"],
       "@app/auth": ["libs/auth/src"],
       "@app/auth/*": ["libs/auth/src/*"],
+      "@app/node-library": ["libs/node-library/src"],
+      "@app/node-library/*": ["libs/node-library/src/*"],
       "@app/integrations": ["libs/integrations/src"],
-      "@app/integrations/*": ["libs/integrations/src/*"]
+      "@app/integrations/*": ["libs/integrations/src/*"],
+      "@test/*": ["test/*"]
     },
     "incremental": true,
     "skipLibCheck": true,

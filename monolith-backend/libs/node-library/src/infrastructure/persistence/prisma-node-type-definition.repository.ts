@@ -18,4 +18,12 @@ export class PrismaNodeTypeDefinitionRepository implements NodeTypeDefinitionRep
 
     return nodeTypes.map((row) => NodeTypeDefinitionMapper.toDomain(row));
   }
+
+  async findByKeys(keys: string[]): Promise<NodeTypeDefinition[]> {
+    const nodeTypes = await this.prisma.nodeTypeDefinition.findMany({
+      where: { key: { in: keys } },
+    });
+
+    return nodeTypes.map((row) => NodeTypeDefinitionMapper.toDomain(row));
+  }
 }

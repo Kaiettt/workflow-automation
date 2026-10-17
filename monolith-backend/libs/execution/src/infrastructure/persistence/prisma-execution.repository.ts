@@ -7,6 +7,7 @@ import { ExecutionStatus } from '../../domain/constants/execution.constants';
 import {
   ExecutionRecord,
   NodeLogRecord,
+  ResolvedCredential,
   WorkflowVersionForExecution,
 } from '../../domain/models/execution.types';
 
@@ -51,7 +52,7 @@ export class PrismaExecutionRepository implements ExecutionRepository {
   async resolveCredential(
     credentialId: string,
     ownerId: string,
-  ): Promise<unknown> {
+  ): Promise<ResolvedCredential> {
     const credential = await this.prisma.connectorCredential.findUnique({
       where: { id: credentialId },
       include: { connector: true },
@@ -72,7 +73,10 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       credential.encryptedSecret,
       encryptionKey,
     );
-    return JSON.parse(plaintext);
+    return {
+      connectorKey: credential.connector.key,
+      secret: JSON.parse(plaintext) as unknown,
+    };
   }
 
   async saveNodeLog(executionId: string, log: NodeLogRecord): Promise<void> {

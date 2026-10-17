@@ -2,7 +2,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from './../src/app.module';
+import { AppModule } from '../../../apps/api/src/app.module';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
 
 describe('Publish Workflow (e2e)', () => {

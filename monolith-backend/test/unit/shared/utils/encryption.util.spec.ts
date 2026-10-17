@@ -1,4 +1,4 @@
-import { EncryptionUtil } from './encryption.util';
+﻿import { EncryptionUtil } from '@app/shared/utils/encryption.util';
 import { randomBytes } from 'crypto';
 
 describe('EncryptionUtil', () => {
@@ -23,8 +23,12 @@ describe('EncryptionUtil', () => {
 
   it('should throw an error on decryption if data is tampered with', () => {
     const encrypted = EncryptionUtil.encrypt('test', keyHex);
-    const tampered = encrypted.substring(0, encrypted.length - 1) + '0';
+    // Change the last character for certain; a fixed '0' left the data as it was
+    // about one run in sixteen, because the last hex digit is random.
+    const last = encrypted.slice(-1);
+    const tampered = encrypted.slice(0, -1) + (last === '0' ? '1' : '0');
 
     expect(() => EncryptionUtil.decrypt(tampered, keyHex)).toThrow();
   });
 });
+

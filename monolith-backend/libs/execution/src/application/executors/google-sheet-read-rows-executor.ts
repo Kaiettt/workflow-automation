@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { google } from 'googleapis';
-import { INodeExecutor } from '../../domain/entities/node-executor';
-import { NodeKeys } from '../../domain/constants/execution.constants';
+import { IOnceExecutor } from '../../domain/entities/node-executor';
+import {
+  ConnectorKeys,
+  NodeKeys,
+} from '../../domain/constants/execution.constants';
+import { Item } from '../../domain/models/item';
 
 const ConfigSchema = z.object({
   credential_id: z.string().min(1),
@@ -10,8 +14,6 @@ const ConfigSchema = z.object({
 });
 
 export type GoogleSheetReadRowsConfig = z.infer<typeof ConfigSchema>;
-
-const InputSchema = z.null();
 
 export interface GoogleSheetsValuesResponse {
   data: {
@@ -40,14 +42,10 @@ export type SheetsClientFactory = (credential: {
   refresh_token: string;
 }) => GoogleSheetsClient;
 
-export class GoogleSheetReadRowsExecutor implements INodeExecutor<
-  GoogleSheetReadRowsConfig,
-  null,
-  Array<Record<string, unknown>>
-> {
+export class GoogleSheetReadRowsExecutor implements IOnceExecutor<GoogleSheetReadRowsConfig> {
   readonly key = NodeKeys.GOOGLE_SHEET_READ_ROWS;
+  readonly runMode = 'once' as const;
   readonly configSchema = ConfigSchema;
-  readonly inputSchema = InputSchema;
   readonly credentialSchema = CredentialSchema;
 
   constructor(
@@ -72,23 +70,20 @@ export class GoogleSheetReadRowsExecutor implements INodeExecutor<
     return this.configSchema.parse(raw);
   }
 
-  parseInput(raw: unknown): null {
-    return this.inputSchema.parse(raw);
+  expectedConnectorKey(): string {
+    return ConnectorKeys.GOOGLE;
   }
 
   parseCredential(raw: unknown) {
     return this.credentialSchema.parse(raw);
   }
 
+  // The sheet is a source node: it ignores incoming items and emits one item per row.
   async execute(params: {
     config: GoogleSheetReadRowsConfig;
-    input: null;
+    items: Item[];
     credential: unknown;
-  }): Promise<Array<Record<string, unknown>>> {
-    if (params.input !== null) {
-      throw new Error('Google Sheets input must be null');
-    }
-
+  }): Promise<Item[]> {
     const googleCredential = this.parseCredential(params.credential);
     try {
       const sheets = this.sheetsClientFactory(googleCredential);
@@ -107,11 +102,11 @@ export class GoogleSheetReadRowsExecutor implements INodeExecutor<
       const headers = headerRow.map((header) => String(header));
 
       return dataRows.map((row) => {
-        const item: Record<string, unknown> = {};
+        const json: Record<string, unknown> = {};
         headers.forEach((header, index) => {
-          item[header] = row[index] ?? '';
+          json[header] = row[index] ?? '';
         });
-        return item;
+        return { json };
       });
     } catch (error) {
       const message =

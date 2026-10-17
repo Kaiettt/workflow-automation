@@ -14,28 +14,34 @@ import {
 } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { ExecutionRepository } from '../../../domain/repositories/execution.repository';
-import {
-  NodeLogRecord,
-  WorkflowVersionForExecution,
-} from '../../../domain/models/execution.types';
+import { WorkflowVersionForExecution } from '../../../domain/models/execution.types';
 import { ExecutionStatus } from '../../../domain/constants/execution.constants';
 import {
   getExecutionOrder,
   WorkflowDefinition,
 } from '../../../domain/entities/workflow-execution.entity';
 import { INodeExecutor } from '../../../domain/entities/node-executor';
+import {
+  buildNodeNameIndex,
+  NodeRun,
+} from '../../../domain/entities/run-state';
+import { Item } from '../../../domain/models/item';
+import { NodeCatalogPort } from '../../ports/node-catalog.port';
+import { NodeRunner } from '../../services/node-runner';
 
 @Injectable()
 @CommandHandler(StartExecutionCommand)
 export class StartExecutionHandler implements ICommandHandler<StartExecutionCommand> {
-  private readonly executors: ReadonlyMap<string, INodeExecutor>;
+  private readonly runner: NodeRunner;
 
   constructor(
     private readonly repository: ExecutionRepository,
     @Inject('NODE_EXECUTORS') executors: INodeExecutor[],
+    private readonly catalog: NodeCatalogPort,
   ) {
-    this.executors = new Map(
-      executors.map((executor) => [executor.key, executor]),
+    this.runner = new NodeRunner(
+      repository,
+      new Map(executors.map((executor) => [executor.key, executor])),
     );
   }
 
@@ -63,103 +69,24 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
     }
   }
 
-  private async resolveNodeCredential(
-    node: WorkflowDefinition['nodes'][number],
-    actorId: string,
-  ): Promise<unknown> {
-    const config = node.data?.config;
-    if (!config || typeof config !== 'object' || Array.isArray(config)) {
-      return null;
-    }
-
-    const candidate = (config as Record<string, unknown>).credential_id;
-    if (candidate === undefined) {
-      return null;
-    }
-
-    if (
-      typeof candidate !== 'string' ||
-      !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
-        candidate,
-      )
-    ) {
-      throw new BadRequestException('Invalid credential ID format');
-    }
-
-    return this.repository.resolveCredential(candidate, actorId);
-  }
-
-  private async executeSingleNode(
-    node: WorkflowDefinition['nodes'][number],
-    input: unknown,
-    actorId: string,
-  ): Promise<{ log: NodeLogRecord; output: unknown; status: ExecutionStatus }> {
-    const nodeStartedAt = new Date();
-    const executor = this.executors.get(node.data?.key);
-
-    try {
-      if (!executor) {
-        throw new Error(
-          `No executor registered for node key: ${String(node.data?.key)}`,
-        );
-      }
-
-      const config = executor.parseConfig
-        ? executor.parseConfig(node.data.config ?? {})
-        : (node.data.config ?? {});
-
-      const parsedInput = executor.parseInput
-        ? executor.parseInput(input)
-        : input;
-
-      const credential = await this.resolveNodeCredential(node, actorId);
-
-      const output = await executor.execute({
-        config,
-        input: parsedInput,
-        credential,
-      });
-
-      const log: NodeLogRecord = {
-        nodeId: node.id,
-        nodeKey: node.data.key,
-        status: ExecutionStatus.SUCCESS,
-        input: parsedInput,
-        output,
-        startedAt: nodeStartedAt,
-        finishedAt: new Date(),
-      };
-
-      return { log, output, status: ExecutionStatus.SUCCESS };
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Node execution failed';
-      const summary =
-        typeof error === 'object' && error !== null && 'summary' in error
-          ? (error as { summary?: unknown }).summary
-          : null;
-
-      const log: NodeLogRecord = {
-        nodeId: node.id,
-        nodeKey: node.data?.key ?? 'unknown',
-        status: ExecutionStatus.FAILED,
-        input,
-        output: summary,
-        errorMessage: sanitizeErrorText(message),
-        startedAt: nodeStartedAt,
-        finishedAt: new Date(),
-      };
-
-      return { log, output: null, status: ExecutionStatus.FAILED };
-    }
-  }
-
   async execute(command: StartExecutionCommand) {
     const version = await this.validateAndFetchWorkflow(
       command.workflowVersionId,
       command.actorId,
     );
     const order = this.calculateExecutionOrder(version.definition);
+
+    const definition = version.definition as WorkflowDefinition;
+    const nodes = new Map(definition.nodes.map((node) => [node.id, node]));
+    const names = buildNodeNameIndex(definition.nodes);
+    // A malformed node without a key must fail on its own (no executor),
+    // not break the catalog lookup for the whole run.
+    const nodeKeys = definition.nodes
+      .map((node) => node.data?.key)
+      .filter((key): key is string => typeof key === 'string');
+    const configSchemas = await this.catalog.getConfigSchemas([
+      ...new Set(nodeKeys),
+    ]);
 
     const startedAt = new Date();
     const executionId = await this.repository.createExecution({
@@ -169,19 +96,20 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
       startedAt,
     });
 
-    const definition = version.definition as WorkflowDefinition;
-    const nodes = new Map(definition.nodes.map((node) => [node.id, node]));
-
-    let currentInput: unknown = null;
+    const runs: NodeRun[] = [];
+    let items: Item[] = [];
     let finalStatus = ExecutionStatus.SUCCESS;
 
     for (const nodeId of order) {
       const node = nodes.get(nodeId)!;
-      const result = await this.executeSingleNode(
+      const result = await this.runner.run({
         node,
-        currentInput,
-        command.actorId,
-      );
+        items,
+        runs,
+        names,
+        configSchema: configSchemas.get(node.data?.key),
+        actorId: command.actorId,
+      });
 
       await this.repository.saveNodeLog(executionId, result.log);
 
@@ -189,7 +117,13 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
         finalStatus = ExecutionStatus.FAILED;
         break;
       }
-      currentInput = result.output;
+      runs.push({
+        nodeId: node.id,
+        nodeName: typeof node.data.name === 'string' ? node.data.name : node.id,
+        input: items,
+        output: result.output,
+      });
+      items = result.output;
     }
 
     const finishedAt = new Date();
@@ -202,13 +136,4 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
 
     return this.repository.findExecutionResult(executionId);
   }
-}
-
-function sanitizeErrorText(message: string): string {
-  return message
-    .replace(
-      /(access_token|refresh_token|token|encrypted_secret|ENCRYPTION_KEY|client_secret|Bearer [A-Za-z0-9._~+/=-]+)/gi,
-      '[REDACTED]',
-    )
-    .replace(/\b[a-fA-F0-9]{32,}\b/g, '[REDACTED]');
 }

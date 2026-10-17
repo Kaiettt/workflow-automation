@@ -134,6 +134,7 @@ enum NodeCategory {
   LOGIC
   DATA_PROCESSING
   INTEGRATION
+  AI
 }
 
 // Catalog các loại node có sẵn trong palette — KHÁC với instance node nằm

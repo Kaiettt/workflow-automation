@@ -5,4 +5,8 @@ export abstract class ConnectorCredentialRepository {
   abstract create(
     credential: ConnectorCredential,
   ): Promise<ConnectorCredential>;
+  abstract findByOwnerAndConnector(
+    ownerId: string,
+    connectorId: string,
+  ): Promise<ConnectorCredential[]>;
 }

@@ -1,5 +1,6 @@
 import { PrismaClient, UserRole } from '@prisma/client';
 import { seedMvp } from './seed-mvp';
+import { seedAi } from './seed-ai';
 
 const prisma = new PrismaClient();
 
@@ -43,6 +44,7 @@ async function main() {
 
   // Run MVP execution data seeding
   await seedMvp(prisma);
+  await seedAi(prisma);
 }
 
 main()

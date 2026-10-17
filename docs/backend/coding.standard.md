@@ -87,14 +87,21 @@ infrastructure → application, domain
 
 ## 7. Testing
 
-| Loại test | Phạm vi | Vị trí |
-|---|---|---|
-| Unit test | Domain entity, domain service, command/query handler (mock port) | Cùng cấp file, hậu tố `.spec.ts` |
-| Integration test | Infrastructure (repository thật với DB test/container) | `infrastructure/**/*.integration-spec.ts` |
-| E2E test | Presentation layer, gọi qua HTTP thật | `apps/api/test/*.e2e-spec.ts` |
+### 7.1. Nguyên tắc cốt lõi: Tách biệt hoàn toàn (Separation of Concerns)
+- **Zero test code in `src/`**: Thư mục `src/` của các module (`libs/`, `apps/`) CHỈ chứa mã nguồn production. Tuyệt đối không đặt file test (`*.spec.ts`), file mock, fixture hay test-helper bên trong cây thư mục `src/`.
+- Mọi hoạt động kiểm thử nằm tập trung trong thư mục gốc `test/` của backend.
+
+### 7.2. Phân loại và cấu trúc thư mục kiểm thử
+
+| Loại test | Thư mục | Hậu tố file | Mục đích & Quy ước |
+|---|---|---|---|
+| **Unit Test** | `test/unit/<module>/...` | `*.spec.ts` | Test độc lập từng Handler, Domain Entity, Service, Mapper. Mock 100% các dependency và port bên ngoài. Cấu trúc thư mục con ánh xạ 1:1 theo layer (`application/`, `domain/`, `infrastructure/`). |
+| **Integration Test** | `test/integration/<module>/...` | `*.integration-spec.ts` | Test kiểm tra tích hợp giữa code và hạ tầng thật (Prisma Repository với Postgres, Cache Service với Redis). |
+| **E2E Test** | `test/e2e/<module>/...` | `*.e2e-spec.ts` | Test toàn trình từ HTTP API qua `supertest`, kiểm tra đúng status code, schema response và tính toàn vẹn của luồng nghiệp vụ. |
+| **Test Support / Fixtures** | `test/support/<module>/...` | `*.test-support.ts` hoặc `*.fixture.ts` | Chứa các In-memory Repository, Fake Port, Object Mother, Builder và Mock API dùng chung cho các bộ test. |
 
 - Domain và application layer phải đạt coverage cao (mock hoàn toàn infrastructure qua interface) vì đây là phần chứa business logic quan trọng nhất.
-- Không mock Prisma trực tiếp trong test business logic — nếu thấy cần mock Prisma, nghĩa là logic đang nằm sai layer (nên nằm ở domain/application, test qua mock repository interface).
+- Không mock Prisma trực tiếp trong test business logic — sử dụng In-Memory Repository kế thừa domain repository interface (đặt tại `test/support/`).
 
 ---
 

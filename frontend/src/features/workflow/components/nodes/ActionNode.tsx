@@ -1,6 +1,6 @@
 import { Handle, Position } from '@xyflow/react';
 import { useDesignerStore } from '../../store/designer.store';
-import { Play, Settings } from 'lucide-react';
+import { NodeIcon } from './NodeIcon';
 
 interface NodeProps {
   data: {
@@ -27,13 +27,7 @@ export function ActionNode({ data }: NodeProps) {
         Action
       </div>
       <div className="p-3 text-sm text-gray-700 flex items-center gap-3">
-        {nodeType?.icon?.startsWith('http') ? (
-          <img src={nodeType.icon} alt={data.name} className="w-5 h-5 object-contain" />
-        ) : nodeType?.icon === 'play' ? (
-          <Play className="w-5 h-5" style={{ color }} />
-        ) : (
-          <Settings className="w-5 h-5 text-gray-500" />
-        )}
+        <NodeIcon icon={nodeType?.icon} name={data.name} color={color} />
         <span className="font-medium truncate">{data.name}</span>
       </div>
       

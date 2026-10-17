@@ -21,6 +21,7 @@ import '@xyflow/react/dist/style.css';
 import { TriggerNode } from './nodes/TriggerNode';
 import { ActionNode } from './nodes/ActionNode';
 import { useDesignerStore } from '../store/designer.store';
+import { getDefaultConfig, uniqueNodeName } from '../utils/node-config';
 
 interface CanvasProps {
   nodes: Node[];
@@ -85,16 +86,28 @@ function CanvasContent({ nodes, edges, onNodesChange, onEdgesChange, setNodes, s
         y: event.clientY,
       });
 
-      const newNode: Node = {
-        id: `${type}-${Date.now()}`,
-        type,
-        position,
-        data: { name, key, config: {} },
-      };
+      const catalogNode = Array.isArray(catalogNodeTypes)
+        ? catalogNodeTypes.find((nt) => nt.key === key)
+        : undefined;
 
-      setNodes((nds) => nds.concat(newNode));
+      setNodes((nds) => {
+        const newNode: Node = {
+          id: `${type}-${Date.now()}`,
+          type,
+          position,
+          data: {
+            name: uniqueNodeName(
+              name,
+              nds.map((node) => String(node.data?.name ?? '')),
+            ),
+            key,
+            config: getDefaultConfig(catalogNode?.configSchema),
+          },
+        };
+        return nds.concat(newNode);
+      });
     },
-    [screenToFlowPosition, setNodes]
+    [screenToFlowPosition, setNodes, catalogNodeTypes]
   );
 
   return (
@@ -107,6 +120,7 @@ function CanvasContent({ nodes, edges, onNodesChange, onEdgesChange, setNodes, s
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        deleteKeyCode={['Backspace', 'Delete']}
         nodeTypes={nodeTypes}
         onSelectionChange={(params) => {
           if (params.nodes.length > 0) {

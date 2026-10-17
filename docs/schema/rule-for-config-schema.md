@@ -79,7 +79,12 @@ Ngoài JSON Schema gốc, cố định 1 bộ `x-*` key dùng xuyên suốt:
 |---|---|---|
 | `x-refType: "credential"` | `config_schema` | UI render credential picker; **engine dùng để biết field nào cần gửi qua `CredentialVault.decrypt()`** trước khi truyền vào executor — tránh executor tự phải biết field nào là credential_id |
 | `x-connectorKey` | `config_schema`, field kiểu `x-refType: credential` | Filter danh sách credential đúng connector (không cho chọn nhầm credential Slack cho node Gmail) — validate được cả ở DB lẫn UI |
-| `x-allowExpression: true` | `config_schema` | Báo `template-resolver.ts` field này cần chạy qua `resolveConfig()`; field không đánh dấu thì **bỏ qua resolve** để tránh cost + tránh resolve nhầm chuỗi tình cờ chứa `{{` |
+| `x-allowExpression: true` | `config_schema` | Engine (`resolveConfig()` trong `libs/execution/src/domain/expression`) chỉ resolve `{{...}}` ở field có cờ này; field không đánh dấu thì **bỏ qua resolve** để tránh cost + tránh resolve nhầm chuỗi tình cờ chứa `{{`. Cú pháp và quy tắc giữ kiểu: xem mục D |
+| `x-connectorKeyFrom: "<field>"` | `config_schema`, field kiểu `x-refType: credential` | Dùng thay `x-connectorKey` khi một node phục vụ nhiều connector: connector của credential lấy theo giá trị đang chọn ở field `<field>` (vd. `provider`). UI chỉ liệt kê credential của connector đó, và **xoá credential đã chọn khi field `<field>` đổi**. Engine kiểm tra credential thuộc đúng connector qua `expectedConnectorKey(rawConfig)` của executor, nên field `<field>` không được là biểu thức |
+| `x-propertyOrder: ["a", "b", ...]` | `config_schema` (ở gốc schema, cạnh `properties`) | Thứ tự hiển thị các field trong form. Bắt buộc phải khai báo vì **JSONB của Postgres không giữ thứ tự key** (sắp lại theo độ dài), nên thứ tự viết trong `properties` bị mất. Field không được liệt kê hiện sau cùng |
+| `x-multiline: true` | `config_schema` | UI render textarea thay vì ô một dòng (prompt dài) |
+| `x-placeholderByField: { field, values }` | `config_schema` | UI hiện gợi ý (placeholder) lấy từ `values[<giá trị hiện tại của field>]` — vd. gợi ý tên model theo provider |
+| `default` | `config_schema` (JSON Schema chuẩn) | Engine điền giá trị này khi config **thiếu** key (`applySchemaDefaults`); UI điền sẵn khi thêm node lên canvas. Default có thể là biểu thức, vd. Gmail `to` = `{{$json.email}}` |
 | `x-secret: true` | `config_schema` (hiếm khi cần, vì secret thường đã nằm ở `credential_id`) | Field này bị **mask khi ghi vào `execution_node_logs.input`** — bổ sung lớp bảo vệ nếu 1 node nào đó lỡ cần nhập secret trực tiếp (không qua credential) |
 | `x-dynamicSource: { operation }` | `config_schema` | Field cần load option runtime (list channel, list sheet) — UI gọi `GET /connectors/:credentialId/dynamic-options?operation=...`, executor implement thêm 1 method `listOptions()` ngoài `execute()` |
 
@@ -96,10 +101,37 @@ Ngoài JSON Schema gốc, cố định 1 bộ `x-*` key dùng xuyên suốt:
 
 ---
 
-## D. Checklist khi thêm 1 node type mới (kết quả cuối cùng của toàn bộ thiết kế trên)
+## D. Hợp đồng item & cú pháp biểu thức (engine)
+
+Dữ liệu giữa các node luôn là `Item[]`, `Item = { json, pairedItem? }`. Mỗi executor tự khai báo cách chạy:
+
+| `runMode` | Engine làm gì | Node hiện có |
+|---|---|---|
+| `per_item` | Gọi `executeItem` một lần cho **mỗi** item; resolve config theo item đó; gán `pairedItem`. Trả `null`/`[]` → bỏ item | Filter, Gmail |
+| `once` | Resolve config một lần, gọi `execute` với toàn bộ `Item[]` | Manual Trigger, Google Sheet, Aggregate |
+
+Output của một node **chỉ chứa kết quả của chính node đó** (trừ Filter trả nguyên item); dữ liệu node trước lấy bằng `$node[...]`.
+
+Biểu thức (không phải JavaScript, chỉ truy cập dữ liệu):
+
+| Biểu thức | Ý nghĩa |
+|---|---|
+| `{{$json.name}}`, `{{$json.a.b[0]}}`, `{{$json["full name"]}}` | field của item hiện tại |
+| `{{$node["Read Customers"].json.email}}` | item của node đó **ghép cặp** với item hiện tại (đi ngược `pairedItem`) |
+| `{{$node["Read Customers"].all}}` | mảng `json` của mọi item output của node đó |
+| `{{name}}` | tương thích ngược, bằng `{{$json.name}}` |
+
+- Cả field chỉ là **một** biểu thức → giữ nguyên kiểu (number, object, array...); thiếu → `null`. Biểu thức lẫn trong chuỗi → nối chuỗi (thiếu → rỗng, object → JSON).
+- `$node["Tên"]` tra theo **tên hiển thị** (`data.name`). Tên không tồn tại, trùng, hoặc node chưa chạy → node `FAILED` kèm lý do. Đi qua node không ghép cặp (vd. Aggregate) thì `.json` báo lỗi, dùng `.all`.
+- Node `per_item` lỗi ở item thứ *k* → engine ghi `{ total_items, processed, failed_at_index }` vào output log.
+- `expectedConnectorKey(rawConfig)` của executor cho engine biết connector mà credential phải thuộc về; field dùng để suy ra nó không được là biểu thức.
+
+---
+
+## E. Checklist khi thêm 1 node type mới (kết quả cuối cùng của toàn bộ thiết kế trên)
 
 1. INSERT `node_type_definitions` với `config_schema`/`output_schema` đầy đủ `x-*` hint.
-2. Viết 1 class implement `NodeExecutor` (như `GmailSendExecutor`) — **chỉ chứa business logic gọi API**, không tự lo decrypt/resolve/log.
+2. Viết 1 class implement `INodeExecutor` (như `GmailSendExecutor`) — **chỉ chứa business logic gọi API**, không tự lo decrypt/resolve/log.
 3. `registry.register('integration.xxx.yyy', new XxxExecutor(...))`.
 4. Không đụng: `execute-node.ts`, `template-resolver.ts`, Designer form component.
 

@@ -4,7 +4,7 @@ export interface NodeType {
   displayName: string;
   icon: string;
   color: string;
-  category: 'TRIGGER' | 'LOGIC' | 'INTEGRATION';
+  category: 'TRIGGER' | 'LOGIC' | 'DATA_PROCESSING' | 'INTEGRATION' | 'AI';
   description: string;
   configSchema: {
     type: 'object';
