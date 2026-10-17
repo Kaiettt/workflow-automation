@@ -1,8 +1,8 @@
-import {
+﻿import {
   ExecutionStatus,
   NodeKeys,
-} from '../../../domain/constants/execution.constants';
-import { LlmProviderError } from '../../ports/llm-provider.port';
+} from '@app/execution/domain/constants/execution.constants';
+import { LlmProviderError } from '@app/execution/application/ports/llm-provider.port';
 import {
   aggregateNode,
   build,
@@ -17,7 +17,7 @@ import {
   logOf,
   sheetNode,
   trigger,
-} from './start-execution.test-support';
+} from '@test/support/execution/start-execution.test-support';
 
 const NAME = NodeKeys.AI_LLM_GENERATE;
 
@@ -334,3 +334,4 @@ describe('StartExecutionHandler with an LLM node', () => {
     });
   });
 });
+

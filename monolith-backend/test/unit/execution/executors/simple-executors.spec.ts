@@ -1,7 +1,7 @@
-import { AggregateExecutor } from './aggregate-executor';
-import { GmailSendExecutor } from './gmail-send-executor';
-import { GoogleSheetReadRowsExecutor } from './google-sheet-read-rows-executor';
-import { ManualTriggerExecutor } from './manual-trigger-executor';
+﻿import { AggregateExecutor } from '@app/execution/application/executors/aggregate-executor';
+import { GmailSendExecutor } from '@app/execution/application/executors/gmail-send-executor';
+import { GoogleSheetReadRowsExecutor } from '@app/execution/application/executors/google-sheet-read-rows-executor';
+import { ManualTriggerExecutor } from '@app/execution/application/executors/manual-trigger-executor';
 
 describe('ManualTriggerExecutor', () => {
   it('emits a single empty item to start the flow', async () => {
@@ -145,8 +145,8 @@ describe('GmailSendExecutor', () => {
     await executor.executeItem({
       config: executor.parseConfig({
         ...baseConfig,
-        subject: 'Chúc bạn một ngày tốt lành',
-        body: 'Chào bạn,\nTrân trọng',
+        subject: 'ChÃºc báº¡n má»™t ngÃ y tá»‘t lÃ nh',
+        body: 'ChÃ o báº¡n,\nTrÃ¢n trá»ng',
       }),
       item: { json: {} },
       credential,
@@ -154,12 +154,12 @@ describe('GmailSendExecutor', () => {
     const message = decode();
     const subject = /^Subject: =\?UTF-8\?B\?(.+)\?=$/m.exec(message);
     expect(Buffer.from(subject![1], 'base64').toString()).toBe(
-      'Chúc bạn một ngày tốt lành',
+      'ChÃºc báº¡n má»™t ngÃ y tá»‘t lÃ nh',
     );
     const encodedBody = message.split('\r\n\r\n')[1].replace(/\r\n/g, '');
     expect(message).toContain('Content-Transfer-Encoding: base64');
     expect(Buffer.from(encodedBody, 'base64').toString()).toBe(
-      'Chào bạn,\nTrân trọng',
+      'ChÃ o báº¡n,\nTrÃ¢n trá»ng',
     );
   });
 
@@ -201,3 +201,4 @@ describe('GmailSendExecutor', () => {
     ).rejects.toThrow();
   });
 });
+

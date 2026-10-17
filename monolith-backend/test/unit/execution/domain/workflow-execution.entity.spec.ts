@@ -1,4 +1,4 @@
-import { getExecutionOrder } from './workflow-execution.entity';
+import { getExecutionOrder } from '@app/execution/domain/entities/workflow-execution.entity';
 
 const node = (id: string) => ({ id, data: { key: 'k' } });
 const edge = (source: string, target: string) => ({ source, target });

@@ -1,7 +1,7 @@
-import { NodeCategory as PrismaNodeCategory } from '@prisma/client';
+﻿import { NodeCategory as PrismaNodeCategory } from '@prisma/client';
 import type { NodeTypeDefinition as PrismaNodeTypeDefinition } from '@prisma/client';
-import { NodeCategory } from '../../../domain/enums/node-category.enum';
-import { NodeTypeDefinitionMapper } from './node-type-definition.mapper';
+import { NodeCategory } from '@app/node-library/domain/enums/node-category.enum';
+import { NodeTypeDefinitionMapper } from '@app/node-library/infrastructure/persistence/mappers/node-type-definition.mapper';
 
 const row = (category: PrismaNodeCategory): PrismaNodeTypeDefinition => ({
   id: 'id-1',
@@ -52,3 +52,4 @@ describe('NodeTypeDefinitionMapper', () => {
     ).toThrow('Unknown node category: SOMETHING_NEW');
   });
 });
+

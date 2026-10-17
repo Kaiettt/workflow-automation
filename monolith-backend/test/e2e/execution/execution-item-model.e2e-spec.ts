@@ -8,7 +8,7 @@ import { PrismaService } from '@app/database/prisma/prisma.service';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
 import { ExecutionModule } from '@app/execution';
 import { NodeLibraryModule } from '@app/node-library';
-import { NodeCatalogPort } from '../../../libs/execution/src/application/ports/node-catalog.port';
+import { NodeCatalogPort } from '@app/execution/application/ports/node-catalog.port';
 
 // Runs real workflows through POST /api/executions against the real module wiring
 // and database. Only nodes that need no external service are used.

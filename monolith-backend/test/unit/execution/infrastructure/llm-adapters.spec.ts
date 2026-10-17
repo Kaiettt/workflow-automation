@@ -1,14 +1,14 @@
-import Anthropic from '@anthropic-ai/sdk';
+﻿import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { ApiError, FinishReason } from '@google/genai';
 import type { GenerateContentResponse } from '@google/genai';
 import {
   LlmGenerateRequest,
   LlmProviderError,
-} from '../../application/ports/llm-provider.port';
-import { AnthropicLlmAdapter } from './anthropic-llm.adapter';
-import { OpenAiLlmAdapter } from './openai-llm.adapter';
-import { GeminiLlmAdapter } from './gemini-llm.adapter';
+} from '@app/execution/application/ports/llm-provider.port';
+import { AnthropicLlmAdapter } from '@app/execution/infrastructure/llm/anthropic-llm.adapter';
+import { OpenAiLlmAdapter } from '@app/execution/infrastructure/llm/openai-llm.adapter';
+import { GeminiLlmAdapter } from '@app/execution/infrastructure/llm/gemini-llm.adapter';
 
 const request: LlmGenerateRequest = {
   model: 'm',
@@ -404,3 +404,4 @@ describe('GeminiLlmAdapter', () => {
     expect((await rejection(adapter.generate(request))).retryable).toBe(false);
   });
 });
+

@@ -1,10 +1,10 @@
-import { NodeReferenceError, PairedItemError } from '../expression/errors';
-import { Item } from '../models/item';
+﻿import { NodeReferenceError, PairedItemError } from '@app/execution/domain/expression/errors';
+import { Item } from '@app/execution/domain/models/item';
 import {
   buildNodeNameIndex,
   createExpressionContext,
   NodeRun,
-} from './run-state';
+} from '@app/execution/domain/entities/run-state';
 
 const item = (json: Record<string, unknown>, pairedItem?: number): Item => ({
   json,
@@ -129,3 +129,4 @@ describe('buildNodeNameIndex', () => {
     expect(index.size).toBe(1);
   });
 });
+

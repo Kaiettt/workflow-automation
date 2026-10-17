@@ -1,7 +1,7 @@
-import {
+﻿import {
   ExecutionStatus,
   NodeKeys,
-} from '../../../domain/constants/execution.constants';
+} from '@app/execution/domain/constants/execution.constants';
 import {
   build,
   chain,
@@ -14,8 +14,8 @@ import {
   Row,
   sheetNode,
   trigger,
-} from './start-execution.test-support';
-import { NodeCatalogPort } from '../../ports/node-catalog.port';
+} from '@test/support/execution/start-execution.test-support';
+import { NodeCatalogPort } from '@app/execution/application/ports/node-catalog.port';
 
 describe('StartExecutionHandler', () => {
   it('filters sheet rows to those whose status equals new', async () => {
@@ -339,3 +339,4 @@ describe('StartExecutionHandler', () => {
     expect(result.nodeLogs[1].errorMessage).toContain('No executor registered');
   });
 });
+

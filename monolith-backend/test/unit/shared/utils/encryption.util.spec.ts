@@ -1,4 +1,4 @@
-import { EncryptionUtil } from './encryption.util';
+﻿import { EncryptionUtil } from '@app/shared/utils/encryption.util';
 import { randomBytes } from 'crypto';
 
 describe('EncryptionUtil', () => {
@@ -31,3 +31,4 @@ describe('EncryptionUtil', () => {
     expect(() => EncryptionUtil.decrypt(tampered, keyHex)).toThrow();
   });
 });
+

@@ -1,8 +1,8 @@
-import { ExpressionSyntaxError } from './errors';
-import { parseExpression } from './parser';
-import { readField } from './path';
-import { applySchemaDefaults, resolveConfig } from './resolve-config';
-import { evaluateTemplate, ExpressionContext, parseTemplate } from './template';
+﻿import { ExpressionSyntaxError } from '@app/execution/domain/expression/errors';
+import { parseExpression } from '@app/execution/domain/expression/parser';
+import { readField } from '@app/execution/domain/expression/path';
+import { applySchemaDefaults, resolveConfig } from '@app/execution/domain/expression/resolve-config';
+import { evaluateTemplate, ExpressionContext, parseTemplate } from '@app/execution/domain/expression/template';
 
 const ctx = (json: Record<string, unknown>): ExpressionContext => ({
   currentItem: { json },
@@ -201,3 +201,4 @@ describe('resolveConfig / applySchemaDefaults', () => {
     });
   });
 });
+

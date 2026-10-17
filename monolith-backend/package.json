@@ -15,10 +15,11 @@
     "start:prod": "node dist/main",
     "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
+    "test:unit": "jest --testPathPattern=test/unit",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./apps/api/test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
@@ -109,7 +110,8 @@
       "^@app/shared(|/.*)$": "<rootDir>/libs/shared/src/$1",
       "^@app/connector(|/.*)$": "<rootDir>/libs/connector/src/$1",
       "^@app/node-library(|/.*)$": "<rootDir>/libs/node-library/src/$1",
-      "^@app/integrations(|/.*)$": "<rootDir>/libs/integrations/src/$1"
+      "^@app/integrations(|/.*)$": "<rootDir>/libs/integrations/src/$1",
+      "^@test/(.*)$": "<rootDir>/test/$1"
     },
     "testPathIgnorePatterns": [
       "/node_modules/",

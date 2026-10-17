@@ -1,19 +1,19 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+﻿import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { EncryptionUtil } from '@app/shared/utils/encryption.util';
-import { Connector } from '../domain/entities/connector.entity';
-import { ConnectorCredential } from '../domain/entities/connector-credential.entity';
-import { ConnectorAuthType } from '../domain/enums/connector-auth-type.enum';
-import { ConnectorRepository } from '../domain/repositories/connector.repository';
-import { ConnectorCredentialRepository } from '../domain/repositories/connector-credential.repository';
+import { Connector } from '@app/connector/domain/entities/connector.entity';
+import { ConnectorCredential } from '@app/connector/domain/entities/connector-credential.entity';
+import { ConnectorAuthType } from '@app/connector/domain/enums/connector-auth-type.enum';
+import { ConnectorRepository } from '@app/connector/domain/repositories/connector.repository';
+import { ConnectorCredentialRepository } from '@app/connector/domain/repositories/connector-credential.repository';
 import {
   CreateApiKeyCredentialCommand,
   CreateApiKeyCredentialHandler,
-} from './commands/create-api-key-credential.command';
+} from '@app/connector/application/commands/create-api-key-credential.command';
 import {
   ListCredentialsHandler,
   ListCredentialsQuery,
-} from './queries/list-credentials.query';
+} from '@app/connector/application/queries/list-credentials.query';
 
 const connectors = [
   new Connector(
@@ -213,3 +213,4 @@ describe('credential handlers', () => {
     });
   });
 });
+

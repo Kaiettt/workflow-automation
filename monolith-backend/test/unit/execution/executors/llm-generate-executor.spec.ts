@@ -1,17 +1,17 @@
-import { LLM_GENERATE_CONFIG_SCHEMA } from '../../../../../prisma/mvp-node-schemas';
-import { LlmLimits } from '../../domain/constants/execution.constants';
+﻿import { LLM_GENERATE_CONFIG_SCHEMA } from '../../../../prisma/mvp-node-schemas';
+import { LlmLimits } from '@app/execution/domain/constants/execution.constants';
 import {
   LlmGenerateExecutor,
   parseJsonOutput,
   parseMaxItemsCeiling,
-} from './llm-generate-executor';
+} from '@app/execution/application/executors/llm-generate-executor';
 import {
   LlmGenerateRequest,
   LlmGenerateResult,
   LlmProvider,
   LlmProviderError,
-} from '../ports/llm-provider.port';
-import { LlmProviderRegistry } from '../services/llm-provider.registry';
+} from '@app/execution/application/ports/llm-provider.port';
+import { LlmProviderRegistry } from '@app/execution/application/services/llm-provider.registry';
 
 type Reply = LlmGenerateResult | Error;
 
@@ -329,3 +329,4 @@ describe('platform ceiling', () => {
     );
   });
 });
+

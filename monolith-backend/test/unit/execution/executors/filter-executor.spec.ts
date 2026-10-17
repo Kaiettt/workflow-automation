@@ -1,4 +1,4 @@
-import { FilterExecutor } from './filter-executor';
+﻿import { FilterExecutor } from '@app/execution/application/executors/filter-executor';
 
 const rows = [
   { name: 'Kiet', email: 'kiet@gmail.com', status: 'new' },
@@ -89,3 +89,4 @@ describe('FilterExecutor', () => {
     ).toThrow(/value/);
   });
 });
+

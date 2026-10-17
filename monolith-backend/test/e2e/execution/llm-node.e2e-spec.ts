@@ -13,12 +13,12 @@ import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
 import { ConnectorModule } from '@app/connector';
 import { ExecutionModule } from '@app/execution';
 import { NodeLibraryModule } from '@app/node-library';
-import { LlmProviderRegistry } from '../../../libs/execution/src/application/services/llm-provider.registry';
+import { LlmProviderRegistry } from '@app/execution/application/services/llm-provider.registry';
 import {
   LlmGenerateRequest,
   LlmGenerateResult,
   LlmProvider,
-} from '../../../libs/execution/src/application/ports/llm-provider.port';
+} from '@app/execution/application/ports/llm-provider.port';
 
 // Saves a real API key through the HTTP API (encrypted in Postgres) and runs an
 // LLM workflow with it. Only the vendor call is replaced, so nothing leaves the machine.
