@@ -3,6 +3,7 @@ import { NodeTypeDefinitionRepository } from '../../domain/repositories/node-typ
 
 export interface NodeConfigSchemaDto {
   key: string;
+  category: string;
   configSchema: unknown;
 }
 
@@ -20,6 +21,7 @@ export class GetNodeConfigSchemasHandler implements IQueryHandler<GetNodeConfigS
     const nodeTypes = await this.nodeTypeRepo.findByKeys(query.keys);
     return nodeTypes.map((nodeType) => ({
       key: nodeType.key,
+      category: nodeType.category,
       configSchema: nodeType.configSchema,
     }));
   }

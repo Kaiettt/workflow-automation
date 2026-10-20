@@ -6,6 +6,11 @@ import { workflowService } from '../services/workflow.service';
 import { DesignerLayout } from '../components/DesignerLayout';
 import { VersionHistoryDialog } from '../components/VersionHistoryDialog';
 import { useDesignerStore } from '../store/designer.store';
+import { PublishValidationAlert } from '../components/PublishValidationAlert';
+import {
+  WorkflowPublishValidationError,
+  type WorkflowValidationIssue,
+} from '../models/workflow-validation.model';
 
 interface DesignerPageProps {
   workflowId?: string;
@@ -17,6 +22,48 @@ interface WorkflowDraft {
     nodes?: Node[];
     edges?: Edge[];
   };
+  validationErrors?: {
+    message?: string;
+    issues?: WorkflowValidationIssue[];
+  } | null;
+}
+
+const VALIDATION_NODE_CLASS = 'workflow-validation-error';
+
+function updateValidationHighlights(
+  nodes: Node[],
+  issues: WorkflowValidationIssue[],
+): Node[] {
+  const invalidNodeIds = new Set(
+    issues.flatMap((issue) => (issue.nodeId ? [issue.nodeId] : [])),
+  );
+  let changed = false;
+
+  const updatedNodes = nodes.map((node) => {
+    const classNames = (node.className ?? '').split(/\s+/).filter(Boolean);
+    const hasValidationClass = classNames.includes(VALIDATION_NODE_CLASS);
+    const shouldHighlight = invalidNodeIds.has(node.id);
+
+    if (shouldHighlight && !hasValidationClass) {
+      classNames.push(VALIDATION_NODE_CLASS);
+      changed = true;
+    } else if (!shouldHighlight && hasValidationClass) {
+      changed = true;
+      return {
+        ...node,
+        className: classNames
+          .filter((className) => className !== VALIDATION_NODE_CLASS)
+          .join(' '),
+      };
+    }
+
+    if (shouldHighlight && !hasValidationClass) {
+      return { ...node, className: classNames.join(' ') };
+    }
+    return node;
+  });
+
+  return changed ? updatedNodes : nodes;
 }
 
 export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }: DesignerPageProps) {
@@ -34,7 +81,10 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstLoad = useRef(true);
-  const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishValidation, setPublishValidation] = useState<{
+    message: string;
+    issues: WorkflowValidationIssue[];
+  } | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -47,7 +97,7 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
     async function loadData() {
       try {
         const [draft, nodeTypes] = await Promise.all([
-          workflowService.getDraft(workflowId) as Promise<WorkflowDraft & { validationErrors?: { message: string } }>,
+          workflowService.getDraft(workflowId) as Promise<WorkflowDraft>,
           workflowService.getNodeTypes(),
         ]);
 
@@ -62,7 +112,15 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
             setEdges(draft.definition.edges || []);
           }
           if (draft?.validationErrors) {
-            setPublishError(draft.validationErrors.message);
+            const issues = draft.validationErrors.issues ?? [];
+            setPublishValidation({
+              message:
+                draft.validationErrors.message ?? 'Workflow validation failed.',
+              issues,
+            });
+            setNodes((currentNodes) =>
+              updateValidationHighlights(currentNodes, issues),
+            );
           }
           setNodeTypes(nodeTypes);
         }
@@ -84,7 +142,8 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
   const saveDraft = useCallback(async (currentNodes: Node[], currentEdges: Edge[]) => {
     setIsSaving(true);
     // Clear validation error on edit
-    setPublishError(null);
+    setPublishValidation(null);
+    setNodes((currentNodes) => updateValidationHighlights(currentNodes, []));
     try {
       const definition = {
         nodes: currentNodes,
@@ -97,7 +156,7 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
     } finally {
       setIsSaving(false);
     }
-  }, [workflowId, setIsSaving]);
+  }, [workflowId, setIsSaving, setNodes]);
 
   useEffect(() => {
     if (loading) return; // Don't save during initial load
@@ -134,7 +193,7 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
 
   const handlePublish = async () => {
     setIsPublishing(true);
-    setPublishError(null);
+    setPublishValidation(null);
 
     // Ensure latest changes are saved first
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -150,10 +209,15 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
         navigate(`/workflows/${workflowId}/versions`);
       }
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setPublishError(err.message);
+      if (err instanceof WorkflowPublishValidationError) {
+        setPublishValidation({ message: err.message, issues: err.issues });
+        setNodes((currentNodes) =>
+          updateValidationHighlights(currentNodes, err.issues),
+        );
+      } else if (err instanceof Error) {
+        setPublishValidation({ message: err.message, issues: [] });
       } else {
-        setPublishError(String(err));
+        setPublishValidation({ message: String(err), issues: [] });
       }
     } finally {
       setIsPublishing(false);
@@ -171,7 +235,8 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
         setNodes(safeNodes);
       }
       if (def?.edges) setEdges(def.edges);
-      setPublishError(null);
+      setPublishValidation(null);
+      setNodes((currentNodes) => updateValidationHighlights(currentNodes, []));
     },
     [setNodes, setEdges],
   );
@@ -186,11 +251,15 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
 
   return (
     <>
-      {publishError && (
-        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-50 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded shadow-lg w-96 flex justify-between items-center">
-          <span className="block sm:inline">{publishError}</span>
-          <button onClick={() => setPublishError(null)} className="ml-4 font-bold">&times;</button>
-        </div>
+      {publishValidation && (
+        <PublishValidationAlert
+          message={publishValidation.message}
+          issues={publishValidation.issues}
+          onFocusNode={(nodeId) =>
+            useDesignerStore.getState().setSelectedNodeId(nodeId)
+          }
+          onDismiss={() => setPublishValidation(null)}
+        />
       )}
       <DesignerLayout
         nodes={nodes}

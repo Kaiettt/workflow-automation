@@ -16,6 +16,7 @@ import { RestoreVersionHandler } from './application/commands/restore-version.co
 import { GetDraftStatusHandler } from './application/queries/get-draft-status.query';
 import { WorkflowVersionRepository } from './domain/repositories/workflow-version.repository';
 import { PrismaWorkflowVersionRepository } from './infrastructure/persistence/prisma-workflow-version.repository';
+import { NodeLibraryModule } from '@app/node-library';
 
 const CommandHandlers = [
   SaveDraftHandler,
@@ -40,7 +41,7 @@ const Repositories = [
 ];
 
 @Module({
-  imports: [CqrsModule, AuthModule],
+  imports: [CqrsModule, AuthModule, NodeLibraryModule],
   controllers: [WorkflowDraftsController, WorkflowsController],
   providers: [...CommandHandlers, ...QueryHandlers, ...Repositories],
 })

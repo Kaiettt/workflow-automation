@@ -1,6 +1,21 @@
 import { AxiosError } from 'axios';
 import { workflowApi } from '../api/workflow.api';
 import type { NodeTypeDefinition } from '../models/workflow.model';
+import {
+  WorkflowPublishValidationError,
+  type WorkflowValidationIssue,
+} from '../models/workflow-validation.model';
+
+function isValidationIssue(value: unknown): value is WorkflowValidationIssue {
+  if (typeof value !== 'object' || value === null) return false;
+  const issue = value as Record<string, unknown>;
+  return (
+    typeof issue.code === 'string' &&
+    typeof issue.message === 'string' &&
+    (issue.nodeId === undefined || typeof issue.nodeId === 'string') &&
+    (issue.field === undefined || typeof issue.field === 'string')
+  );
+}
 
 export const workflowService = {
   async createWorkflow(): Promise<string> {
@@ -55,7 +70,18 @@ export const workflowService = {
         typeof error.response.data === 'object' &&
         'message' in error.response.data
       ) {
-        throw new Error(String(error.response.data.message), { cause: error });
+        const response = error.response.data as Record<string, unknown>;
+        const issues = Array.isArray(response.issues)
+          ? response.issues.filter(isValidationIssue)
+          : [];
+        if (issues.length > 0) {
+          throw new WorkflowPublishValidationError(
+            String(response.message),
+            issues,
+            { cause: error },
+          );
+        }
+        throw new Error(String(response.message), { cause: error });
       }
       throw new Error('Failed to publish workflow', { cause: error });
     }
