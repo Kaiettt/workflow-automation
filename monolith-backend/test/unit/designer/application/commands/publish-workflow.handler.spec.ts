@@ -1,8 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/require-await */
 import { BadRequestException } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
-import * as fs from 'fs';
-import * as path from 'path';
 import {
   PublishWorkflowCommand,
   PublishWorkflowHandler,
@@ -124,13 +122,111 @@ describe('PublishWorkflowHandler (TDD)', () => {
   let versionRepo: InMemoryWorkflowVersionRepo;
   let queryBus: jest.Mocked<QueryBus>;
 
-  const definitionSavedPath = path.resolve(
-    __dirname,
-    '../../../../../../definition-saved.json',
-  );
-  const validDefinition = JSON.parse(
-    fs.readFileSync(definitionSavedPath, 'utf8'),
-  );
+  const validDefinition = {
+    nodes: [
+      {
+        id: 'triggerNode-1792224328950',
+        type: 'triggerNode',
+        data: {
+          key: 'trigger.manual',
+          name: 'Manual Trigger',
+          config: {},
+        },
+      },
+      {
+        id: 'actionNode-1792224333910',
+        type: 'actionNode',
+        data: {
+          key: 'integration.google_sheet.readRows',
+          name: 'Read Google Sheet Rows',
+          config: {
+            sheet_name: 'Sheet1',
+            credential_id: 'a2c90569-9eae-4a43-b150-3959a53527d9',
+            spreadsheet_id: '19nZNvZobCKH4th-vKy00Po-3SknXD8v-VEDDm_qwmPk',
+          },
+        },
+      },
+      {
+        id: 'actionNode-1792224342073',
+        type: 'actionNode',
+        data: {
+          key: 'logic.filter',
+          name: 'Filter',
+          config: {
+            field: 'status',
+            value: 'new',
+            operator: 'equals',
+          },
+        },
+      },
+      {
+        id: 'actionNode-1792224340416',
+        type: 'actionNode',
+        data: {
+          key: 'data.aggregate',
+          name: 'Aggregate',
+          config: {
+            field: 'items',
+          },
+        },
+      },
+      {
+        id: 'actionNode-1792220527195',
+        type: 'actionNode',
+        data: {
+          key: 'ai.llm.generate',
+          name: 'LLM',
+          config: {
+            provider: 'gemini',
+            credential_id: '9318a77f-2cb0-431f-966c-f06d7e36dcaa',
+            model: 'gemini-1.5-flash',
+            prompt: 'Summarize',
+          },
+        },
+      },
+      {
+        id: 'actionNode-1792224337378',
+        type: 'actionNode',
+        data: {
+          key: 'integration.gmail.send',
+          name: 'Send Gmail',
+          config: {
+            to: 'test@example.com',
+            body: 'Summary',
+            subject: 'Report',
+            credential_id: '6d84f3ae-b7db-429d-9067-062e713a0e41',
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: 'edge-1',
+        source: 'triggerNode-1792224328950',
+        target: 'actionNode-1792224333910',
+      },
+      {
+        id: 'edge-2',
+        source: 'actionNode-1792224333910',
+        target: 'actionNode-1792224342073',
+      },
+      {
+        id: 'edge-3',
+        source: 'actionNode-1792224342073',
+        target: 'actionNode-1792224340416',
+      },
+      {
+        id: 'edge-4',
+        source: 'actionNode-1792224340416',
+        target: 'actionNode-1792220527195',
+      },
+      {
+        id: 'edge-5',
+        source: 'actionNode-1792220527195',
+        target: 'actionNode-1792224337378',
+      },
+    ],
+  };
 
   beforeEach(() => {
     workflowRepo = new InMemoryWorkflowRepo();
@@ -158,7 +254,7 @@ describe('PublishWorkflowHandler (TDD)', () => {
     );
   });
 
-  it('should successfully publish a valid workflow draft from definition-saved.json', async () => {
+  it('should successfully publish a valid workflow draft', async () => {
     const workflowId = 'wf-test-valid';
     const userId = 'user-1';
 
