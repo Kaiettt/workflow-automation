@@ -1,10 +1,18 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { WorkflowDraftRepository } from '../../domain/repositories/workflow-draft.repository';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
 import { WorkflowVersionRepository } from '../../domain/repositories/workflow-version.repository';
 import { WorkflowVersion } from '../../domain/entities/workflow-version.entity';
+import { WorkflowDraft } from '../../domain/entities/workflow-draft.entity';
+import { GetNodeConfigSchemasQuery } from '@app/node-library/application/queries/get-node-config-schemas.query';
+import {
+  extractNodeCatalogKeys,
+  validateWorkflowDraft,
+  NodeCatalogTypeInfo,
+  PublishValidationIssue,
+} from '../utils';
 
 export class PublishWorkflowCommand {
   constructor(
@@ -19,6 +27,7 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     private readonly workflowRepo: WorkflowRepository,
     private readonly workflowDraftRepo: WorkflowDraftRepository,
     private readonly workflowVersionRepo: WorkflowVersionRepository,
+    private readonly queryBus: QueryBus,
   ) {}
 
   async execute(
@@ -36,54 +45,27 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
       throw new BadRequestException('Workflow draft is empty or not found.');
     }
 
-    const nodes = draft.definition.nodes || [];
-    const edges = draft.definition.edges || [];
+    const nodeKeys = extractNodeCatalogKeys(draft.definition.nodes || []);
+    const nodeTypes = await this.queryBus.execute<
+      GetNodeConfigSchemasQuery,
+      NodeCatalogTypeInfo[]
+    >(new GetNodeConfigSchemasQuery(nodeKeys));
 
-    const triggers = nodes.filter(
-      (n: any) => n.type && n.type.startsWith('trigger'),
+    const nodeTypesByKey = new Map(
+      nodeTypes.map((nodeType) => [nodeType.key, nodeType]),
     );
-    const actions = nodes.filter(
-      (n: any) => n.type && !n.type.startsWith('action'),
+
+    const validationReport = validateWorkflowDraft(
+      draft.definition,
+      nodeTypesByKey,
     );
 
-    if (triggers.length !== 1) {
-      await this.saveValidationError(
-        draft,
-        'Workflow must have exactly one trigger node.',
-      );
-      throw new BadRequestException(
-        'Workflow must have exactly one trigger node.',
-      );
-    }
-
-    if (actions.length === 0) {
-      await this.saveValidationError(
-        draft,
-        'Workflow must have at least one action node.',
-      );
-      throw new BadRequestException(
-        'Workflow must have at least one action node.',
-      );
-    }
-
-    // Check for disconnected nodes (every node except the trigger should have an incoming edge,
-    // and every node except leaf nodes should have an outgoing edge. For simplicity, just ensure every node is in an edge if there are >1 nodes)
-    if (nodes.length > 1) {
-      const connectedNodeIds = new Set([
-        ...edges.map((e: any) => e.source),
-        ...edges.map((e: any) => e.target),
-      ]);
-
-      const disconnected = nodes.find((n: any) => !connectedNodeIds.has(n.id));
-      if (disconnected) {
-        await this.saveValidationError(
-          draft,
-          `Node ${disconnected.data?.name || disconnected.id} is disconnected.`,
-        );
-        throw new BadRequestException(
-          `Node ${disconnected.data?.name || disconnected.id} is disconnected.`,
-        );
-      }
+    if (!validationReport.isValid) {
+      await this.saveValidationErrors(draft, validationReport.issues);
+      throw new BadRequestException({
+        message: 'Workflow validation failed.',
+        issues: validationReport.issues,
+      });
     }
 
     // Success - clear validation errors
@@ -118,8 +100,11 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     };
   }
 
-  private async saveValidationError(draft: any, message: string) {
-    draft.validationErrors = { message };
+  private async saveValidationErrors(
+    draft: WorkflowDraft,
+    issues: PublishValidationIssue[],
+  ) {
+    draft.validationErrors = { issues };
     await this.workflowDraftRepo.upsert(draft);
   }
 }

@@ -339,4 +339,3 @@ describe('StartExecutionHandler', () => {
     expect(result.nodeLogs[1].errorMessage).toContain('No executor registered');
   });
 });
-

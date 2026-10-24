@@ -31,4 +31,3 @@ describe('EncryptionUtil', () => {
     expect(() => EncryptionUtil.decrypt(tampered, keyHex)).toThrow();
   });
 });
-

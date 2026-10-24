@@ -404,4 +404,3 @@ describe('GeminiLlmAdapter', () => {
     expect((await rejection(adapter.generate(request))).retryable).toBe(false);
   });
 });
-

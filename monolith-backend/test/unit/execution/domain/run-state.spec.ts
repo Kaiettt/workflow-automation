@@ -1,4 +1,7 @@
-﻿import { NodeReferenceError, PairedItemError } from '@app/execution/domain/expression/errors';
+﻿import {
+  NodeReferenceError,
+  PairedItemError,
+} from '@app/execution/domain/expression/errors';
 import { Item } from '@app/execution/domain/models/item';
 import {
   buildNodeNameIndex,
@@ -129,4 +132,3 @@ describe('buildNodeNameIndex', () => {
     expect(index.size).toBe(1);
   });
 });
-
