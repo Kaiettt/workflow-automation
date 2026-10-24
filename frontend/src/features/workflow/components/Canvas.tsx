@@ -6,7 +6,6 @@ import {
   MiniMap,
   addEdge,
   useReactFlow,
-  ReactFlowProvider,
 } from '@xyflow/react';
 import type {
   Node,
@@ -140,9 +139,5 @@ function CanvasContent({ nodes, edges, onNodesChange, onEdgesChange, setNodes, s
 }
 
 export function Canvas(props: CanvasProps) {
-  return (
-    <ReactFlowProvider>
-      <CanvasContent {...props} />
-    </ReactFlowProvider>
-  );
+  return <CanvasContent {...props} />;
 }

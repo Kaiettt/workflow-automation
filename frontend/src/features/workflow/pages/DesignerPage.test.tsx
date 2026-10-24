@@ -89,10 +89,8 @@ describe('DesignerPage publish validation', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
 
         const alert = await screen.findByRole('alert');
-        expect(alert.textContent).toContain(
-            'Required field "body" is missing for Send Gmail.',
-        );
-        expect(screen.getByText('Field: body')).toBeTruthy();
+        expect(alert.textContent).toContain('Send Gmail');
+        expect(alert.textContent).toContain('Body is required');
 
         const renderedNodes = JSON.parse(
             screen.getByTestId('designer-nodes').textContent ?? '[]',

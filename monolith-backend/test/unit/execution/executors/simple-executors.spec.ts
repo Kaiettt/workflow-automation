@@ -201,4 +201,3 @@ describe('GmailSendExecutor', () => {
     ).rejects.toThrow();
   });
 });
-

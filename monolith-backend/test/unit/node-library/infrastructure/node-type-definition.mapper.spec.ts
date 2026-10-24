@@ -52,4 +52,3 @@ describe('NodeTypeDefinitionMapper', () => {
     ).toThrow('Unknown node category: SOMETHING_NEW');
   });
 });
-

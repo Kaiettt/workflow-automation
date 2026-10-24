@@ -1,222 +1,87 @@
 # Design: Workflow Publish Validation
 
 ## 1. Overview
-The publish validation feature sits in the designer application layer and validates the workflow draft before creating an immutable version snapshot.
+The publish validation feature sits in the designer application layer (`monolith-backend/libs/designer`) and validates a workflow draft before creating an immutable `WorkflowVersion` snapshot.
 
-The validation is split into three layers:
-1. existence validation
-2. graph validation
-3. node schema validation
+Validation is organized into three sequential layers:
+1. **Existence validation**: Verifies workflow and draft exist and draft definition is non-empty.
+2. **Catalog & Schema validation**: Resolves node keys via `node.data.key` (with fallback to `node.type`), fetches schemas via `GetNodeConfigSchemasQuery`, verifies catalog existence, and checks required config properties against `configSchema.required`.
+3. **Graph structure & Reachability validation**: Verifies at least one trigger node exists, at least one action/processing node exists, and all action nodes are reachable from a trigger node through directed edges.
 
-This keeps the logic testable, easy to extend, and aligned with the existing CQRS architecture.
+## 2. Architecture & CQRS Integration
+### Application Layer
+- `PublishWorkflowCommand`: Dispatched with `workflowId` and `publishedById`.
+- `PublishWorkflowHandler`: Orchestrates the validation and version snapshot creation.
+- `GetNodeConfigSchemasQuery`: CQRS query dispatched to `@app/node-library` to fetch catalog metadata (`key`, `category`, `configSchema`) in a single batch query.
 
-## 2. Architecture
-### Domain layer
-- `Workflow`: workflow metadata
-- `WorkflowDraft`: draft definition and validation error metadata
-- `WorkflowVersion`: published immutable snapshot
+### Domain Models
+- `Workflow`: Root workflow entity. Updated with `currentVersionId` on publish success.
+- `WorkflowDraft`: Stores canvas `definition` (`nodes[]`, `edges[]`) and `validationErrors`.
+- `WorkflowVersion`: Immutable version record created upon passing validation.
 
-### Application layer
-- `PublishWorkflowCommand`
-- `PublishWorkflowHandler`
-
-The handler will perform these steps:
-- load workflow by ID
-- load draft by workflow ID
-- reject empty or missing draft
-- validate node graph structure
-- validate node configSchema values
-- if valid, create version and update workflow current version
-- if invalid, store validation errors and reject with 400
-
-### Infrastructure layer
-- `WorkflowRepository`
-- `WorkflowDraftRepository`
-- `WorkflowVersionRepository`
-
-The validation logic is implemented in the application layer; repositories remain responsible for persistence only.
-
-## 3. Validation model
-Use a structured validation object so the frontend can show precise errors.
-
-```ts
-export type ValidationIssue = {
-  code: string;
-  severity: 'error' | 'warning';
-  message: string;
-  nodeId?: string;
-  field?: string;
-};
-
-export type ValidationReport = {
-  isValid: boolean;
-  issues: ValidationIssue[];
-};
-```
-
-Example issues:
-- missing action node
-- missing trigger node
-- action unreachable from any trigger
-- required config field missing
-
-## 4. Graph validation algorithm
-### Inputs
-- `nodes[]`
-- `edges[]`
-
-### Rules
-- if workflow not found -> invalid
-- if draft missing/empty -> invalid
-- if no trigger nodes -> invalid
-- if no action nodes -> invalid
-- build adjacency map from edges
-- mark nodes reachable from each trigger
-- ensure every action node is reachable from at least one trigger
-
-### Pseudocode
-```ts
-const triggers = nodes.filter(node => node.type?.startsWith('trigger'));
-const actions = nodes.filter(node => node.type?.startsWith('action'));
-
-if (triggers.length === 0) {
-  issues.push({ code: 'NO_TRIGGER', message: 'Workflow must contain at least one trigger node.' });
-}
-
-if (actions.length === 0) {
-  issues.push({ code: 'NO_ACTION', message: 'Workflow must contain at least one action node.' });
-}
-
-const adjacency = new Map<string, string[]>();
-for (const edge of edges) {
-  adjacency.set(edge.source, [...(adjacency.get(edge.source) ?? []), edge.target]);
-}
-
-const reachable = new Set<string>();
-for (const trigger of triggers) {
-  const stack = [trigger.id];
-  while (stack.length > 0) {
-    const current = stack.pop()!;
-    if (reachable.has(current)) continue;
-    reachable.add(current);
-    for (const next of adjacency.get(current) ?? []) {
-      stack.push(next);
-    }
-  }
-}
-
-for (const action of actions) {
-  if (!reachable.has(action.id)) {
-    issues.push({
-      code: 'ACTION_UNREACHABLE',
-      message: `Action node ${action.data?.name ?? action.id} is not reachable from any trigger node.`,
-      nodeId: action.id,
-    });
-  }
-}
-```
-
-## 5. Schema validation
-This part reuses the node schema definitions in `mvp-node-schemas.ts`.
-
-For each node:
-- look up the schema by node type
-- compare required fields against the node config
-- if required fields are missing, report the node and field name
-
-Example:
-```ts
-const schema = nodeSchemas[node.type];
-const requiredFields = schema.required ?? [];
-
-for (const field of requiredFields) {
-  if (!node.config?.[field] && node.config?.[field] !== false && node.config?.[field] !== 0) {
-    issues.push({
-      code: 'REQUIRED_FIELD_MISSING',
-      message: `Missing required field "${field}" for node "${node.data?.name ?? node.id}".`,
-      nodeId: node.id,
-      field,
-    });
-  }
-}
-```
-
-## 6. Publish handler flow
-```ts
-const workflow = await this.workflowRepo.findById(workflowId);
-if (!workflow) throw new NotFoundException(...);
-
-const draft = await this.workflowDraftRepo.findById(workflowId);
-if (!draft || !draft.definition) throw new BadRequestException(...);
-
-const validationReport = validateWorkflowForPublish(draft.definition);
-if (!validationReport.isValid) {
-  draft.validationErrors = validationReport.issues;
-  await this.workflowDraftRepo.upsert(draft);
-  throw new BadRequestException({
-    message: 'Workflow validation failed.',
-    issues: validationReport.issues,
-  });
-}
-
-const newVersion = WorkflowVersion.create(...);
-await this.workflowVersionRepo.save(newVersion);
-
-workflow.currentVersionId = newVersion.id;
-await this.workflowRepo.update(workflow);
-```
-
-## 7. Frontend behavior
-The API response should return structured validation issues.
-
-Frontend handling:
-- show a summary banner on the publish failure
-- render per-node validation messages
-- highlight affected node in the canvas or properties panel
-- disable publish while the graph is invalid
-
-Example API error payload:
+## 3. Node Resolution & Taxonomy
+### Canvas Data Structure
+React Flow stores nodes on canvas as:
 ```json
 {
-  "message": "Workflow validation failed.",
-  "issues": [
-    {
-      "code": "ACTION_UNREACHABLE",
-      "severity": "error",
-      "nodeId": "node-8",
-      "message": "Action node Send Email is not reachable from any trigger node."
+  "id": "actionNode-1792220527195",
+  "type": "actionNode",
+  "data": {
+    "key": "ai.llm.generate",
+    "name": "LLM",
+    "config": {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "prompt": "..."
     }
-  ]
+  }
 }
 ```
 
-## 8. Testing strategy
-### Unit tests
-- workflow with no trigger -> fail
-- workflow with no action -> fail
-- trigger exists but action unreachable -> fail
-- valid trigger-to-action path -> pass
-- missing required schema field -> fail
+### Key Resolution Helper
+To support both production React Flow drafts and test fixtures:
+```ts
+const getNodeKey = (node: any): string | undefined => {
+  if (typeof node?.data?.key === 'string' && node.data.key.length > 0) {
+    return node.data.key;
+  }
+  if (
+    typeof node?.type === 'string' &&
+    node.type !== 'actionNode' &&
+    node.type !== 'triggerNode'
+  ) {
+    return node.type;
+  }
+  return undefined;
+};
+```
 
-### Integration tests
-- publish valid workflow creates version
-- publish invalid workflow stores validationErrors
-- publish invalid workflow does not create version
+### Classification
+- **Triggers**: Nodes where `nodeType.category === 'TRIGGER'` or `node.type === 'triggerNode'`.
+- **Actions / Processing Nodes**: Nodes where `category !== 'TRIGGER'` and `node.type !== 'triggerNode'` (covers `LOGIC`, `DATA_PROCESSING`, `INTEGRATION`, `AI`).
 
-## 9. Risks and mitigations
-### Risk: false positives from disconnected but valid node groups
-Mitigation: reachability is evaluated relative to trigger nodes, not against all nodes globally.
+## 4. Graph Reachability Algorithm
+1. Construct adjacency list: `adjacency: Map<string, string[]>` from `edges[].source` -> `edges[].target`.
+2. Initialize `reachable: Set<string>` and queue with all trigger node IDs.
+3. Traverse graph using BFS/DFS. Mark each visited node in `reachable`.
+4. Iterate over all action nodes. If an action node ID is not in `reachable`, push `ACTION_UNREACHABLE` issue with `nodeId`.
 
-### Risk: schema check duplicated in multiple places
-Mitigation: centralize validation in a reusable validator service.
+## 5. Schema Validation Algorithm
+1. For each node, resolve `key = getNodeKey(node)`.
+2. Look up `nodeType = nodeTypesByKey.get(key)`.
+3. If not found in catalog, push `UNKNOWN_NODE_TYPE`.
+4. If found, inspect `schema = nodeType.configSchema as { required?: string[] }`.
+5. For each `field` in `schema.required`:
+   - Inspect `value = node.data?.config?.[field]`.
+   - If `value === undefined || value === null || (typeof value === 'string' && value.trim().length === 0)`, push `REQUIRED_FIELD_MISSING` with `nodeId` and `field`.
 
-### Risk: unclear frontend errors
-Mitigation: return structured issues with `code`, `message`, `nodeId`, and `field`.
-
-## 10. Definition of done
-The feature is complete when:
-- graph validation is implemented for trigger/action reachability
-- configSchema validation is enforced for required fields
-- validation errors are stored and returned in a structured format
-- publish is blocked until the workflow is valid
-- frontend shows clear, user-friendly errors
+## 6. Execution & Persistence Flow
+1. If `issues.length > 0`:
+   - Persist `{ issues }` to `draft.validationErrors`.
+   - Throw `BadRequestException({ message: 'Workflow validation failed.', issues })`.
+2. If `issues.length === 0`:
+   - Clear `draft.validationErrors = null`.
+   - Calculate next `versionNumber`.
+   - Create and persist `WorkflowVersion`.
+   - Update `workflow.currentVersionId` to the newly created version ID.
+   - Return `{ versionId, versionNumber }`.

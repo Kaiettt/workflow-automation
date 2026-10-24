@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useNodesState, useEdgesState } from '@xyflow/react';
+import { useNodesState, useEdgesState, useReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import { workflowService } from '../services/workflow.service';
 import { DesignerLayout } from '../components/DesignerLayout';
 import { VersionHistoryDialog } from '../components/VersionHistoryDialog';
 import { useDesignerStore } from '../store/designer.store';
-import { PublishValidationAlert } from '../components/PublishValidationAlert';
+import { PublishValidationDialog } from '../components/PublishValidationDialog';
 import {
   WorkflowPublishValidationError,
   type WorkflowValidationIssue,
@@ -66,11 +66,13 @@ function updateValidationHighlights(
   return changed ? updatedNodes : nodes;
 }
 
-export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }: DesignerPageProps) {
+function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: DesignerPageProps) {
   const { workflowId: paramWorkflowId } = useParams<{ workflowId: string }>();
   const navigate = useNavigate();
   const workflowId = propWorkflowId || paramWorkflowId || '';
   const onBack = propOnBack || (() => navigate('/workflows'));
+
+  const { setCenter, getNode } = useReactFlow();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -78,6 +80,7 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
 
   const isSaving = useDesignerStore((state) => state.isSaving);
   const setIsSaving = useDesignerStore((state) => state.setIsSaving);
+  const setValidationIssues = useDesignerStore((state) => state.setValidationIssues);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstLoad = useRef(true);
@@ -85,6 +88,7 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
     message: string;
     issues: WorkflowValidationIssue[];
   } | null>(null);
+  const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -118,6 +122,7 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
                 draft.validationErrors.message ?? 'Workflow validation failed.',
               issues,
             });
+            setValidationIssues(issues);
             setNodes((currentNodes) =>
               updateValidationHighlights(currentNodes, issues),
             );
@@ -136,19 +141,16 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
     return () => {
       isMounted = false;
     };
-  }, [workflowId, setNodes, setEdges, setNodeTypes]);
+  }, [workflowId, setNodes, setEdges, setNodeTypes, setValidationIssues]);
 
   // Auto-save logic (debounced)
   const saveDraft = useCallback(async (currentNodes: Node[], currentEdges: Edge[]) => {
     setIsSaving(true);
-    // Clear validation error on edit
-    setPublishValidation(null);
-    setNodes((currentNodes) => updateValidationHighlights(currentNodes, []));
     try {
       const definition = {
         nodes: currentNodes,
         edges: currentEdges,
-        viewport: { x: 0, y: 0, zoom: 1 } // Viewport could be synced with React Flow's onMove if needed
+        viewport: { x: 0, y: 0, zoom: 1 },
       };
       await workflowService.saveDraft(workflowId, definition);
     } catch (error) {
@@ -156,10 +158,10 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
     } finally {
       setIsSaving(false);
     }
-  }, [workflowId, setIsSaving, setNodes]);
+  }, [workflowId, setIsSaving]);
 
   useEffect(() => {
-    if (loading) return; // Don't save during initial load
+    if (loading) return;
     if (isFirstLoad.current) {
       isFirstLoad.current = false;
       return;
@@ -194,6 +196,7 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
   const handlePublish = async () => {
     setIsPublishing(true);
     setPublishValidation(null);
+    setValidationDialogOpen(false);
 
     // Ensure latest changes are saved first
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -201,9 +204,13 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
 
     try {
       await workflowService.publishWorkflow(workflowId);
+      setPublishValidation(null);
+      setValidationDialogOpen(false);
+      useDesignerStore.getState().setValidationIssues([]);
+      setNodes((currentNodes) => updateValidationHighlights(currentNodes, []));
       if (
         window.confirm(
-          'Xuất bản quy trình thành công! Bạn có muốn mở danh sách phiên bản để xem chi tiết và chạy thực thi (Run UI) không?',
+          'Workflow published successfully! Would you like to view the version history and run it?',
         )
       ) {
         navigate(`/workflows/${workflowId}/versions`);
@@ -211,18 +218,38 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
     } catch (err: unknown) {
       if (err instanceof WorkflowPublishValidationError) {
         setPublishValidation({ message: err.message, issues: err.issues });
+        setValidationDialogOpen(true);
+        useDesignerStore.getState().setValidationIssues(err.issues);
         setNodes((currentNodes) =>
           updateValidationHighlights(currentNodes, err.issues),
         );
       } else if (err instanceof Error) {
         setPublishValidation({ message: err.message, issues: [] });
+        setValidationDialogOpen(true);
       } else {
         setPublishValidation({ message: String(err), issues: [] });
+        setValidationDialogOpen(true);
       }
     } finally {
       setIsPublishing(false);
     }
   };
+
+  const handleFocusNode = useCallback(
+    (nodeId: string) => {
+      setValidationDialogOpen(false);
+      useDesignerStore.getState().setSelectedNodeId(nodeId);
+
+      const targetNode = getNode(nodeId) || nodes.find((n) => n.id === nodeId);
+      if (targetNode?.position) {
+        setCenter(targetNode.position.x + 96, targetNode.position.y + 38, {
+          zoom: 1.25,
+          duration: 600,
+        });
+      }
+    },
+    [getNode, nodes, setCenter],
+  );
 
   const handleRestoreSuccess = useCallback(
     (definition: { nodes?: Node[]; edges?: Edge[] } | unknown) => {
@@ -236,6 +263,8 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
       }
       if (def?.edges) setEdges(def.edges);
       setPublishValidation(null);
+      setValidationDialogOpen(false);
+      useDesignerStore.getState().setValidationIssues([]);
       setNodes((currentNodes) => updateValidationHighlights(currentNodes, []));
     },
     [setNodes, setEdges],
@@ -251,16 +280,14 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
 
   return (
     <>
-      {publishValidation && (
-        <PublishValidationAlert
-          message={publishValidation.message}
-          issues={publishValidation.issues}
-          onFocusNode={(nodeId) =>
-            useDesignerStore.getState().setSelectedNodeId(nodeId)
-          }
-          onDismiss={() => setPublishValidation(null)}
-        />
-      )}
+      <PublishValidationDialog
+        open={validationDialogOpen}
+        onOpenChange={setValidationDialogOpen}
+        message={publishValidation?.message}
+        issues={publishValidation?.issues ?? []}
+        nodes={nodes}
+        onSelectNode={handleFocusNode}
+      />
       <DesignerLayout
         nodes={nodes}
         edges={edges}
@@ -275,6 +302,12 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
         isPublishing={isPublishing}
         onOpenHistory={() => setHistoryOpen(true)}
         onViewVersions={() => navigate(`/workflows/${workflowId}/versions`)}
+        validationIssuesCount={
+          publishValidation
+            ? Math.max(publishValidation.issues.length, publishValidation.message ? 1 : 0)
+            : 0
+        }
+        onOpenValidation={() => setValidationDialogOpen(true)}
       />
       <VersionHistoryDialog
         workflowId={workflowId}
@@ -283,5 +316,13 @@ export function DesignerPage({ workflowId: propWorkflowId, onBack: propOnBack }:
         onRestoreSuccess={handleRestoreSuccess}
       />
     </>
+  );
+}
+
+export function DesignerPage(props: DesignerPageProps) {
+  return (
+    <ReactFlowProvider>
+      <DesignerPageInner {...props} />
+    </ReactFlowProvider>
   );
 }

@@ -3,7 +3,7 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { Canvas } from './Canvas';
 import { useDesignerStore } from '../store/designer.store';
 import { Button } from '@/components/ui/button';
-import { History, ArrowLeft, GitBranch } from 'lucide-react';
+import { History, ArrowLeft, GitBranch, AlertCircle } from 'lucide-react';
 import type { Node, Edge, OnNodesChange, OnEdgesChange } from '@xyflow/react';
 
 interface DesignerLayoutProps {
@@ -20,6 +20,8 @@ interface DesignerLayoutProps {
   isPublishing: boolean;
   onOpenHistory?: () => void;
   onViewVersions?: () => void;
+  validationIssuesCount?: number;
+  onOpenValidation?: () => void;
 }
 
 export function DesignerLayout({
@@ -36,6 +38,8 @@ export function DesignerLayout({
   isPublishing,
   onOpenHistory,
   onViewVersions,
+  validationIssuesCount,
+  onOpenValidation,
 }: DesignerLayoutProps) {
   const setSelectedNodeId = useDesignerStore((state) => state.setSelectedNodeId);
 
@@ -57,16 +61,31 @@ export function DesignerLayout({
             className="text-muted-foreground hover:text-foreground gap-1.5"
           >
             <ArrowLeft className="size-4" />
-            Quay lại
+            Back
           </Button>
           <div className="h-4 w-px bg-border" />
           <h1 className="font-semibold text-foreground text-base">Workflow Designer</h1>
         </div>
         <div className="flex items-center gap-3">
+          {Boolean(validationIssuesCount) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenValidation}
+              className="gap-1.5 text-xs font-semibold text-rose-600 border-rose-300 bg-rose-50 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/40 animate-in fade-in"
+            >
+              <AlertCircle className="size-3.5 text-rose-500" />
+              <span>Error</span>
+              <span className="rounded-full bg-rose-200/80 px-1.5 py-0.2 text-[10px] text-rose-700">
+                {validationIssuesCount}
+              </span>
+            </Button>
+          )}
+
           {isSaving ? (
-            <span className="text-xs text-muted-foreground italic">Đang lưu...</span>
+            <span className="text-xs text-muted-foreground italic">Saving...</span>
           ) : (
-            <span className="text-xs text-emerald-600 font-medium">Đã lưu nháp</span>
+            <span className="text-xs text-emerald-600 font-medium">Draft saved</span>
           )}
           {onOpenHistory && (
             <Button
@@ -76,7 +95,7 @@ export function DesignerLayout({
               className="gap-1.5 text-xs"
             >
               <History className="size-3.5" />
-              Lịch sử phiên bản
+              Version History
             </Button>
           )}
           {onViewVersions && (
@@ -87,7 +106,7 @@ export function DesignerLayout({
               className="gap-1.5 text-xs text-primary border-primary/20 hover:bg-primary/5"
             >
               <GitBranch className="size-3.5" />
-              Phiên bản (Run UI)
+              Versions (Run UI)
             </Button>
           )}
           <Button
@@ -97,7 +116,7 @@ export function DesignerLayout({
             disabled={isPublishing || isSaving}
             className="gap-1.5 text-xs font-medium"
           >
-            {isPublishing ? 'Đang xuất bản...' : 'Xuất bản'}
+            {isPublishing ? 'Publishing...' : 'Publish'}
           </Button>
         </div>
       </header>
