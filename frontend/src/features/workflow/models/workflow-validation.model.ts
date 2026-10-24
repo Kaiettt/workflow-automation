@@ -7,12 +7,15 @@ export interface WorkflowValidationIssue {
 }
 
 export class WorkflowPublishValidationError extends Error {
+    readonly issues: WorkflowValidationIssue[];
+
     constructor(
         message: string,
-        public readonly issues: WorkflowValidationIssue[],
+        issues: WorkflowValidationIssue[],
         options?: ErrorOptions,
     ) {
         super(message, options);
+        this.issues = issues;
         this.name = 'WorkflowPublishValidationError';
     }
 }

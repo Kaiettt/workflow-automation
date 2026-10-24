@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { Node } from '@xyflow/react';
 import { PublishValidationDialog } from './PublishValidationDialog';
 import {
   formatFieldLabel,
