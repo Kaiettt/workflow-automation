@@ -1,0 +1,219 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': 'Inter, Segoe UI, sans-serif',
+    'fontSize': '14px',
+    'primaryColor': '#EEF2FF',
+    'primaryBorderColor': '#6366F1',
+    'primaryTextColor': '#1E1B4B',
+    'lineColor': '#64748B',
+    'secondaryColor': '#F0FDF4',
+    'tertiaryColor': '#FFFFFF'
+  }
+}}%%
+classDiagram
+    direction TB
+
+    namespace Identity {
+        class User {
+            +UUID id PK
+            +String email UK
+            +String passwordHash
+            +String name
+            +UserRole role
+            +Boolean isActive
+            +Timestamptz createdAt
+            +Timestamptz updatedAt
+        }
+    }
+
+    namespace WorkflowDesign {
+        class Workflow {
+            +UUID id PK
+            +String name
+            +String description?
+            +WorkflowStatus status
+            +UUID ownerId FK
+            +UUID currentVersionId FK, UK
+            +Timestamptz createdAt
+            +Timestamptz updatedAt
+        }
+        class WorkflowDraft {
+            +UUID workflowId PK, FK
+            +Json definition
+            +Json validationErrors?
+            +UUID lockedById FK?
+            +Timestamptz lockedAt?
+            +Timestamptz updatedAt
+        }
+        class WorkflowVersion {
+            +UUID id PK
+            +UUID workflowId FK
+            +Int versionNumber
+            +Json definition
+            +Timestamptz publishedAt
+            +UUID publishedById FK
+            +Timestamptz createdAt
+        }
+    }
+
+    namespace Catalog {
+        class Connector {
+            +UUID id PK
+            +String key UK
+            +String name
+            +ConnectorAuthType authType
+            +Json configSchema
+            +Boolean isActive
+            +Timestamptz createdAt
+        }
+        class NodeTypeDefinition {
+            +UUID id PK
+            +String key UK
+            +String displayName
+            +String icon?
+            +String color?
+            +NodeCategory category
+            +String description?
+            +Json configSchema
+            +Json inputSchema?
+            +Json outputSchema?
+            +UUID connectorId FK?
+            +Boolean isActive
+            +Timestamptz createdAt
+            +Timestamptz updatedAt
+        }
+        class ConnectorCredential {
+            +UUID id PK
+            +UUID connectorId FK
+            +UUID ownerId FK
+            +String name
+            +String encryptedSecret
+            +Timestamptz createdAt
+            +Timestamptz updatedAt
+        }
+    }
+
+    namespace Runtime {
+        class Execution {
+            +UUID id PK
+            +UUID workflowId FK
+            +UUID workflowVersionId FK
+            +TriggerType triggerType
+            +ExecutionStatus status
+            +UUID triggeredById FK?
+            +Timestamptz startedAt
+            +Timestamptz finishedAt?
+            +Int durationMs?
+            +Json context?
+        }
+        class ExecutionNodeLog {
+            +UUID id PK
+            +UUID executionId FK
+            +String nodeId
+            +String nodeKey
+            +NodeExecutionStatus status
+            +Json input?
+            +Json output?
+            +String errorMessage?
+            +String errorStack?
+            +Int retryCount
+            +Timestamptz startedAt
+            +Timestamptz finishedAt?
+            +Int durationMs?
+        }
+    }
+
+    namespace Enums {
+        class UserRole {
+            <<enumeration>>
+            ADMIN
+            DEVELOPER
+            BUSINESS_USER
+        }
+        class WorkflowStatus {
+            <<enumeration>>
+            DRAFT
+            PUBLISHED
+            ARCHIVED
+        }
+        class NodeCategory {
+            <<enumeration>>
+            TRIGGER
+            LOGIC
+            DATA_PROCESSING
+            INTEGRATION
+            AI
+        }
+        class ConnectorAuthType {
+            <<enumeration>>
+            NONE
+            API_KEY
+            OAUTH2
+            BASIC
+        }
+        class TriggerType {
+            <<enumeration>>
+            SCHEDULE
+            WEBHOOK
+            MANUAL
+        }
+        class ExecutionStatus {
+            <<enumeration>>
+            RUNNING
+            SUCCESS
+            FAILED
+            CANCELLED
+        }
+        class NodeExecutionStatus {
+            <<enumeration>>
+            RUNNING
+            SUCCESS
+            FAILED
+            SKIPPED
+            TIMEOUT
+        }
+    }
+
+    %% ---- Entity relationships ----
+    User "1" --> "0..*" Workflow : owns
+    User "1" --> "0..*" WorkflowVersion : publishes
+    User "0..1" --> "0..*" WorkflowDraft : locks
+    User "1" --> "0..*" ConnectorCredential : owns
+    User "0..1" --> "0..*" Execution : triggers
+
+    Workflow "1" *-- "0..1" WorkflowDraft : draft
+    Workflow "1" *-- "0..*" WorkflowVersion : versions
+    Workflow "0..1" --> "0..1" WorkflowVersion : currentVersion
+    Workflow "1" --> "0..*" Execution : executions
+    WorkflowVersion "1" --> "0..*" Execution : executed as
+
+    Connector "0..1" --> "0..*" NodeTypeDefinition : backs
+    Connector "1" --> "0..*" ConnectorCredential : credentials
+    Execution "1" *-- "0..*" ExecutionNodeLog : logs
+
+    %% ---- Soft references (JSON / values, not FKs) ----
+    WorkflowVersion ..> NodeTypeDefinition : definition node data.key
+    ExecutionNodeLog ..> NodeTypeDefinition : nodeKey (value only)
+
+    %% ---- Enum usage ----
+    User ..> UserRole
+    Workflow ..> WorkflowStatus
+    NodeTypeDefinition ..> NodeCategory
+    Connector ..> ConnectorAuthType
+    Execution ..> TriggerType
+    Execution ..> ExecutionStatus
+    ExecutionNodeLog ..> NodeExecutionStatus
+
+    %% ---- Styling ----
+    classDef identity fill:#E0F2FE,stroke:#0284C7,stroke-width:2px,color:#0C4A6E
+    classDef design fill:#EEF2FF,stroke:#6366F1,stroke-width:2px,color:#1E1B4B
+    classDef catalog fill:#FEF3C7,stroke:#D97706,stroke-width:2px,color:#78350F
+    classDef runtime fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D
+    classDef enums fill:#F1F5F9,stroke:#94A3B8,stroke-width:1.5px,stroke-dasharray:4 3,color:#334155
+
+    cssClass "User" identity
+    cssClass "Workflow,WorkflowDraft,WorkflowVersion" design
+    cssClass "Connector,NodeTypeDefinition,ConnectorCredential" catalog
+    cssClass "Execution,ExecutionNodeLog" runtime
+    cssClass "UserRole,WorkflowStatus,NodeCategory,ConnectorAuthType,TriggerType,ExecutionStatus,NodeExecutionStatus" enums

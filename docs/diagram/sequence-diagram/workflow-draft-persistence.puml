@@ -1,0 +1,54 @@
+@startuml WorkflowDraftPersistence
+title Workflow Draft Creation, Loading and Autosave
+autonumber
+
+actor User
+boundary "Workflow Designer" as UI
+control "Workflows Controller" as Controller
+control "Designer Handlers" as Handlers
+database "PostgreSQL" as DB
+
+User -> UI: Start a new workflow
+UI -> Controller: POST /api/workflows
+Controller -> Handlers: CreateWorkflowCommand
+Handlers -> DB: Insert workflow metadata
+DB --> Handlers: workflowId
+Handlers --> Controller: Created workflow
+Controller --> UI: 201 Created + workflowId
+
+UI -> Controller: GET /api/workflows/{workflowId}/draft
+Controller -> Handlers: GetWorkflowDraftQuery
+Handlers -> DB: Find draft by workflowId
+alt Draft exists
+    DB --> Handlers: Saved definition
+    Handlers --> Controller: Draft definition
+    Controller --> UI: 200 OK + definition
+else No draft exists yet
+    DB --> Handlers: No record
+    Handlers --> Controller: Not Found
+    Controller --> UI: 404 Not Found
+    UI -> UI: Initialize empty graph
+end
+
+loop Each graph change
+    User -> UI: Add/edit/remove node or edge
+    UI -> UI: Debounce autosave (~2 seconds)
+    UI -> Controller: PUT /api/workflows/{workflowId}/draft\n{ definition }
+    Controller -> Handlers: SaveDraftCommand
+    Handlers -> DB: Verify parent workflow exists
+    alt Workflow missing
+        DB --> Handlers: No workflow
+        Handlers --> Controller: Not Found
+        Controller --> UI: 404 Not Found
+    else Workflow exists
+        Handlers -> DB: Upsert the workflow's single draft
+        Note right of DB: Save definition as-is; invalid drafts are allowed
+        Handlers -> DB: Clear stale validationErrors and update timestamp
+        DB --> Handlers: workflowId, updatedAt
+        Handlers --> Controller: Save confirmation
+        Controller --> UI: 200 OK + updatedAt
+        UI --> User: Show Saved state
+    end
+end
+
+@enduml

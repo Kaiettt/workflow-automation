@@ -1,0 +1,141 @@
+@startuml FlowPilot_UseCase
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam nodesep 40
+skinparam ranksep 80
+skinparam ActorBorderColor #334155
+skinparam ArrowColor #334155
+skinparam usecase {
+  BackgroundColor #F8FAFC
+  BorderColor #0F766E
+}
+skinparam rectangle {
+  BackgroundColor #F0FDFA
+  BorderColor #0F766E
+}
+
+' ===== Actor bên trái: người dùng cuối =====
+actor "Khách" as Guest
+actor "Người dùng" as User
+actor "Workflow\nDeveloper" as Dev
+actor "Business\nUser" as Biz
+
+' ===== Actor bên phải: quản trị và hệ thống ngoài =====
+actor "Administrator" as Admin
+actor "Dịch vụ email" as Mail
+actor "Scheduler /\nWebhook caller" as Sched
+actor "Dịch vụ\nbên ngoài" as Ext
+
+' ===== Kế thừa actor =====
+Dev --|> User
+Biz --|> User
+
+rectangle "FlowPilot" {
+
+  rectangle "Tài khoản" {
+    usecase "Đăng ký tài khoản" as UC_Register
+    usecase "Xác minh email" as UC_Verify
+    usecase "Đăng nhập" as UC_Login
+    usecase "Đăng xuất" as UC_Logout
+    usecase "Khôi phục mật khẩu" as UC_Reset
+    usecase "Đổi mật khẩu" as UC_ChangePw
+  }
+
+  rectangle "Thiết kế workflow" {
+    usecase "Xem danh sách workflow" as UC_List
+    usecase "Tạo workflow" as UC_Create
+    usecase "Chỉnh sửa workflow" as UC_Edit
+    usecase "Thêm và nối node" as UC_Compose
+    usecase "Cấu hình node" as UC_Config
+    usecase "Lưu bản nháp" as UC_Draft
+  }
+
+  rectangle "Xuất bản và phiên bản" {
+    usecase "Kiểm tra workflow" as UC_Validate
+    usecase "Xuất bản workflow" as UC_Publish
+    usecase "Tạo phiên bản mới" as UC_NewVer
+    usecase "Xem lịch sử phiên bản" as UC_Versions
+    usecase "So sánh phiên bản" as UC_Compare
+    usecase "Khôi phục phiên bản" as UC_Restore
+  }
+
+  rectangle "Vận hành và theo dõi" {
+    usecase "Chạy thủ công" as UC_RunManual
+    usecase "Kích hoạt theo lịch" as UC_RunSchedule
+    usecase "Kích hoạt bằng webhook" as UC_RunWebhook
+    usecase "Thực thi workflow" as UC_Execute
+    usecase "Theo dõi trạng thái" as UC_Monitor
+    usecase "Xem lịch sử chạy" as UC_History
+    usecase "Xem log chi tiết" as UC_Logs
+  }
+
+  rectangle "Quản trị và kết nối" {
+    usecase "Quản lý người dùng" as UC_Users
+    usecase "Phân quyền" as UC_Roles
+    usecase "Khóa / mở tài khoản" as UC_Lock
+    usecase "Thiết lập kết nối dịch vụ" as UC_Connect
+    usecase "Quản lý kết nối" as UC_Conn
+    usecase "Kiểm tra kết nối" as UC_TestConn
+  }
+}
+
+' ===== Khách =====
+Guest -- UC_Register
+Guest -- UC_Reset
+
+' ===== Người dùng (Developer + Business User) =====
+User -- UC_Login
+User -- UC_Logout
+User -- UC_ChangePw
+User -- UC_List
+User -- UC_Create
+User -- UC_Edit
+User -- UC_Publish
+User -- UC_Versions
+User -- UC_RunManual
+User -- UC_Monitor
+User -- UC_History
+User -- UC_Connect
+
+' ===== Administrator =====
+UC_Login -- Admin
+UC_Logout -- Admin
+UC_ChangePw -- Admin
+UC_Users -- Admin
+UC_Roles -- Admin
+UC_Lock -- Admin
+UC_Conn -- Admin
+UC_Monitor -- Admin
+UC_History -- Admin
+
+' ===== Actor hệ thống ngoài =====
+UC_Verify -- Mail
+UC_Reset -- Mail
+UC_RunSchedule -- Sched
+UC_RunWebhook -- Sched
+UC_TestConn -- Ext
+UC_Execute -- Ext
+
+' ===== «include»: use case gốc ..> use case được bao gồm =====
+UC_Register .> UC_Verify : <<include>>
+UC_Edit .> UC_Compose : <<include>>
+UC_Edit .> UC_Config : <<include>>
+UC_Publish .> UC_Validate : <<include>>
+UC_Publish .> UC_NewVer : <<include>>
+UC_RunManual .> UC_Execute : <<include>>
+UC_RunSchedule .> UC_Execute : <<include>>
+UC_RunWebhook .> UC_Execute : <<include>>
+UC_Connect .> UC_TestConn : <<include>>
+
+' ===== «extend»: use case mở rộng ..> use case gốc =====
+UC_Create .> UC_Edit : <<extend>>
+UC_Draft .> UC_Edit : <<extend>>
+UC_Compare .> UC_Versions : <<extend>>
+UC_Restore .> UC_Versions : <<extend>>
+UC_Logs .> UC_History : <<extend>>
+UC_Conn .> UC_Connect : <<extend>>
+UC_Roles .> UC_Users : <<extend>>
+UC_Lock .> UC_Users : <<extend>>
+
+@enduml
