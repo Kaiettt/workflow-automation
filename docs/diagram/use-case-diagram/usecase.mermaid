@@ -1,0 +1,93 @@
+flowchart LR
+	%% ===== Actors chính =====
+	guest["Khách"]
+	user["Người dùng"]
+	dev["Workflow Developer"]
+	biz["Business User"]
+	admin["Administrator"]
+
+	%% ===== Actors hệ thống ngoài =====
+	emailSvc["Dịch vụ email"]
+	scheduler["Scheduler / Webhook caller"]
+	external["Dịch vụ bên ngoài<br/>(HTTP, Gmail, Sheets, Drive, Slack...)"]
+
+	%% ===== Kế thừa actor =====
+	dev -->|"is-a"| user
+	biz -->|"is-a"| user
+
+	subgraph FP["System boundary: FlowPilot"]
+		direction TB
+
+		subgraph G1["Tài khoản"]
+			register(["Đăng ký tài khoản"])
+			verify(["Xác minh email"])
+			login(["Đăng nhập / đăng xuất"])
+			reset(["Khôi phục mật khẩu"])
+		end
+
+		subgraph G2["Thiết kế & phiên bản"]
+			design(["Thiết kế workflow<br/>(kéo thả, cấu hình node)"])
+			publish(["Xuất bản workflow"])
+			validate(["Kiểm tra workflow"])
+			versions(["Xem lịch sử phiên bản"])
+			compare(["So sánh phiên bản"])
+			restore(["Khôi phục phiên bản"])
+		end
+
+		subgraph G3["Vận hành & theo dõi"]
+			runManual(["Chạy thủ công"])
+			runAuto(["Kích hoạt tự động<br/>(lịch / webhook)"])
+			execute(["Thực thi workflow"])
+			monitor(["Theo dõi trạng thái"])
+			logs(["Xem log chi tiết"])
+		end
+
+		subgraph G4["Quản trị & kết nối"]
+			manageUsers(["Quản lý người dùng<br/>và phân quyền"])
+			connections(["Quản lý kết nối<br/>dịch vụ"])
+		end
+	end
+
+	%% ===== Khách =====
+	guest --- register
+	guest --- reset
+
+	%% ===== Người dùng (Developer + Business User) =====
+	user --- login
+	user --- design
+	user --- publish
+	user --- versions
+	user --- compare
+	user --- restore
+	user --- runManual
+	user --- monitor
+	user --- logs
+	user --- connections
+
+	%% ===== Administrator =====
+	admin --- login
+	admin --- manageUsers
+	admin --- connections
+	admin --- monitor
+
+	%% ===== Actor ngoài =====
+	emailSvc --- verify
+	emailSvc --- reset
+	scheduler --- runAuto
+	external --- connections
+	external --- execute
+
+	%% ===== Quan hệ include / extend =====
+	register -. "«include»" .-> verify
+	publish -. "«include»" .-> validate
+	runManual -. "«include»" .-> execute
+	runAuto -. "«include»" .-> execute
+	compare -. "«extend»" .-> versions
+	restore -. "«extend»" .-> versions
+
+	%% ===== Style =====
+	classDef actor fill:#ffffff,stroke:#334155,color:#0f172a,stroke-width:1.5px;
+	classDef uc fill:#f8fafc,stroke:#0f766e,color:#0f172a,stroke-width:1.2px;
+	class guest,user,dev,biz,admin,emailSvc,scheduler,external actor;
+	class register,verify,login,reset,design,publish,validate,versions,compare,restore,runManual,runAuto,execute,monitor,logs,manageUsers,connections uc;
+	style FP fill:#f0fdfa,stroke:#0f766e,stroke-width:2px;

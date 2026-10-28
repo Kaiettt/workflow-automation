@@ -1,0 +1,48 @@
+@startuml PublishWorkflowVersion
+title Publish Workflow Version
+autonumber
+
+actor User
+boundary "Workflow Designer" as UI
+control "Workflows Controller" as Controller
+control "Publish Workflow Handler" as Handler
+control "Node Catalog" as Catalog
+database "PostgreSQL" as DB
+
+User -> UI: Click Publish
+UI -> Controller: POST /api/workflows/{workflowId}/versions
+Controller -> Handler: PublishWorkflowCommand(workflowId, userId)
+Handler -> DB: Load workflow, owner and draft
+DB --> Handler: Workflow and draft definition
+
+alt Workflow/draft missing or access denied
+    Handler --> Controller: 404 Not Found / 403 Forbidden
+    Controller --> UI: Return error
+    UI --> User: Show error
+else Draft is available
+    Handler -> Catalog: Get node categories and config schemas
+    Catalog --> Handler: Catalog metadata
+    Handler -> Handler: Validate trigger, actions, catalog keys,
+    Handler -> Handler: required config and graph reachability
+
+    alt Validation failed
+        Handler -> DB: Save structured validationErrors
+        DB --> Handler: Errors persisted
+        Handler --> Controller: 400 Bad Request + issues
+        Controller --> UI: Return validation issues
+        UI --> User: Group issues and highlight affected nodes
+    else Validation passed
+        Handler -> DB: BEGIN transaction
+        Handler -> DB: Insert immutable WorkflowVersion
+        Note right of DB: versionNumber = max + 1
+        Handler -> DB: Update currentVersionId and workflow status
+        Handler -> DB: Clear draft validationErrors
+        Handler -> DB: COMMIT transaction
+        DB --> Handler: New version metadata
+        Handler --> Controller: Published version result
+        Controller --> UI: 201 Created
+        UI --> User: Show publish success and version number
+    end
+end
+
+@enduml

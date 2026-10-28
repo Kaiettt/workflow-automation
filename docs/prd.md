@@ -7,59 +7,163 @@ Note: những phần đánh dấu là “Phase Sau” sẽ được phát triể
 
 # 1. Giới thiệu
 
-## 1.1 Tổng quan
+## 1.1. Tổng quan
 
-FlowPilot là một nền tảng Workflow Automation cho phép người dùng thiết kế, thực thi, giám sát và bảo trì các quy trình nghiệp vụ (workflow) thông qua giao diện kéo thả (Drag & Drop) trực quan. Trọng tâm của FlowPilot là cung cấp một công cụ tự động hóa quy trình mạnh mẽ, ổn định và dễ mở rộng.
+**FlowPilot** là nền tảng Workflow Automation giúp doanh nghiệp tự động hóa các quy trình công việc lặp đi lặp lại thông qua giao diện kéo thả trực quan. Người dùng có thể thiết kế, vận hành, theo dõi và quản lý các quy trình nghiệp vụ trên cùng một hệ thống mà không cần viết mã đối với các luồng xử lý phổ biến.
 
-FlowPilot tích hợp thêm **FlowPilot AI** như một trợ lý (copilot) giúp người dùng tạo, giải thích và tối ưu workflow nhanh hơn. AI là một tính năng bổ sung có giá trị, không phải là thành phần bắt buộc để hệ thống vận hành — người dùng vẫn có thể xây dựng và chạy toàn bộ workflow mà không cần dùng đến AI.
+### Vấn đề cần giải quyết
 
-## 1.2 Mục tiêu
+Trong thực tế, nhiều quy trình nghiệp vụ phải đi qua nhiều công cụ khác nhau như email, bảng tính, cơ sở dữ liệu hoặc ứng dụng nhắn tin. Các quy trình này thường được thực hiện thủ công hoặc bằng những đoạn script rời rạc.
 
-- Cung cấp công cụ xây dựng workflow trực quan, dễ dùng cho cả người có và không có nền tảng kỹ thuật.
-- Đơn giản hóa việc tích hợp và kết nối nhiều hệ thống/dịch vụ khác nhau.
-- Đảm bảo thực thi workflow ổn định, có khả năng xử lý lỗi và retry.
-- Tăng khả năng bảo trì, theo dõi và mở rộng workflow theo thời gian.
-- Tích hợp AI như một công cụ hỗ trợ giúp rút ngắn thời gian thiết kế và phát hiện vấn đề trong workflow (“Phase Sau”).
+Cách tiếp cận này dẫn đến nhiều hạn chế:
+
+- Tốn thời gian xử lý.
+- Dễ phát sinh sai sót do thao tác thủ công.
+- Khó theo dõi trạng thái thực thi.
+- Khó bảo trì và mở rộng.
+- Phụ thuộc vào một số cá nhân có kiến thức kỹ thuật.
+
+### Giá trị mang lại
+
+1. **Dễ xây dựng**
+   - Thiết kế quy trình bằng thao tác kéo thả và kết nối các bước xử lý.
+   - Người dùng không chuyên kỹ thuật vẫn có thể tạo workflow cơ bản.
+
+2. **Kết nối nhiều hệ thống**
+   - Liên kết các dịch vụ doanh nghiệp đang sử dụng vào cùng một quy trình thống nhất.
+
+3. **Đáng tin cậy**
+   - Workflow được thực thi đúng theo thiết kế.
+   - Người dùng luôn biết quy trình đang ở trạng thái nào.
+
+4. **Minh bạch và dễ kiểm soát**
+   - Mọi lần chạy đều được lưu lịch sử.
+   - Mọi thay đổi đều có phiên bản và có thể khôi phục khi cần.
 
 ---
+
+## 1.2. Mục tiêu
+
+| Mục tiêu | Tiêu chí thành công (MVP) |
+|-----------|---------------------------|
+| Giúp mọi người dễ dàng tạo workflow | Người dùng mới có thể tạo và xuất bản một workflow đơn giản trong vòng 10 phút |
+| Đáp ứng cả nhu cầu đơn giản lẫn phức tạp | Cùng một nền tảng phục vụ được workflow vài bước và workflow nhiều nhánh, quy mô lớn |
+| Kết nối các dịch vụ phổ biến | Hỗ trợ 8 connector trong giai đoạn MVP và dễ dàng mở rộng thêm connector mới |
+| Vận hành ổn định, dễ theo dõi | Mọi lần chạy đều hiển thị trạng thái rõ ràng và được lưu lịch sử |
+| Dễ bảo trì theo thời gian | Người dùng có thể lưu, so sánh và khôi phục các phiên bản workflow trước đó |
+
+> *Các chỉ số nêu trên là đề xuất ban đầu và có thể điều chỉnh phù hợp với phạm vi đồ án.*
 
 # 2. Đối tượng sử dụng
 
-### Workflow Developer, Business User
-
-Thiết kế, triển khai và bảo trì workflow; là người dùng chính, thao tác trực tiếp trên Workflow Designer.
-
-(“Phase Sau”) Theo dõi trạng thái workflow, và có thể tận dụng FlowPilot AI để mô tả nhu cầu bằng ngôn ngữ tự nhiên mà không cần hiểu sâu về kỹ thuật.
-
-### Administrator
-
-Quản lý hệ thống, connector, người dùng và phân quyền.
+FlowPilot hướng đến ba nhóm người dùng chính: **Workflow Developer**, **Business User** và **Administrator**.
 
 ---
+
+## 2.1. Workflow Developer
+
+### Mô tả
+
+Người có nền tảng kỹ thuật, chịu trách nhiệm thiết kế các workflow phức tạp, quy mô lớn, thường liên quan đến nhiều hệ thống và nhiều nhánh xử lý.
+
+### Nhu cầu
+
+- Xây dựng các quy trình nhiều bước, nhiều điều kiện và nhiều nhánh xử lý.
+- Tích hợp với nhiều hệ thống và dịch vụ khác nhau.
+- Quản lý, cập nhật và mở rộng workflow theo thời gian.
+- Điều tra và xử lý sự cố dựa trên lịch sử chạy.
+- Kiểm soát thay đổi thông qua cơ chế phiên bản.
+- Khôi phục workflow về phiên bản ổn định khi cần.
+
+### Ví dụ
+
+Thiết kế quy trình xử lý đơn hàng đi qua nhiều hệ thống:
+
+1. Nhận đơn hàng.
+2. Kiểm tra tính hợp lệ.
+3. Gửi thông báo cho các bên liên quan.
+4. Đồng bộ dữ liệu sang hệ thống quản lý kho và CRM.
+
+---
+
+## 2.2. Business User
+
+### Mô tả
+
+Nhân sự nghiệp vụ như vận hành, kinh doanh, marketing hoặc kế toán, có ít hoặc không có nền tảng kỹ thuật nhưng muốn tự động hóa công việc hằng ngày.
+
+### Nhu cầu
+
+- Tự tạo workflow đơn giản mà không cần hỗ trợ từ đội kỹ thuật.
+- Sử dụng giao diện dễ hiểu và ít thao tác.
+- Theo dõi được trạng thái hoạt động của workflow.
+- Nhận cảnh báo khi workflow gặp lỗi.
+
+### Ví dụ
+
+- Tự động gửi thông báo Slack khi có dòng mới trong Google Sheets.
+- Tự động lưu tệp đính kèm từ email vào Google Drive.
+- Gửi email cảm ơn khi khách hàng điền biểu mẫu đăng ký.
+
+---
+
+## 2.3. Administrator
+
+### Mô tả
+
+Người quản trị hệ thống, chịu trách nhiệm vận hành nền tảng và quản lý người dùng.
+
+### Nhu cầu
+
+- Quản lý các kết nối đến dịch vụ bên ngoài.
+- Quản lý tài khoản người dùng.
+- Phân quyền truy cập các tài nguyên trong hệ thống.
+- Theo dõi tình trạng hoạt động của nền tảng.
+- Đảm bảo tính bảo mật và tuân thủ chính sách tổ chức.
+
+### Ví dụ
+
+- Thêm kết nối Google Workspace hoặc Microsoft 365 cho tổ chức.
+- Cấp quyền tạo workflow cho nhóm vận hành.
+- Thu hồi quyền truy cập của người dùng đã nghỉ việc.
 
 # 3. Phạm vi dự án
 
-## Bao gồm
+## 3.1. Bao gồm (MVP)
 
-- Workflow Designer (kéo thả)
-- Workflow Execution Engine
-- Node Library
-- Connector Framework
-- Execution Monitor
-- Workflow Logs
-- Workflow Version Management
-- FlowPilot AI (“Phase Sau”)
-
-## Không bao gồm
-
-- Marketplace
-- Distributed Workflow Engine
-- Multi-region Deployment
-- Hỗ trợ hàng trăm connector
-- Tạo workflow bằng ngôn ngữ tự nhiên bằng AI
-- AI tự động triển khai hoặc chỉnh sửa workflow trực tiếp trên Production
+| Nhóm | Nội dung |
+|--------|----------|
+| **Thiết kế workflow** | Workflow Designer cho phép kéo thả để tạo, chỉnh sửa, kiểm tra và xuất bản workflow. |
+| **Thư viện thành phần** | Node Library gồm các khối dựng sẵn như Trigger, Condition & Branching, Data Processing và Service Connector. |
+| **Kết nối dịch vụ** | Hỗ trợ connector cho 8 dịch vụ phổ biến: HTTP, Webhook, Google Sheet, Gmail, Google Sheets, Google Drive, OpenAI; đồng thời cho phép mở rộng thêm connector mới. |
+| **Vận hành workflow** | Workflow Execution Engine thực thi workflow theo đúng luồng đã thiết kế và hỗ trợ cơ chế tự động thử lại (retry) khi gặp lỗi tạm thời. |
+| **Theo dõi và giám sát** | Execution Monitor hiển thị trạng thái các lần chạy; Workflow Logs lưu lịch sử thực thi để phục vụ tra cứu và xử lý sự cố. |
+| **Quản lý phiên bản** | Lưu phiên bản workflow, so sánh sự khác biệt giữa các phiên bản và khôi phục về phiên bản trước đó. |
+| **Quản lý người dùng** | Hỗ trợ đăng nhập, quản lý tài khoản và phân quyền theo vai trò: Administrator, Workflow Developer và Business User. |
+| **Quản lý kết nối** | Administrator có thể cấu hình, lưu trữ và quản lý các tài khoản kết nối tới các dịch vụ bên ngoài. |
 
 ---
+
+## 3.2. Không bao gồm (Ngoài phạm vi MVP)
+
+Các chức năng dưới đây không nằm trong giai đoạn MVP:
+
+1. Marketplace chia sẻ workflow giữa các tổ chức hoặc người dùng.
+2. Hệ thống thực thi workflow phân tán quy mô lớn (distributed execution).
+3. Triển khai đa vùng (multi-region deployment).
+4. Hỗ trợ hàng trăm connector tích hợp sẵn.
+5. Chỉnh sửa workflow theo thời gian thực với nhiều người dùng cùng lúc (real-time collaborative editing).
+
+---
+
+## 3.3. Giới hạn của MVP
+
+Để đảm bảo phạm vi phù hợp với thời gian và nguồn lực thực hiện đồ án, phiên bản MVP tập trung vào:
+
+- Xây dựng nền tảng workflow automation hoàn chỉnh từ thiết kế đến thực thi.
+- Hỗ trợ các kiểu workflow phổ biến của doanh nghiệp vừa và nhỏ.
+- Đảm bảo khả năng mở rộng kiến trúc để bổ sung connector và tính năng trong tương lai.
+- Ưu tiên tính ổn định, khả năng theo dõi và quản lý workflow hơn là tối ưu cho quy mô cực lớn.
 
 # 4. Chức năng chính
 
@@ -96,11 +200,10 @@ Kiến trúc plugin cho phép workflow kết nối với các dịch vụ bên n
 
 - HTTP
 - Webhook
-- PostgreSQL
+- Google Sheet
 - Gmail
 - Google sheet
 - Google drive
-- Slack
 - OpenAI
 
 ## 4.4 Workflow Execution
@@ -146,15 +249,6 @@ Quản lý phiên bản workflow.
 - Save Version
 - Compare Version
 - Rollback
-
-## 4.8 FlowPilot AI (“Phase Sau”)
-
-FlowPilot AI là một lớp tiện ích tùy chọn, giúp tăng tốc quá trình làm việc với workflow.
-
-- **Generate Workflow**: Gợi ý cấu trúc workflow từ mô tả bằng ngôn ngữ tự nhiên (người dùng vẫn cần rà soát và chỉnh sửa trước khi publish).
-- **Explain Workflow**: Diễn giải workflow theo ngôn ngữ nghiệp vụ, dễ hiểu cho Business User.
-- **Review Workflow**: Phân tích và cảnh báo các vấn đề tiềm ẩn (thiếu error handling, node thừa, vòng lặp vô hạn…).
-- **Suggest Optimization**: Đề xuất cải thiện về hiệu năng, cấu trúc và xử lý lỗi.
 
 ---
 
@@ -217,4 +311,4 @@ FlowPilot AI là một lớp tiện ích tùy chọn, giúp tăng tốc quá tr�
 
 # 8. Kết luận
 
-FlowPilot tập trung xây dựng một nền tảng Workflow Automation vững chắc, dễ dùng và dễ mở rộng, giúp người dùng thiết kế, thực thi và giám sát quy trình nghiệp vụ một cách hiệu quả. FlowPilot AI giúp tăng tốc công việc. Trong phạm vi đồ án, hệ thống tập trung triển khai các tính năng cốt lõi của một nền tảng workflow, đồng thời được thiết kế theo kiến trúc mở để dễ dàng tích hợp thêm AI và các khả năng khác trong tương lai.
+FlowPilot tập trung xây dựng một nền tảng Workflow Automation vững chắc, dễ dùng và dễ mở rộng, giúp người dùng thiết kế, thực thi và giám sát quy trình nghiệp vụ một cách hiệu quả. Trong phạm vi đồ án, hệ thống tập trung triển khai các tính năng cốt lõi của một nền tảng workflow, đồng thời được thiết kế theo kiến trúc mở để dễ dàng tích hợp thêm AI và các khả năng khác trong tương lai.

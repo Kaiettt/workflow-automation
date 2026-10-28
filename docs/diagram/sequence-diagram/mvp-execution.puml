@@ -1,0 +1,63 @@
+@startuml MvpExecution
+title MVP Manual Workflow Execution
+autonumber
+
+actor User
+boundary "Version Detail UI" as UI
+control "Executions Controller" as Controller
+control "Start Execution Handler" as Handler
+collections "Executor Registry" as Registry
+control "Credential Vault" as Vault
+participant "Google Sheets / Gmail" as Google
+database "PostgreSQL" as DB
+
+User -> UI: Click Run on published version
+UI -> Controller: POST /api/executions\n{ workflow_version_id }
+Controller -> Handler: StartExecution(versionId, userId)
+Handler -> DB: Check access and load version definition
+DB --> Handler: Published definition
+
+alt Version missing or caller not authorized
+    Handler --> Controller: 404 Not Found / 403 Forbidden
+    Controller --> UI: Return error
+    UI --> User: Show error
+else Version is accessible
+    Handler -> Handler: Check manual trigger and linear edge chain
+    Handler -> DB: Create Execution(status = RUNNING)
+    DB --> Handler: executionId
+
+    loop Nodes in directed chain: Manual -> Sheets -> Filter -> Gmail
+        Handler -> Registry: Resolve executor by node.data.key
+        Registry --> Handler: Node executor
+        opt Node requires a credential
+            Handler -> Vault: Resolve credential_id for owner and connector
+            Vault -> DB: Load encrypted credential
+            DB --> Vault: Encrypted secret
+            Vault --> Handler: Decrypt in memory
+        end
+        Handler -> Registry: Execute node with input and config
+        opt Google Sheets or Gmail node
+            Registry -> Google: Read sheet rows or send email
+            Google --> Registry: Node result
+        end
+        Registry --> Handler: Output or node error
+        Handler -> DB: Save execution_node_log
+        alt Node failed
+            Handler -> DB: Set execution status = FAILED
+            Note over Handler,DB: Stop traversal; remaining nodes are skipped
+        else Node succeeded
+            Handler -> Handler: Pass output to next node
+        end
+    end
+
+    alt All nodes succeeded
+        Handler -> DB: Set execution status = SUCCESS
+    end
+    Handler -> DB: Save finish time and duration
+    DB --> Handler: Execution and node logs
+    Handler --> Controller: Execution DTO
+    Controller --> UI: Return result synchronously
+    UI --> User: Show status and node logs
+end
+
+@enduml
