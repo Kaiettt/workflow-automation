@@ -12,6 +12,8 @@ import { WorkflowRepository } from '@app/designer/domain/repositories/workflow.r
 import { WorkflowDraftRepository } from '@app/designer/domain/repositories/workflow-draft.repository';
 import { WorkflowVersionRepository } from '@app/designer/domain/repositories/workflow-version.repository';
 import { WorkflowPublishedEvent } from '@app/designer/application/events/workflow-published.event';
+import { CheckPublishTriggersQuery } from '@app/designer/application/queries/check-publish-triggers.query';
+import { QueryHandlerNotFoundException } from '@nestjs/cqrs';
 
 // Mock catalog schema data matching sample.data.json
 const catalogSchemas: Record<string, { category: string; configSchema: any }> =
@@ -286,6 +288,63 @@ describe('PublishWorkflowHandler (TDD)', () => {
     expect(eventBus.publish).toHaveBeenCalledWith(
       new WorkflowPublishedEvent(workflowId, result.versionId, validDefinition),
     );
+  });
+
+  it('should reject publish with the trigger issues found by the triggers module', async () => {
+    const workflowId = 'wf-page-taken';
+    workflowRepo.workflows.set(
+      workflowId,
+      Workflow.create({ id: workflowId, name: 'Chat bot', ownerId: 'user-1' }),
+    );
+    const draft = WorkflowDraft.create(workflowId, validDefinition);
+    draftRepo.drafts.set(workflowId, draft);
+    const pageTaken = {
+      code: 'CHANNEL_ALREADY_BOUND',
+      severity: 'error',
+      message: 'This Facebook Page is already used by the workflow "Other".',
+      nodeId: 'triggerNode-1',
+    };
+    const catalog = queryBus.execute.getMockImplementation()!;
+    queryBus.execute.mockImplementation(async (query: any) => {
+      if (query instanceof CheckPublishTriggersQuery) {
+        expect(query).toEqual(
+          new CheckPublishTriggersQuery(workflowId, 'user-1', validDefinition),
+        );
+        return [pageTaken];
+      }
+      return catalog(query);
+    });
+
+    await expect(
+      handler.execute(new PublishWorkflowCommand(workflowId, 'user-1')),
+    ).rejects.toThrow(BadRequestException);
+    expect(draft.validationErrors?.issues).toEqual([pageTaken]);
+    expect(versionRepo.versions).toHaveLength(0);
+    expect(eventBus.publish).not.toHaveBeenCalled();
+  });
+
+  it('should publish when no module answers the trigger check', async () => {
+    const workflowId = 'wf-no-trigger-module';
+    workflowRepo.workflows.set(
+      workflowId,
+      Workflow.create({ id: workflowId, name: 'Plain', ownerId: 'user-1' }),
+    );
+    draftRepo.drafts.set(
+      workflowId,
+      WorkflowDraft.create(workflowId, validDefinition),
+    );
+    const catalog = queryBus.execute.getMockImplementation()!;
+    queryBus.execute.mockImplementation(async (query: any) => {
+      if (query instanceof CheckPublishTriggersQuery) {
+        throw new QueryHandlerNotFoundException('CheckPublishTriggersQuery');
+      }
+      return catalog(query);
+    });
+
+    const result = await handler.execute(
+      new PublishWorkflowCommand(workflowId, 'user-1'),
+    );
+    expect(result.versionNumber).toBe(1);
   });
 
   it('should reject publish with NO_TRIGGER when draft definition has no trigger node', async () => {

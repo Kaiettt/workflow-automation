@@ -6,6 +6,8 @@ import { WebhooksController } from './presentation/http/webhooks.controller';
 import { WorkflowTriggersController } from './presentation/http/workflow-triggers.controller';
 import { SyncWorkflowTriggersHandler } from './application/events/sync-workflow-triggers.handler';
 import { ReceiveWebhookHandler } from './application/commands/receive-webhook.command';
+import { ReceiveMessengerEventsHandler } from './application/commands/receive-messenger-events.command';
+import { CheckPublishTriggersHandler } from './application/queries/check-publish-triggers.handler';
 import { GetWorkflowTriggersHandler } from './application/queries/get-workflow-triggers.query';
 import { WebhookDedupPort } from './application/ports/webhook-dedup.port';
 import { WorkflowTriggerRepository } from './domain/workflow-trigger.repository';
@@ -18,7 +20,9 @@ import { RedisWebhookDedup } from './infrastructure/redis-webhook-dedup';
   providers: [
     SyncWorkflowTriggersHandler,
     ReceiveWebhookHandler,
+    ReceiveMessengerEventsHandler,
     GetWorkflowTriggersHandler,
+    CheckPublishTriggersHandler,
     {
       provide: WorkflowTriggerRepository,
       useClass: PrismaWorkflowTriggerRepository,

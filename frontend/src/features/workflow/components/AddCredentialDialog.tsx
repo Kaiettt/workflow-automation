@@ -10,31 +10,39 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useSaveApiKeyCredential } from '../hooks/useCredentials';
+import { useConnector, useSaveCredential } from '../hooks/useCredentials';
+import { credentialService } from '../services/credential.service';
 
-interface AddApiKeyDialogProps {
+interface AddCredentialDialogProps {
   connectorKey: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (credentialId: string) => void;
 }
 
-export function AddApiKeyDialog({
+// The form fields come from the connector's configSchema: one API key for LLM
+// vendors, Page ID + Page Access Token for Messenger.
+export function AddCredentialDialog({
   connectorKey,
   open,
   onOpenChange,
   onSaved,
-}: AddApiKeyDialogProps) {
+}: AddCredentialDialogProps) {
+  const { data: connector } = useConnector(connectorKey);
+  const fields = credentialService.formFields(connector);
   const [name, setName] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const save = useSaveApiKeyCredential();
+  const [values, setValues] = useState<Record<string, string>>({});
+  const save = useSaveCredential();
 
-  const canSave = name.trim() !== '' && apiKey.trim() !== '' && !save.isPending;
+  const canSave =
+    name.trim() !== '' &&
+    fields.every((field) => (values[field.key] ?? '').trim() !== '') &&
+    !save.isPending;
 
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       setName('');
-      setApiKey('');
+      setValues({});
       save.reset();
     }
     onOpenChange(next);
@@ -44,7 +52,7 @@ export function AddApiKeyDialog({
     event.preventDefault();
     if (!canSave) return;
     save.mutate(
-      { connectorKey, name, apiKey },
+      { connectorKey, name, values },
       {
         onSuccess: (saved) => {
           onSaved(saved.id);
@@ -59,35 +67,39 @@ export function AddApiKeyDialog({
       <DialogContent>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <DialogHeader>
-            <DialogTitle>Add API key for {connectorKey}</DialogTitle>
+            <DialogTitle>Connect {connector?.name ?? connectorKey}</DialogTitle>
             <DialogDescription>
-              The key is stored encrypted and is never shown again.
+              Secrets are stored encrypted and are never shown again.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-1.5">
-            <Label htmlFor="api-key-name">Name</Label>
+            <Label htmlFor="credential-name">Name</Label>
             <Input
-              id="api-key-name"
+              id="credential-name"
               value={name}
-              placeholder="e.g. Personal key"
+              placeholder="e.g. My shop"
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="api-key-value">API key</Label>
-            <Input
-              id="api-key-value"
-              type="password"
-              autoComplete="off"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-          </div>
+          {fields.map((field) => (
+            <div key={field.key} className="space-y-1.5">
+              <Label htmlFor={`credential-${field.key}`}>{field.title}</Label>
+              <Input
+                id={`credential-${field.key}`}
+                type={field.secret ? 'password' : 'text'}
+                autoComplete="off"
+                value={values[field.key] ?? ''}
+                onChange={(e) =>
+                  setValues((current) => ({ ...current, [field.key]: e.target.value }))
+                }
+              />
+            </div>
+          ))}
 
           {save.isError && (
             <p className="text-xs text-destructive">
-              Could not save the key. Check the values and try again.
+              Could not save. Check the values and try again.
             </p>
           )}
 

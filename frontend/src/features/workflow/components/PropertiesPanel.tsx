@@ -70,7 +70,9 @@ export function PropertiesPanel({
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'oauth-success') {
-        const currentKey = Object.keys(properties).find((k) => properties[k]['x-connectorKey']);
+        const currentKey = Object.keys(properties).find(
+          (k) => properties[k]['x-connectorKey'] && properties[k]['x-credentialInput'] !== 'form',
+        );
         if (currentKey && event.data.credentialId) {
           handleConfigChange(currentKey, event.data.credentialId);
         }

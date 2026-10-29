@@ -1,17 +1,39 @@
 import { credentialApi } from '../api/credential.api';
-import type { CredentialSummary } from '../types/credential.types';
+import { orderedProperties, propertyTitle } from '../utils/node-config';
+import type {
+  ConnectorSummary,
+  CredentialFormField,
+  CredentialSummary,
+} from '../types/credential.types';
+
+// Connectors whose schema declares no field take a single API key.
+const API_KEY_FIELD: CredentialFormField = { key: 'api_key', title: 'API key', secret: true };
 
 export const credentialService = {
   list: (connectorKey: string): Promise<CredentialSummary[]> =>
     credentialApi.list(connectorKey),
 
-  saveApiKey: (
+  listConnectors: (): Promise<ConnectorSummary[]> => credentialApi.listConnectors(),
+
+  save: (
     connectorKey: string,
     name: string,
-    apiKey: string,
+    values: Record<string, string>,
   ): Promise<CredentialSummary> =>
-    credentialApi.createApiKey(connectorKey, {
+    credentialApi.create(connectorKey, {
       name: name.trim(),
-      api_key: apiKey.trim(),
+      secret: Object.fromEntries(
+        Object.entries(values).map(([key, value]) => [key, value.trim()]),
+      ),
     }),
+
+  // Inputs of the "add credential" form; x-secret fields are typed hidden.
+  formFields: (connector: ConnectorSummary | undefined): CredentialFormField[] => {
+    const fields = orderedProperties(connector?.configSchema).map(([key, property]) => ({
+      key,
+      title: propertyTitle(key, property),
+      secret: property['x-secret'] === true,
+    }));
+    return fields.length > 0 ? fields : [API_KEY_FIELD];
+  },
 };

@@ -8,19 +8,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCredentials } from '../../hooks/useCredentials';
-import { AddApiKeyDialog } from '../AddApiKeyDialog';
+import { AddCredentialDialog } from '../AddCredentialDialog';
 import { FieldShell } from './FieldShell';
 
 interface CredentialPickerProps {
   id: string;
   label: string;
-  // Provider chosen in another field of the node; undefined until it is picked.
+  // Fixed by the schema (x-connectorKey) or chosen in another field of the node
+  // (x-connectorKeyFrom); undefined until that provider is picked.
   connectorKey: string | undefined;
   value: string;
   onChange: (credentialId: string) => void;
 }
 
-// Lists only the credentials of the chosen connector and lets the user save a new API key.
+// Lists only the credentials of the connector and lets the user save a new one.
 export function CredentialPicker({
   id,
   label,
@@ -37,10 +38,10 @@ export function CredentialPicker({
   const placeholder = isLoading
     ? 'Loading...'
     : isError
-      ? 'Could not load saved keys'
+      ? 'Could not load saved connections'
       : credentials.length === 0
-        ? 'No saved keys yet'
-        : 'Select a key';
+        ? 'Nothing saved yet'
+        : 'Select a connection';
 
   return (
     <FieldShell
@@ -50,7 +51,7 @@ export function CredentialPicker({
         !connectorKey
           ? 'Choose a provider first'
           : isError
-            ? 'Saved keys could not be loaded. Check your connection and reopen the node.'
+            ? 'Saved connections could not be loaded. Check your network and reopen the node.'
             : undefined
       }
     >
@@ -83,9 +84,9 @@ export function CredentialPicker({
             className="w-full"
             onClick={() => setDialogOpen(true)}
           >
-            + Add API key
+            + Add connection
           </Button>
-          <AddApiKeyDialog
+          <AddCredentialDialog
             connectorKey={connectorKey}
             open={dialogOpen}
             onOpenChange={setDialogOpen}

@@ -6,7 +6,24 @@ export interface CredentialSummary {
   createdAt: string;
 }
 
-export interface CreateApiKeyCredentialRequest {
+// `secret` holds the fields of the connector's configSchema
+// (e.g. { api_key } or { page_id, page_access_token }).
+export interface CreateCredentialRequest {
   name: string;
-  api_key: string;
+  secret: Record<string, string>;
+}
+
+export interface ConnectorSummary {
+  id: string;
+  key: string;
+  name: string;
+  authType: 'NONE' | 'API_KEY' | 'OAUTH2' | 'BASIC';
+  configSchema: unknown;
+}
+
+// One input of the "add credential" form, read from the connector's configSchema.
+export interface CredentialFormField {
+  key: string;
+  title: string;
+  secret: boolean;
 }

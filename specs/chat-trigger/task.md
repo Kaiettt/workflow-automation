@@ -72,7 +72,7 @@ Việc 👤 của P2/P3 nên **bắt đầu song song ngay từ đầu** vì xé
 
 ### P2.1. Setup phía Meta — 👤 **Bạn phải tự làm**
 
-> Claude sẽ viết `docs/setup/messenger.md` với ảnh chụp vị trí từng nút nếu cần, nhưng **mọi thao tác dưới đây phải do chủ tài khoản thực hiện**.
+> Làm theo `docs/setup/messenger.md`. **Mọi thao tác dưới đây phải do chủ tài khoản thực hiện**.
 
 - [ ] 👤 Có tài khoản Facebook cá nhân và **một Facebook Page để thử** (tạo Page mới riêng cho test, không dùng Page thật của shop)
 - [ ] 👤 Đăng ký **Meta for Developers** (developers.facebook.com), xác minh tài khoản developer
@@ -87,18 +87,21 @@ Việc 👤 của P2/P3 nên **bắt đầu song song ngay từ đầu** vì xé
 - [ ] 👤 *(Chỉ khi muốn khách thật dùng được)* Gửi **App Review** xin quyền `pages_messaging` (cần video demo, chính sách quyền riêng tư, có thể cần xác minh doanh nghiệp). **Không bắt buộc để hoàn thành spec này.**
 
 ### P2.2. Code — 🤖 Claude làm
-- [ ] 🤖 Seed connector `messenger`, node `trigger.messenger.message`, `integration.messenger.send`
-- [ ] 🤖 `SignatureVerifier.verifyMeta` (HMAC-SHA256, `timingSafeEqual`)
-- [ ] 🤖 `GET /api/webhooks/messenger` (verify challenge), `POST /api/webhooks/messenger`
-- [ ] 🤖 `MessengerEventMapper` (lọc echo / delivery / read; tách nhiều tin → nhiều execution)
-- [ ] 🤖 `MetaGraphClient.sendText`, `MessengerSendExecutor` (retry 429/5xx, lỗi 24h không retry, text ≤ 2000)
-- [ ] 🤖 `sanitizeErrorText`: pattern `EAA...`
-- [ ] 🤖 Rule validate `CHANNEL_ALREADY_BOUND` khi publish
-- [ ] 🤖 Credential nhiều field (`CreateCredentialCommand`, DTO, `displayHint`) — giữ tương thích body `{ name, api_key }`
-- [ ] 🤖 Frontend: `AddCredentialDialog` sinh form từ `configSchema`; picker hiện `name — page_id`; cảnh báo `sender_id` sau LLM
-- [ ] 🤖 Script `scripts/simulate-messenger-webhook.ts`: ký payload mẫu bằng `META_APP_SECRET` và POST vào local — **test trọn luồng không cần Meta**
-- [ ] 🤖 Unit + e2e theo `design.md` mục 6
-- [ ] 🤖 `docs/setup/messenger.md`
+- [x] 🤖 Seed connector `messenger` (Page ID + Page Access Token), node `trigger.messenger.message`, `integration.messenger.send`
+- [x] 🤖 Kiểm chữ ký Meta `isValidMetaSignature` (HMAC-SHA256 trên body gốc, `timingSafeEqual`)
+- [x] 🤖 `GET /api/webhooks/messenger` (verify challenge), `POST /api/webhooks/messenger` (sai chữ ký → 401; hợp lệ → luôn 200, lỗi chỉ ghi log)
+- [x] 🤖 `parseMessengerMessages` (bỏ echo / delivery / read; nhiều tin trong một request → nhiều execution); dedup theo `message_id` 24h
+- [x] 🤖 `GraphMessengerClient.sendText` (Graph API `me/messages`, `messaging_type: RESPONSE`), `MessengerSendExecutor` (retry 429/5xx/rate limit/timeout 1s→2s, lỗi 24h / người dùng không nhận / token hỏng không retry, text ≤ 2000)
+- [x] 🤖 `sanitizeErrorText`: pattern `EAA...`
+- [x] 🤖 Publish bị chặn `CHANNEL_ALREADY_BOUND` (Page đang thuộc workflow khác, nêu tên workflow; hai trigger cùng Page) và `INVALID_CREDENTIAL` — qua `CheckPublishTriggersQuery` do module triggers trả lời
+- [x] 🤖 Credential nhiều field: body `{ name, secret }` validate theo `connectors.config_schema`; body cũ `{ name, api_key }` vẫn chạy
+- [ ] ~~`displayHint` (`name — page_id`) trong picker~~ → bỏ: phải giải mã mọi credential khi liệt kê; người dùng tự đặt tên connection
+- [x] 🤖 Frontend: `AddCredentialDialog` (thay `AddApiKeyDialog`) sinh form từ `configSchema`; hint `x-credentialInput: "form"`; gợi ý dùng `$node["Messenger Trigger"].json.sender_id` dưới ô Recipient ID; icon node
+- [x] 🤖 Script `scripts/simulate-messenger-webhook.mjs`: ký payload bằng `META_APP_SECRET`, POST vào local
+- [x] 🤖 Unit (Messenger: chữ ký, parse, routing, check publish, nhận sự kiện, executor, Graph lỗi, engine Messenger → LLM → Messenger, credential nhiều field); e2e `messenger-trigger.e2e-spec.ts` (HTTP + DB + Redis + queue thật, chỉ thay client Facebook)
+- [x] 🤖 Chạy thử server build thật (cổng 8091): verify challenge 200 / sai token 403, script ký đúng → 200, ký sai → 401
+- [x] 🤖 `docs/setup/messenger.md`, `docs/schema/rule-for-config-schema.md` (`x-credentialInput`, `x-display`, `description`)
+- [x] 🤖 Hồi quy: unit backend 266/266; e2e 21/23 (2 test fail có sẵn trên `master`); frontend lint + 11/11 test + build
 
 ### P2.3. Chạy thật — 🤝 Cùng làm
 - [ ] 👤 Chạy backend + tunnel, verify webhook thành công trên dashboard Meta

@@ -38,6 +38,18 @@ export function ConfigField({
       />
     );
   }
+  // Typed into a form (e.g. a Facebook Page's ID and token), not an OAuth pop-up.
+  if (typeof schema['x-connectorKey'] === 'string' && schema['x-credentialInput'] === 'form') {
+    return (
+      <CredentialPicker
+        id={id}
+        label={label}
+        connectorKey={schema['x-connectorKey']}
+        value={typeof value === 'string' ? value : ''}
+        onChange={change}
+      />
+    );
+  }
   if (schema['x-connectorKey']) {
     return (
       <OAuthField
@@ -79,6 +91,7 @@ export function ConfigField({
       multiline={schema['x-multiline'] === true}
       expression={schema['x-allowExpression'] === true}
       placeholder={placeholderFor(schema, config)}
+      hint={typeof schema.description === 'string' ? schema.description : undefined}
       value={typeof value === 'string' ? value : ''}
       onChange={change}
     />

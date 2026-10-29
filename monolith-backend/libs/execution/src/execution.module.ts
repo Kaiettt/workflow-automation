@@ -22,7 +22,14 @@ import { AnthropicLlmAdapter } from './infrastructure/llm/anthropic-llm.adapter'
 import { OpenAiLlmAdapter } from './infrastructure/llm/openai-llm.adapter';
 import { GeminiLlmAdapter } from './infrastructure/llm/gemini-llm.adapter';
 import { ManualTriggerExecutor } from './application/executors/manual-trigger-executor';
-import { WebhookTriggerExecutor } from './application/executors/webhook-trigger-executor';
+import { PassThroughTriggerExecutor } from './application/executors/pass-through-trigger-executor';
+import { MessengerSendExecutor } from './application/executors/messenger-send-executor';
+import { MessengerClient } from './application/ports/messenger-client.port';
+import { GraphMessengerClient } from './infrastructure/messenger/graph-messenger.client';
+import { NodeKeys } from './domain/constants/execution.constants';
+
+// Overridable in tests so nothing is sent to Facebook.
+export const MESSENGER_CLIENT = 'MESSENGER_CLIENT';
 import { GoogleSheetReadRowsExecutor } from './application/executors/google-sheet-read-rows-executor';
 import { FilterExecutor } from './application/executors/filter-executor';
 import { GmailSendExecutor } from './application/executors/gmail-send-executor';
@@ -38,7 +45,6 @@ import { INodeExecutor } from './domain/entities/node-executor';
   controllers: [ExecutionController],
   providers: [
     ManualTriggerExecutor,
-    WebhookTriggerExecutor,
     GoogleSheetReadRowsExecutor,
     FilterExecutor,
     GmailSendExecutor,
@@ -70,35 +76,44 @@ import { INodeExecutor } from './domain/entities/node-executor';
         ),
       inject: [LlmProviderRegistry],
     },
+    { provide: MESSENGER_CLIENT, useClass: GraphMessengerClient },
+    {
+      provide: MessengerSendExecutor,
+      useFactory: (client: MessengerClient) =>
+        new MessengerSendExecutor(client),
+      inject: [MESSENGER_CLIENT],
+    },
     { provide: ExecutionRepository, useClass: PrismaExecutionRepository },
     { provide: NodeCatalogPort, useClass: NodeCatalogAdapter },
     {
       provide: 'NODE_EXECUTORS',
       useFactory: (
         manualTriggerExecutor: ManualTriggerExecutor,
-        webhookTriggerExecutor: WebhookTriggerExecutor,
         googleSheetReadRowsExecutor: GoogleSheetReadRowsExecutor,
         filterExecutor: FilterExecutor,
         gmailSendExecutor: GmailSendExecutor,
         aggregateExecutor: AggregateExecutor,
         llmGenerateExecutor: LlmGenerateExecutor,
+        messengerSendExecutor: MessengerSendExecutor,
       ): INodeExecutor[] => [
         manualTriggerExecutor,
-        webhookTriggerExecutor,
+        new PassThroughTriggerExecutor(NodeKeys.TRIGGER_WEBHOOK),
+        new PassThroughTriggerExecutor(NodeKeys.TRIGGER_MESSENGER_MESSAGE),
         googleSheetReadRowsExecutor,
         filterExecutor,
         gmailSendExecutor,
         aggregateExecutor,
         llmGenerateExecutor,
+        messengerSendExecutor,
       ],
       inject: [
         ManualTriggerExecutor,
-        WebhookTriggerExecutor,
         GoogleSheetReadRowsExecutor,
         FilterExecutor,
         GmailSendExecutor,
         AggregateExecutor,
         LlmGenerateExecutor,
+        MessengerSendExecutor,
       ],
     },
     {

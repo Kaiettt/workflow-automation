@@ -14,7 +14,7 @@ import {
   EnqueueExecutionHandler,
 } from '@app/execution/application/commands/enqueue-execution/enqueue-execution.command';
 import { ExecutionProcessor } from '@app/execution/infrastructure/queue/execution.processor';
-import { WebhookTriggerExecutor } from '@app/execution/application/executors/webhook-trigger-executor';
+import { PassThroughTriggerExecutor } from '@app/execution/application/executors/pass-through-trigger-executor';
 import { FilterExecutor } from '@app/execution/application/executors/filter-executor';
 import { GmailSendExecutor } from '@app/execution/application/executors/gmail-send-executor';
 import { ManualTriggerExecutor } from '@app/execution/application/executors/manual-trigger-executor';
@@ -72,7 +72,7 @@ function setup(definition: unknown) {
     repository,
     [
       new ManualTriggerExecutor(),
-      new WebhookTriggerExecutor(),
+      new PassThroughTriggerExecutor(NodeKeys.TRIGGER_WEBHOOK),
       new FilterExecutor(),
       new GmailSendExecutor(() => ({ users: { messages: { send } } })),
     ],
@@ -178,7 +178,7 @@ describe('Webhook executions', () => {
   });
 
   it('starts the flow with an empty item when a webhook workflow gets no payload', async () => {
-    const executor = new WebhookTriggerExecutor();
+    const executor = new PassThroughTriggerExecutor(NodeKeys.TRIGGER_WEBHOOK);
     await expect(executor.execute({ items: [] })).resolves.toEqual([
       { json: {} },
     ]);

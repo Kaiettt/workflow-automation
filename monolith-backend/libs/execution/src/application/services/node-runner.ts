@@ -253,12 +253,16 @@ function toRecord(value: unknown): Record<string, unknown> {
 }
 
 export function sanitizeErrorText(message: string): string {
-  return message
-    .replace(/\b(?:sk-ant-|sk-)[A-Za-z0-9_-]{16,}/g, '[REDACTED]')
-    .replace(/\bAIza[0-9A-Za-z_-]{20,}/g, '[REDACTED]')
-    .replace(
-      /(access_token|refresh_token|token|encrypted_secret|ENCRYPTION_KEY|client_secret|Bearer [A-Za-z0-9._~+/=-]+)/gi,
-      '[REDACTED]',
-    )
-    .replace(/\b[a-fA-F0-9]{32,}\b/g, '[REDACTED]');
+  return (
+    message
+      .replace(/\b(?:sk-ant-|sk-)[A-Za-z0-9_-]{16,}/g, '[REDACTED]')
+      .replace(/\bAIza[0-9A-Za-z_-]{20,}/g, '[REDACTED]')
+      // Meta Page / user access tokens.
+      .replace(/\bEAA[A-Za-z0-9]{20,}/g, '[REDACTED]')
+      .replace(
+        /(access_token|refresh_token|token|encrypted_secret|ENCRYPTION_KEY|client_secret|Bearer [A-Za-z0-9._~+/=-]+)/gi,
+        '[REDACTED]',
+      )
+      .replace(/\b[a-fA-F0-9]{32,}\b/g, '[REDACTED]')
+  );
 }

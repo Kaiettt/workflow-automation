@@ -7,6 +7,9 @@ import {
   GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA,
   LLM_GENERATE_CONFIG_SCHEMA,
   MANUAL_TRIGGER_CONFIG_SCHEMA,
+  MESSENGER_CONNECTOR_CONFIG_SCHEMA,
+  MESSENGER_SEND_CONFIG_SCHEMA,
+  MESSENGER_TRIGGER_CONFIG_SCHEMA,
   WEBHOOK_TRIGGER_CONFIG_SCHEMA,
 } from './mvp-node-schemas';
 
@@ -14,6 +17,7 @@ export async function seedMvp(prisma: PrismaClient) {
   // Define constants for UUIDs used in sample-data
   const userId = '11111111-1111-1111-1111-111111111111';
   const googleConnectorId = '22222222-2222-2222-2222-222222222221';
+  const messengerConnectorId = '22222222-2222-2222-2222-222222222225';
 
   // 1. Seed User
   console.log('Seeding User...');
@@ -69,6 +73,20 @@ export async function seedMvp(prisma: PrismaClient) {
       create: { id, ...data },
     });
   }
+
+  // Facebook Page for Messenger: Page ID + Page Access Token typed in by the user.
+  const messengerConnector = {
+    key: 'messenger',
+    name: 'Facebook Messenger',
+    authType: ConnectorAuthType.API_KEY,
+    configSchema: MESSENGER_CONNECTOR_CONFIG_SCHEMA,
+    isActive: true,
+  };
+  await prisma.connector.upsert({
+    where: { key: messengerConnector.key },
+    update: messengerConnector,
+    create: { id: messengerConnectorId, ...messengerConnector },
+  });
 
   // 3. Seed Node Type Definitions (catalog data: kept in sync on every run,
   // otherwise databases seeded earlier would keep an outdated config_schema)
@@ -152,6 +170,28 @@ export async function seedMvp(prisma: PrismaClient) {
       description: 'Start a workflow when an HTTP POST arrives at its URL',
       configSchema: WEBHOOK_TRIGGER_CONFIG_SCHEMA,
       connectorId: null,
+    },
+    {
+      id: '44444444-4444-4444-4444-444444444448',
+      key: 'trigger.messenger.message',
+      displayName: 'Messenger Trigger',
+      icon: 'message-circle',
+      color: '#0084FF',
+      category: NodeCategory.TRIGGER,
+      description: 'Start a workflow when a customer messages your Facebook Page',
+      configSchema: MESSENGER_TRIGGER_CONFIG_SCHEMA,
+      connectorId: messengerConnectorId,
+    },
+    {
+      id: '44444444-4444-4444-4444-444444444449',
+      key: 'integration.messenger.send',
+      displayName: 'Send Messenger Message',
+      icon: 'send',
+      color: '#0084FF',
+      category: NodeCategory.INTEGRATION,
+      description: 'Reply to a customer on Messenger from your Facebook Page',
+      configSchema: MESSENGER_SEND_CONFIG_SCHEMA,
+      connectorId: messengerConnectorId,
     },
   ];
 

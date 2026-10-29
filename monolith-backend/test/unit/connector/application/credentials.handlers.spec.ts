@@ -14,6 +14,7 @@ import {
   ListCredentialsHandler,
   ListCredentialsQuery,
 } from '@app/connector/application/queries/list-credentials.query';
+import { MESSENGER_CONNECTOR_CONFIG_SCHEMA } from '../../../../prisma/mvp-node-schemas';
 
 const connectors = [
   new Connector(
@@ -25,6 +26,14 @@ const connectors = [
     true,
   ),
   new Connector('c-off', 'old', 'Old', ConnectorAuthType.API_KEY, {}, false),
+  new Connector(
+    'c-messenger',
+    'messenger',
+    'Facebook Messenger',
+    ConnectorAuthType.API_KEY,
+    MESSENGER_CONNECTOR_CONFIG_SCHEMA,
+    true,
+  ),
   new Connector(
     'c-google',
     'google',
@@ -105,6 +114,42 @@ describe('credential handlers', () => {
   });
 
   describe('CreateApiKeyCredentialHandler', () => {
+    it('stores every field of a multi-field connector (Messenger Page), trimmed', async () => {
+      await create.execute(
+        new CreateApiKeyCredentialCommand('messenger', 'u1', 'Shop Page', {
+          page_id: ' 112233 ',
+          page_access_token: ' EAAsecret ',
+          unknown_field: 'dropped',
+        }),
+      );
+
+      const stored = credentials.rows[0];
+      expect(stored.connectorId).toBe('c-messenger');
+      expect(stored.encryptedSecret).not.toContain('EAAsecret');
+      expect(
+        JSON.parse(
+          EncryptionUtil.decrypt(stored.encryptedSecret, encryptionKey),
+        ),
+      ).toEqual({ page_id: '112233', page_access_token: 'EAAsecret' });
+    });
+
+    it('names the missing required fields of a multi-field connector', async () => {
+      await expect(
+        create.execute(
+          new CreateApiKeyCredentialCommand('messenger', 'u1', 'Shop Page', {
+            page_id: '112233',
+            page_access_token: '  ',
+          }),
+        ),
+      ).rejects.toThrow('page_access_token must not be blank');
+      await expect(
+        create.execute(
+          new CreateApiKeyCredentialCommand('messenger', 'u1', 'Shop', 'EAA'),
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(credentials.rows).toHaveLength(0);
+    });
+
     it('stores the key encrypted and returns a summary without it', async () => {
       const summary = await create.execute(
         new CreateApiKeyCredentialCommand(

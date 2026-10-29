@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiTags,
@@ -65,7 +73,7 @@ export class ConnectorsController {
 
   @Post(':connectorKey/credentials')
   @ApiOperation({
-    summary: 'Save an API key for a connector (stored encrypted)',
+    summary: 'Save a credential (API key or form fields) for a connector',
   })
   @ApiResponse({ status: 201, type: CredentialResponseDto })
   async createCredential(
@@ -73,12 +81,16 @@ export class ConnectorsController {
     @Body() body: CreateApiKeyCredentialDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    const secret = body.secret ?? body.api_key;
+    if (secret === undefined) {
+      throw new BadRequestException('api_key or secret is required');
+    }
     const result: CredentialSummary = await this.commandBus.execute(
       new CreateApiKeyCredentialCommand(
         connectorKey,
         user.id,
         body.name,
-        body.api_key,
+        secret,
       ),
     );
     return { success: true, data: CredentialResponseDto.fromSummary(result) };

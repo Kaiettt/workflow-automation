@@ -4,6 +4,11 @@ import {
   WorkflowTrigger,
 } from './workflow-trigger';
 
+export interface StoredCredential {
+  connectorKey: string;
+  secret: Record<string, unknown>;
+}
+
 export abstract class WorkflowTriggerRepository {
   abstract findActive(
     channel: TriggerChannel,
@@ -18,4 +23,10 @@ export abstract class WorkflowTriggerRepository {
     triggers: NewWorkflowTrigger[],
   ): Promise<void>;
   abstract findWorkflowOwnerId(workflowId: string): Promise<string | null>;
+  abstract findWorkflowName(workflowId: string): Promise<string | null>;
+  // Decrypted credential if it exists and belongs to `ownerId`, else null.
+  abstract findCredential(
+    credentialId: string,
+    ownerId: string,
+  ): Promise<StoredCredential | null>;
 }

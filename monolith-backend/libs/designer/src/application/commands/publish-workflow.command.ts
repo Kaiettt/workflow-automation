@@ -4,6 +4,7 @@ import {
   EventBus,
   ICommandHandler,
   QueryBus,
+  QueryHandlerNotFoundException,
 } from '@nestjs/cqrs';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { WorkflowDraftRepository } from '../../domain/repositories/workflow-draft.repository';
@@ -13,6 +14,7 @@ import { WorkflowVersion } from '../../domain/entities/workflow-version.entity';
 import { WorkflowDraft } from '../../domain/entities/workflow-draft.entity';
 import { GetNodeConfigSchemasQuery } from '@app/node-library/application/queries/get-node-config-schemas.query';
 import { WorkflowPublishedEvent } from '../events/workflow-published.event';
+import { CheckPublishTriggersQuery } from '../queries/check-publish-triggers.query';
 import {
   extractNodeCatalogKeys,
   validateWorkflowDraft,
@@ -66,12 +68,20 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
       draft.definition,
       nodeTypesByKey,
     );
+    const triggerIssues = await this.checkTriggers(
+      new CheckPublishTriggersQuery(
+        workflowId,
+        existingWorkflow.ownerId,
+        draft.definition,
+      ),
+    );
+    const issues = [...validationReport.issues, ...triggerIssues];
 
-    if (!validationReport.isValid) {
-      await this.saveValidationErrors(draft, validationReport.issues);
+    if (issues.length > 0) {
+      await this.saveValidationErrors(draft, issues);
       throw new BadRequestException({
         message: 'Workflow validation failed.',
-        issues: validationReport.issues,
+        issues,
       });
     }
 
@@ -109,6 +119,22 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
       versionId: newVersion.id,
       versionNumber: newVersion.versionNumber,
     };
+  }
+
+  // Without the triggers module loaded (e.g. a test app) there is nothing to check.
+  private async checkTriggers(
+    query: CheckPublishTriggersQuery,
+  ): Promise<PublishValidationIssue[]> {
+    try {
+      const issues = await this.queryBus.execute<
+        CheckPublishTriggersQuery,
+        PublishValidationIssue[] | undefined
+      >(query);
+      return Array.isArray(issues) ? issues : [];
+    } catch (error) {
+      if (error instanceof QueryHandlerNotFoundException) return [];
+      throw error;
+    }
   }
 
   private async saveValidationErrors(

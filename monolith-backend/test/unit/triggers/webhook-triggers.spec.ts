@@ -3,14 +3,15 @@ import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import {
   findTriggerNodes,
-  NewWorkflowTrigger,
   planTriggers,
   TriggerChannel,
   WorkflowTrigger,
 } from '@app/triggers/domain/workflow-trigger';
 import { buildWebhookItem } from '@app/triggers/domain/webhook-item';
-import { WorkflowTriggerRepository } from '@app/triggers/domain/workflow-trigger.repository';
-import { WebhookDedupPort } from '@app/triggers/application/ports/webhook-dedup.port';
+import {
+  MemoryDedup,
+  MemoryTriggerRepository,
+} from '@test/support/triggers/memory-triggers';
 import {
   ReceiveWebhookCommand,
   ReceiveWebhookHandler,
@@ -27,62 +28,6 @@ const definition = (...keys: string[]) => ({
   nodes: keys.map((key, i) => ({ id: `node-${i}`, data: { key } })),
   edges: [],
 });
-
-class MemoryTriggerRepository extends WorkflowTriggerRepository {
-  rows: WorkflowTrigger[] = [];
-  owner: string | null = 'owner-1';
-  private seq = 0;
-
-  findActive(channel: TriggerChannel, routingKey: string) {
-    return Promise.resolve(
-      this.rows.find(
-        (r) =>
-          r.channel === channel && r.routingKey === routingKey && r.isActive,
-      ) ?? null,
-    );
-  }
-
-  findByWorkflow(workflowId: string) {
-    return Promise.resolve(
-      this.rows.filter((r) => r.workflowId === workflowId),
-    );
-  }
-
-  replaceActive(
-    workflowId: string,
-    workflowVersionId: string,
-    triggers: NewWorkflowTrigger[],
-  ) {
-    for (const row of this.rows) {
-      if (row.workflowId === workflowId) row.isActive = false;
-    }
-    for (const trigger of triggers) {
-      this.seq += 1;
-      this.rows.push({
-        ...trigger,
-        id: `trigger-${this.seq}`,
-        workflowId,
-        workflowVersionId,
-        isActive: true,
-        createdAt: new Date(Date.UTC(2026, 9, 29, 0, 0, this.seq)),
-      });
-    }
-    return Promise.resolve();
-  }
-
-  findWorkflowOwnerId() {
-    return Promise.resolve(this.owner);
-  }
-}
-
-class MemoryDedup extends WebhookDedupPort {
-  seen = new Set<string>();
-  claim(key: string) {
-    if (this.seen.has(key)) return Promise.resolve(false);
-    this.seen.add(key);
-    return Promise.resolve(true);
-  }
-}
 
 describe('findTriggerNodes', () => {
   it('returns webhook triggers only (manual triggers need no listener)', () => {
@@ -127,14 +72,19 @@ describe('planTriggers', () => {
   });
 
   it('creates a new token the first time', () => {
-    expect(planTriggers([node], [], () => 'fresh')).toEqual([
+    expect(planTriggers([node], [], new Map(), () => 'fresh')).toEqual([
       { ...node, routingKey: 'fresh' },
     ]);
   });
 
   it('keeps the most recent token of the same node so the URL does not change', () => {
     expect(
-      planTriggers([node], [earlier('old', 1), earlier('newer', 2)], () => 'x'),
+      planTriggers(
+        [node],
+        [earlier('old', 1), earlier('newer', 2)],
+        new Map(),
+        () => 'x',
+      ),
     ).toEqual([{ ...node, routingKey: 'newer' }]);
   });
 
