@@ -1,0 +1,88 @@
+@startuml LlmNode
+title LLM Node: API Key Credential Setup and Per-Item Generation
+autonumber
+
+actor User
+boundary "Properties Panel" as UI
+boundary "Add API Key Dialog" as Dialog
+control "Connectors Controller" as ConnCtrl
+control "Connector Handlers (CQRS)" as ConnHandlers
+participant "Node Runner" as Runner
+participant "LLM Generate Executor" as Executor
+participant "LLM Provider Registry" as Registry
+participant "Provider Adapter\n(Anthropic / OpenAI / Gemini)" as Adapter
+participant "Provider API" as API
+database "PostgreSQL" as DB
+
+== Configure the node in the designer ==
+User -> UI: Drop "LLM" node (ai.llm.generate) and select it
+User -> UI: Choose provider
+UI -> UI: Clear credential_id, enable credential picker
+UI -> ConnCtrl: GET /api/connectors/{provider}/credentials
+ConnCtrl -> ConnHandlers: ListCredentialsQuery(provider, ownerId)
+ConnHandlers -> DB: Find credentials of current user
+DB --> ConnHandlers: Credential rows
+ConnHandlers --> ConnCtrl: { id, connectorKey, name, createdAt }[]
+ConnCtrl --> UI: 200 OK (no secrets)
+
+opt User has no suitable credential
+    User -> UI: Pick "+ Add API key"
+    UI -> Dialog: Open dialog for provider
+    User -> Dialog: Enter name and API key
+    Dialog -> ConnCtrl: POST /api/connectors/{provider}/credentials\n{ name, api_key }
+    ConnCtrl -> ConnHandlers: CreateApiKeyCredentialCommand
+    ConnHandlers -> DB: Find active connector by key
+    alt Connector missing or not API_KEY
+        ConnHandlers --> ConnCtrl: 404 Not Found / 400 Bad Request
+        ConnCtrl --> Dialog: Return error
+    else Connector uses API_KEY
+        ConnHandlers -> ConnHandlers: Encrypt { api_key } with ENCRYPTION_KEY
+        ConnHandlers -> DB: Insert connector_credentials row
+        ConnHandlers --> ConnCtrl: Credential DTO without secret
+        ConnCtrl --> Dialog: 201 Created
+        Dialog --> UI: Invalidate credentials query, auto-select new credential
+    end
+end
+
+User -> UI: Enter model, prompt with expressions, output format, limits
+UI -> UI: Save into node.data.config (autosaved with the draft)
+
+== Run inside an execution (after publish) ==
+Runner -> Executor: expectedConnectorKey(rawConfig) -> provider
+Runner -> Runner: Credential connectorKey must equal provider
+Runner -> Executor: maxItems(rawConfig)
+Executor --> Runner: min(max_items, LLM_MAX_ITEMS)
+alt Item count exceeds the limit
+    Runner -> Runner: FAILED before calling any provider
+else Within the limit
+    loop Each input item
+        Runner -> Runner: Resolve prompt and system_prompt expressions
+        Runner -> Executor: executeItem({ config, item, credential })
+        Executor -> Registry: get(config.provider)
+        Registry --> Executor: Adapter
+        loop Up to 1 + 2 retries (backoff 1s, 2s)
+            Executor -> Adapter: generate(request with apiKey)
+            Adapter -> API: HTTP request (timeout 60s, SDK retry off)
+            alt Success
+                API --> Adapter: Response
+                Adapter --> Executor: { text, usage }
+            else Error (408, 429, 5xx or timeout = retryable)
+                API --> Adapter: Error
+                Adapter --> Executor: LlmProviderError(retryable)
+            end
+        end
+        alt Provider still failing or non-retryable error
+            Executor --> Runner: Throw error
+            Runner -> Runner: FAILED with item summary,\nAPI keys masked in error text
+        else Got text
+            opt output_format = json
+                Executor -> Executor: Strip code fence and JSON.parse
+                Note right of Executor: Invalid JSON -> "LLM returned invalid JSON"
+            end
+            Executor --> Runner: { text, data?, model, usage }
+            Runner -> Runner: Attach output to item (pairedItem)
+        end
+    end
+end
+
+@enduml

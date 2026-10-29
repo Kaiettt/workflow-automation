@@ -1,0 +1,88 @@
+@startuml WorkflowPublishValidation
+title Workflow Publish Validation and Error Feedback
+autonumber
+
+actor User
+boundary "Workflow Designer" as UI
+boundary "Publish Validation Dialog" as Dialog
+control "Workflows Controller" as Controller
+control "Publish Workflow Handler" as Handler
+control "Node Library\n(GetNodeConfigSchemasQuery)" as Catalog
+database "PostgreSQL" as DB
+
+User -> UI: Click Publish
+UI -> Controller: POST /api/workflows/{workflowId}/versions
+Controller -> Handler: PublishWorkflowCommand(workflowId, publishedById)
+
+== Layer 1: Existence ==
+Handler -> DB: Load workflow and draft
+DB --> Handler: Workflow, draft definition
+alt Workflow or draft missing, or definition empty
+    Handler --> Controller: 404 Not Found / 400 Bad Request
+    Controller --> UI: Return error
+    UI --> User: Show error
+else Draft has nodes
+    group Layer 2: Catalog and config schema
+    Handler -> Handler: Resolve key per node\n(node.data.key, fallback node.type)
+    Handler -> Catalog: GetNodeConfigSchemasQuery(keys)
+    Catalog -> DB: Find node_type_definitions by keys
+    DB --> Catalog: key, category, configSchema
+    Catalog --> Handler: Catalog metadata (single batch)
+    loop Each node
+        alt Key not in catalog
+            Handler -> Handler: Add UNKNOWN_NODE_TYPE(nodeId)
+        else Key found
+            loop Each field in configSchema.required
+                opt Value missing, null or blank string
+                    Handler -> Handler: Add REQUIRED_FIELD_MISSING(nodeId, field)
+                end
+            end
+        end
+    end
+    end
+
+    group Layer 3: Graph structure and reachability
+    Handler -> Handler: Classify triggers (category TRIGGER or triggerNode)\nand actions (all other categories)
+    opt No trigger node
+        Handler -> Handler: Add NO_TRIGGER
+    end
+    opt No action node
+        Handler -> Handler: Add NO_ACTION
+    end
+    Handler -> Handler: Build adjacency list from edges
+    Handler -> Handler: BFS from every trigger node
+    loop Each action node not visited
+        Handler -> Handler: Add ACTION_UNREACHABLE(nodeId)
+    end
+    end
+
+    alt Issues found
+        Handler -> DB: Save { issues } to draft.validationErrors
+        Handler --> Controller: 400 Bad Request\n{ message, issues[] }
+        Controller --> UI: Validation issues
+        UI -> UI: Map issues to node names and readable messages
+        UI -> UI: Add error badge and red ring to invalid nodes
+        UI -> Dialog: Open dialog grouped by node
+        Dialog --> User: e.g. "Read Google Sheet (2 errors)"
+
+        opt User clicks an error card
+            User -> Dialog: Select node card
+            Dialog -> UI: Focus node
+            UI -> UI: Zoom and center, select node
+            UI --> User: Open Properties Panel for the node
+        end
+        Note over UI, Dialog: Autosave does not close the dialog or clear issues;\nheader "Error" button reopens it
+    else No issues
+        Handler -> DB: BEGIN transaction
+        Handler -> DB: Clear draft.validationErrors
+        Handler -> DB: Insert WorkflowVersion(versionNumber = max + 1)
+        Handler -> DB: Set workflow.currentVersionId
+        Handler -> DB: COMMIT
+        DB --> Handler: versionId, versionNumber
+        Handler --> Controller: Published version
+        Controller --> UI: 201 Created
+        UI --> User: Show publish success and version number
+    end
+end
+
+@enduml

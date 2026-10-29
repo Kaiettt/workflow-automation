@@ -1,0 +1,93 @@
+@startuml WorkflowExecutionEngine
+title Execution Engine: Item Model, Expression Resolution and Node Lifecycle
+autonumber
+
+actor User
+boundary "Version Detail UI" as UI
+control "Executions Controller" as Controller
+control "Start Execution Handler" as Handler
+participant "Node Catalog Adapter" as Catalog
+participant "Node Runner" as Runner
+participant "Expression Resolver" as Expr
+collections "Node Executors\n(once / per_item)" as Executor
+participant "Execution Repository" as Repo
+database "PostgreSQL" as DB
+
+User -> UI: Click Run on a published version
+UI -> Controller: POST /api/executions { workflow_version_id }
+Controller -> Handler: StartExecution(versionId, actorId)
+Handler -> Repo: Check access and load WorkflowVersion definition
+Repo -> DB: Query version
+DB --> Repo: Immutable definition
+Repo --> Handler: Definition
+Handler -> Handler: getExecutionOrder(definition)
+Handler -> Catalog: getConfigSchemas(keys in definition)
+Catalog -> Catalog: QueryBus: GetNodeConfigSchemasQuery
+Catalog --> Handler: Map<key, configSchema>
+Handler -> Handler: Build node name index (flag duplicate names)
+Handler -> Repo: Create Execution(status = RUNNING)
+Repo -> DB: Insert executions row
+Handler -> Handler: state = [], items = []
+
+loop Each node in execution order
+    Handler -> Runner: run(node, items, state, schemas, actorId)
+    Runner -> Executor: Resolve executor by node.data.key
+    alt No executor registered
+        Runner --> Handler: FAILED
+    else Executor found
+        Runner -> Runner: rawConfig = apply configSchema defaults
+        opt rawConfig.credential_id is set (once per node)
+            Runner -> Repo: resolveCredential(credential_id, actorId)
+            Repo -> DB: Load encrypted credential with connector
+            DB --> Repo: Secret
+            Repo --> Runner: { connectorKey, secret }
+            Runner -> Executor: expectedConnectorKey(rawConfig)
+            alt Connector key does not match
+                Runner --> Handler: FAILED (wrong credential)
+            end
+        end
+
+        alt runMode = once (Trigger, Google Sheet, Aggregate)
+            Runner -> Expr: resolveConfig(rawConfig, schema, ctx with items[0])
+            Expr --> Runner: Resolved config
+            Runner -> Executor: execute({ config, items, credential })
+            Executor --> Runner: Item[] output
+        else runMode = per_item (Filter, Gmail, LLM)
+            loop Each item i
+                Runner -> Expr: resolveConfig(rawConfig, schema, ctx with item i)
+                Expr -> Expr: Parse template expressions in x-allowExpression fields
+                opt Expression uses $node["X"].json
+                    Expr -> Expr: Walk pairedItem back through state to node X
+                end
+                alt Expression error (syntax, node not found, not executed)
+                    Expr --> Runner: ExpressionError
+                    Runner --> Handler: FAILED with summary\n{ total_items, processed, failed_at_index }
+                else Resolved
+                    Expr --> Runner: Resolved config
+                    Runner -> Executor: executeItem({ config, item, credential })
+                    Executor --> Runner: object / array / null
+                    Runner -> Runner: Append outputs with pairedItem = i
+                end
+            end
+        end
+        Runner --> Handler: Node result and log
+    end
+
+    Handler -> Repo: Save execution_node_log\n(input items, output items, sanitized error, timing)
+    Repo -> DB: Insert node log
+    alt Node failed
+        Handler -> Handler: finalStatus = FAILED
+        Note over Handler: Stop traversal; remaining nodes are skipped
+    else Node succeeded
+        Handler -> Handler: state.push({ nodeId, nodeName, input, output })
+        Handler -> Handler: items = output
+    end
+end
+
+Handler -> Repo: Finish execution (SUCCESS / FAILED, duration)
+Repo -> DB: Update executions row
+Handler --> Controller: Execution DTO with node logs
+Controller --> UI: 201 Created (synchronous result)
+UI --> User: Show status and "N items in -> M items out" per node
+
+@enduml
