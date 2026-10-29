@@ -7,6 +7,7 @@ import { History, ArrowLeft, GitBranch, AlertCircle } from 'lucide-react';
 import type { Node, Edge, OnNodesChange, OnEdgesChange } from '@xyflow/react';
 
 interface DesignerLayoutProps {
+  workflowId: string;
   nodes: Node[];
   edges: Edge[];
   onNodesChange: OnNodesChange;
@@ -25,6 +26,7 @@ interface DesignerLayoutProps {
 }
 
 export function DesignerLayout({
+  workflowId,
   nodes,
   edges,
   onNodesChange,
@@ -132,6 +134,7 @@ export function DesignerLayout({
           setEdges={setEdges} 
         />
         <PropertiesPanel
+          workflowId={workflowId}
           nodes={nodes}
           onNodeDataChange={onNodeDataChange}
           onDeleteNode={handleDeleteNode}

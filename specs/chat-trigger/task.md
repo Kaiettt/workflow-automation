@@ -30,37 +30,40 @@ Việc 👤 của P2/P3 nên **bắt đầu song song ngay từ đầu** vì xé
 > Toàn bộ P1 Claude làm được, không cần bạn setup gì ngoài Redis đang chạy sẵn (`docker-compose up -d`).
 
 ### P1.1. Database
-- [ ] 🤖 Enum `TriggerChannel`, model `WorkflowTrigger` trong `schema.prisma`
-- [ ] 🤖 Migration viết tay (bảng + partial unique index `WHERE is_active`), chạy lên DB dev
-- [ ] 🤖 Seed node `trigger.webhook`
-- [ ] 🤖 Cập nhật `docs/schema/schema.md`
+- [x] 🤖 Enum `TriggerChannel`, model `WorkflowTrigger` trong `schema.prisma`
+- [x] 🤖 Migration `20261029000000_add_workflow_triggers` viết tay (bảng + partial unique index `WHERE is_active`), đã chạy lên DB dev bằng `prisma db execute`; `prisma migrate diff` xác nhận DB khớp schema
+- [x] 🤖 Seed node `trigger.webhook` (`config_schema` có hint `x-display: "webhookUrl"`)
+- [x] 🤖 Cập nhật `docs/schema/schema.md`
 
 ### P1.2. Execution engine
-- [ ] 🤖 Tách `WorkflowEngine` khỏi `StartExecutionHandler`; manual giữ nguyên hành vi đồng bộ
-- [ ] 🤖 `NodeRunner`: `actorId` → `credentialOwnerId`; bỏ qua credential cho node TRIGGER
-- [ ] 🤖 `createExecution` nhận `triggerType`, `triggeredById` (nullable), `context`
-- [ ] 🤖 `PassThroughTriggerExecutor` cho 3 trigger key
-- [ ] 🤖 Cài `bullmq`, `@nestjs/bullmq`; điền `execution-queue.module.ts`, `execution.processor.ts`
-- [ ] 🤖 Dọn execution kẹt `RUNNING` khi khởi động
-- [ ] 🤖 `.env.example`: `PUBLIC_BASE_URL`, `EXECUTION_CONCURRENCY`, `EXECUTION_STALE_MINUTES`
+- [x] 🤖 Tách `WorkflowEngine` khỏi `StartExecutionHandler`; manual giữ nguyên hành vi đồng bộ (test cũ không đổi kịch bản)
+- [x] 🤖 `NodeRunner`: `actorId` → `credentialOwnerId` (luôn là chủ workflow)
+- [ ] ~~Bỏ qua credential cho node TRIGGER~~ → chuyển sang P2 (trigger webhook không có credential, chỉ trigger kênh chat cần)
+- [x] 🤖 `createExecution` nhận `triggerType`, `triggeredById` (nullable), `context` (`{ triggerItems }`)
+- [x] 🤖 `WebhookTriggerExecutor` (chỉ `trigger.webhook`; Messenger / Zalo thêm ở P2/P3)
+- [x] 🤖 Cài `bullmq`, `@nestjs/bullmq`; điền `execution-queue.module.ts`, `execution.processor.ts`; `EnqueueExecutionCommand`
+- [x] 🤖 Dọn execution kẹt `RUNNING` khi khởi động (`failStaleExecutions`)
+- [x] 🤖 `.env.example`: `PUBLIC_BASE_URL`, `EXECUTION_CONCURRENCY`, `EXECUTION_STALE_MINUTES`
 
 ### P1.3. Module `libs/triggers`
-- [ ] 🤖 Domain: `WorkflowTrigger`, repository port; `SignatureVerifier` (chỉ khung, Meta/Zalo điền ở P2/P3)
-- [ ] 🤖 `WorkflowPublishedEvent` từ `PublishWorkflowHandler` và nhánh `PUBLISH_THEN_RESTORE`
-- [ ] 🤖 `SyncWorkflowTriggersHandler` (giữ token webhook giữa các version)
-- [ ] 🤖 `WebhooksController` `POST /api/webhooks/w/:token` → `202 { executionId }`; `rawBody: true` trong `main.ts`; giới hạn 1 MB
-- [ ] 🤖 Redis dedup service
-- [ ] 🤖 `GET /api/workflows/:id/triggers`
+- [x] 🤖 Domain: `WorkflowTrigger`, `findTriggerNodes`, `planTriggers`, `buildWebhookItem` (ẩn header `authorization`, `cookie`, `x-api-key`), repository port
+- [ ] ~~`SignatureVerifier` khung~~ → làm luôn ở P2 cùng thuật toán Meta (khung rỗng không có người dùng)
+- [x] 🤖 `WorkflowPublishedEvent` từ `PublishWorkflowHandler` và nhánh `PUBLISH_THEN_RESTORE`
+- [x] 🤖 `SyncWorkflowTriggersHandler` (giữ token webhook giữa các version)
+- [x] 🤖 `WebhooksController` `POST /api/webhooks/w/:token` → `202 { executionId }`; `rawBody: true` trong `main.ts`; giới hạn JSON 1 MB
+- [x] 🤖 Redis dedup — dùng cho header `Idempotency-Key` của webhook chung (P2/P3 dùng lại cho `message_id`)
+- [x] 🤖 `GET /api/workflows/:id/triggers` (chỉ chủ workflow)
 
 ### P1.4. Frontend
-- [ ] 🤖 `WebhookUrlField` (readonly + copy), `trigger.api.ts`, `useWorkflowTriggers`
-- [ ] 🤖 `VersionDetailPage`: ẩn Run khi không phải manual; cột nguồn chạy; tự làm mới khi có execution `RUNNING`
+- [x] 🤖 `WebhookUrlField` (readonly + copy) trong Properties Panel, `trigger.api.ts`, `trigger.service.ts`, `useWorkflowTriggers` (tự kiểm tra lại mỗi 5s đến khi node có URL)
+- [x] 🤖 `VersionDetailPage`: version có `trigger.webhook` hiện URL (`WebhookTriggerInfo`) thay nút Run; version cũ báo không nhận request
+- [ ] ~~Cột nguồn chạy, tự làm mới khi có execution `RUNNING`~~ → chưa làm: frontend chưa có màn hình danh sách execution để gắn vào
 
 ### P1.5. Kiểm thử
-- [ ] 🤖 Unit: engine với `triggerItems`, sync triggers, dedup
-- [ ] 🤖 E2E: `curl` vào URL webhook → execution `WEBHOOK` hoàn tất; publish lại → URL không đổi
-- [ ] 🤖 Hồi quy: `execution-run-ui.e2e-spec.ts`, `llm-node.e2e-spec.ts`
-- [ ] 🤖 `npm run lint` + `npm test` backend, `npm run build` frontend
+- [x] 🤖 Unit (`webhook-execution.spec.ts`, `webhook-triggers.spec.ts`, 23 test): enqueue / processor, payload vào node đầu, credential theo chủ workflow, definition lỗi → FAILED, version bị xoá → FAILED, sync giữ token, tắt listener cũ, dedup, URL, quyền xem
+- [x] 🤖 E2E `webhook-trigger.e2e-spec.ts` (HTTP + Postgres + Redis + BullMQ thật): POST → 202 → execution `WEBHOOK` hoàn tất nền, header `Authorization` không vào log; publish lại → URL không đổi và chạy version mới; `Idempotency-Key` trùng → 1 lần chạy; token sai → 404
+- [x] 🤖 Hồi quy: unit backend 234/234; e2e 19/21 — 2 test fail (`restore-version`, `execution-run-ui`) **fail y hệt trên `master`** (node filter không có config bị validate publish chặn), không do P1
+- [x] 🤖 Lint các file đổi (backend), `npm run lint` + `npm test` (9/9) + `npm run build` frontend
 - [ ] 👤 Thử bằng tay: tạo workflow `Webhook Trigger → Gmail`, publish, `curl` vào URL, thấy email đến
 
 ---

@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
+import {
+  CommandHandler,
+  EventBus,
+  ICommandHandler,
+  QueryBus,
+} from '@nestjs/cqrs';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { WorkflowDraftRepository } from '../../domain/repositories/workflow-draft.repository';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
@@ -7,6 +12,7 @@ import { WorkflowVersionRepository } from '../../domain/repositories/workflow-ve
 import { WorkflowVersion } from '../../domain/entities/workflow-version.entity';
 import { WorkflowDraft } from '../../domain/entities/workflow-draft.entity';
 import { GetNodeConfigSchemasQuery } from '@app/node-library/application/queries/get-node-config-schemas.query';
+import { WorkflowPublishedEvent } from '../events/workflow-published.event';
 import {
   extractNodeCatalogKeys,
   validateWorkflowDraft,
@@ -28,6 +34,7 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     private readonly workflowDraftRepo: WorkflowDraftRepository,
     private readonly workflowVersionRepo: WorkflowVersionRepository,
     private readonly queryBus: QueryBus,
+    private readonly eventBus: EventBus,
   ) {}
 
   async execute(
@@ -93,6 +100,10 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     // Update workflow current version
     existingWorkflow.currentVersionId = newVersion.id;
     await this.workflowRepo.update(existingWorkflow);
+
+    this.eventBus.publish(
+      new WorkflowPublishedEvent(workflowId, newVersion.id, draft.definition),
+    );
 
     return {
       versionId: newVersion.id,

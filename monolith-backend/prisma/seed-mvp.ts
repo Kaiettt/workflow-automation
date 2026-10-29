@@ -7,6 +7,7 @@ import {
   GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA,
   LLM_GENERATE_CONFIG_SCHEMA,
   MANUAL_TRIGGER_CONFIG_SCHEMA,
+  WEBHOOK_TRIGGER_CONFIG_SCHEMA,
 } from './mvp-node-schemas';
 
 export async function seedMvp(prisma: PrismaClient) {
@@ -139,6 +140,17 @@ export async function seedMvp(prisma: PrismaClient) {
       description: 'Send a prompt to a language model and get its answer',
       configSchema: LLM_GENERATE_CONFIG_SCHEMA,
       // Not tied to one connector: the provider is chosen on the node.
+      connectorId: null,
+    },
+    {
+      id: '44444444-4444-4444-4444-444444444447',
+      key: 'trigger.webhook',
+      displayName: 'Webhook Trigger',
+      icon: 'webhook',
+      color: '#6B7280',
+      category: NodeCategory.TRIGGER,
+      description: 'Start a workflow when an HTTP POST arrives at its URL',
+      configSchema: WEBHOOK_TRIGGER_CONFIG_SCHEMA,
       connectorId: null,
     },
   ];

@@ -36,6 +36,8 @@ erDiagram
     Workflow o|--o| WorkflowVersion : current_version
     Workflow ||--o{ Execution : executions
     WorkflowVersion ||--o{ Execution : executed_as
+    Workflow ||--o{ WorkflowTrigger : triggers
+    WorkflowVersion ||--o{ WorkflowTrigger : listens_as
 
     Connector ||--o{ NodeTypeDefinition : backs
     Connector ||--o{ ConnectorCredential : credentials
@@ -168,9 +170,27 @@ Index: `(connectorId, ownerId)`. Encryption and preventing secrets from entering
 | `triggeredById` | `triggered_by_id`, nullable UUID relation to `User` | Null for non-user triggers |
 | `startedAt`, `finishedAt` | `started_at`, `finished_at`, timestamps | `finishedAt` nullable |
 | `durationMs` | `duration_ms`, nullable integer | |
-| `context` | nullable JSON | Run input/context |
+| `context` | nullable JSON | Run input/context; webhook runs store `{ triggerItems }` |
 
 Indexes: `(workflowId, startedAt DESC)` and `status`.
+
+**`WorkflowTrigger` → `workflow_triggers`**
+
+Which published version listens for outside events. Publishing a version deactivates the workflow's rows and inserts rows for the new version's trigger nodes (manual triggers get none).
+
+| Field | Database mapping / constraint | Notes |
+| --- | --- | --- |
+| `id` | UUID, primary key | |
+| `workflowId` | `workflow_id`, UUID, required relation to `Workflow` | Cascades on delete |
+| `workflowVersionId` | `workflow_version_id`, UUID, required relation to `WorkflowVersion` | Version that receives the events |
+| `nodeId` | `node_id`, `VarChar(100)` | Trigger node ID in the definition JSON; not a foreign key |
+| `triggerKey` | `trigger_key`, `VarChar(150)` | e.g. `trigger.webhook` |
+| `channel` | `TriggerChannel` | |
+| `routingKey` | `routing_key`, `VarChar(255)` | `WEBHOOK`: secret URL token, kept across versions of the same node. Later: page / OA id |
+| `isActive` | `is_active`, default `true` | Only active rows receive events |
+| `createdAt` | `created_at`, timestamp, default now | |
+
+Indexes: `(channel, routingKey, isActive)`, `workflowId`, and a partial unique index on `(channel, routing_key) WHERE is_active` written by hand in migration `20261029000000_add_workflow_triggers` (Prisma cannot express it).
 
 **`ExecutionNodeLog` → `execution_node_logs`**
 
@@ -199,6 +219,7 @@ Indexes: `executionId` and `(executionId, status)`. The schema does not define p
 | `ConnectorAuthType` | `NONE`, `API_KEY`, `OAUTH2`, `BASIC` |
 | `ConnectorTestStatus` | `UNTESTED`, `SUCCESS`, `FAILED` |
 | `TriggerType` | `SCHEDULE`, `WEBHOOK`, `MANUAL` |
+| `TriggerChannel` | `WEBHOOK`, `MESSENGER`, `ZALO_OA` |
 | `ExecutionStatus` | `RUNNING`, `SUCCESS`, `FAILED`, `CANCELLED` |
 | `NodeExecutionStatus` | `RUNNING`, `SUCCESS`, `FAILED`, `SKIPPED`, `TIMEOUT` |
 

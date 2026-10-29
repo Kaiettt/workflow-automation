@@ -8,6 +8,7 @@ import { NodeLibraryModule } from '../../../libs/node-library/src';
 import { ConnectorModule } from '../../../libs/connector/src';
 import { IntegrationsModule } from '@app/integrations';
 import { ExecutionModule } from '@app/execution';
+import { TriggersModule } from '@app/triggers';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ExecutionModule } from '@app/execution';
     ConnectorModule,
     IntegrationsModule,
     ExecutionModule,
+    TriggersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

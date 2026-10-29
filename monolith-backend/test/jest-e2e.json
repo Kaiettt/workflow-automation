@@ -18,6 +18,7 @@
     "^@app/connector(|/.*)$": "<rootDir>/libs/connector/src/$1",
     "^@app/node-library(|/.*)$": "<rootDir>/libs/node-library/src/$1",
     "^@app/integrations(|/.*)$": "<rootDir>/libs/integrations/src/$1",
+    "^@app/triggers(|/.*)$": "<rootDir>/libs/triggers/src/$1",
     "^@test/(.*)$": "<rootDir>/test/$1"
   }
 }

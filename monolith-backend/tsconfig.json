@@ -37,6 +37,8 @@
       "@app/node-library/*": ["libs/node-library/src/*"],
       "@app/integrations": ["libs/integrations/src"],
       "@app/integrations/*": ["libs/integrations/src/*"],
+      "@app/triggers": ["libs/triggers/src"],
+      "@app/triggers/*": ["libs/triggers/src/*"],
       "@test/*": ["test/*"]
     },
     "incremental": true,

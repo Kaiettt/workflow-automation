@@ -6,6 +6,7 @@ import {
 } from '@app/execution/application/commands/start-execution/start-execution.command';
 import { ExecutionRepository } from '@app/execution/domain/repositories/execution.repository';
 import {
+  ExecutionRecord,
   NodeLogRecord,
   ResolvedCredential,
   WorkflowVersionForExecution,
@@ -35,6 +36,7 @@ import {
   GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA,
   LLM_GENERATE_CONFIG_SCHEMA,
   MANUAL_TRIGGER_CONFIG_SCHEMA,
+  WEBHOOK_TRIGGER_CONFIG_SCHEMA,
 } from '../../../prisma/mvp-node-schemas';
 
 export const CREDENTIAL_ID = '33333333-3333-3333-3333-333333333331';
@@ -56,7 +58,10 @@ export class MemoryExecutionRepository extends ExecutionRepository {
     return Promise.resolve(this.version);
   }
 
-  createExecution(): Promise<string> {
+  created: Array<Omit<ExecutionRecord, 'id'>> = [];
+
+  createExecution(input: Omit<ExecutionRecord, 'id'>): Promise<string> {
+    this.created.push(input);
     return Promise.resolve('execution-1');
   }
 
@@ -99,6 +104,10 @@ export class MemoryExecutionRepository extends ExecutionRepository {
       nodeLogs: this.logs,
     });
   }
+
+  failStaleExecutions(): Promise<number> {
+    return Promise.resolve(0);
+  }
 }
 
 export class FakeCatalog extends NodeCatalogPort {
@@ -106,6 +115,7 @@ export class FakeCatalog extends NodeCatalogPort {
     return Promise.resolve(
       new Map<string, unknown>([
         [NodeKeys.TRIGGER_MANUAL, MANUAL_TRIGGER_CONFIG_SCHEMA],
+        [NodeKeys.TRIGGER_WEBHOOK, WEBHOOK_TRIGGER_CONFIG_SCHEMA],
         [NodeKeys.GOOGLE_SHEET_READ_ROWS, GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA],
         [NodeKeys.LOGIC_FILTER, FILTER_CONFIG_SCHEMA],
         [NodeKeys.GMAIL_SEND, GMAIL_SEND_CONFIG_SCHEMA],

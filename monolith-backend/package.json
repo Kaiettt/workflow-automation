@@ -25,6 +25,7 @@
     "@anthropic-ai/sdk": "^0.135.0",
     "@google/genai": "^2.30.0",
     "@hookform/resolvers": "^5.4.0",
+    "@nestjs/bullmq": "^11.0.5",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/cqrs": "^11.0.3",
@@ -37,6 +38,7 @@
     "@tanstack/react-query": "^5.101.2",
     "axios": "^1.18.1",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^5.81.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "class-variance-authority": "^0.7.1",
@@ -111,6 +113,7 @@
       "^@app/connector(|/.*)$": "<rootDir>/libs/connector/src/$1",
       "^@app/node-library(|/.*)$": "<rootDir>/libs/node-library/src/$1",
       "^@app/integrations(|/.*)$": "<rootDir>/libs/integrations/src/$1",
+      "^@app/triggers(|/.*)$": "<rootDir>/libs/triggers/src/$1",
       "^@test/(.*)$": "<rootDir>/test/$1"
     },
     "testPathIgnorePatterns": [

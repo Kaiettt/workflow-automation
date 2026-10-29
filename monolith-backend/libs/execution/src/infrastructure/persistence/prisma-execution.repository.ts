@@ -39,10 +39,12 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       data: {
         workflowId: input.workflowId,
         workflowVersionId: input.workflowVersionId,
-        triggerType: 'MANUAL',
+        triggerType: input.triggerType,
         triggeredById: input.triggeredById,
         status: ExecutionStatus.RUNNING,
         startedAt: input.startedAt,
+        context:
+          input.context === undefined ? undefined : jsonValue(input.context),
       },
       select: { id: true },
     });
@@ -106,6 +108,17 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       where: { id },
       data: { status: status, finishedAt, durationMs },
     });
+  }
+
+  async failStaleExecutions(startedBefore: Date): Promise<number> {
+    const { count } = await this.prisma.execution.updateMany({
+      where: {
+        status: ExecutionStatus.RUNNING,
+        startedAt: { lt: startedBefore },
+      },
+      data: { status: ExecutionStatus.FAILED, finishedAt: new Date() },
+    });
+    return count;
   }
 
   async findExecutionResult(id: string): Promise<unknown> {

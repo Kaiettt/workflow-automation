@@ -60,6 +60,7 @@ import { useWorkflowVersion } from '../hooks/useWorkflowVersions';
 import { useStartExecution } from '../hooks/useStartExecution';
 import type { ExecutionResult } from '../types/execution.types';
 import { countItems } from '../utils/node-config';
+import { WebhookTriggerInfo } from '../components/WebhookTriggerInfo';
 
 // --- Custom Interactive Canvas Node ---
 interface RunnerNodeData extends Record<string, unknown> {
@@ -196,9 +197,7 @@ function mapDefinitionNodeToRunner(
   if (key.startsWith('trigger.') || key.includes('webhook') || key.includes('manual')) {
     category = 'Trigger';
     iconType = 'webhook';
-    detail = rawNode.data?.config?.path
-      ? `POST ${String(rawNode.data.config.path)}`
-      : 'trigger.manual';
+    detail = key === 'trigger.webhook' ? 'POST webhook URL' : 'trigger.manual';
   } else if (key.startsWith('logic.') || key.includes('filter')) {
     category = 'Logic';
     iconType = 'filter';
@@ -266,6 +265,8 @@ export const VersionDetailPage: React.FC = () => {
   }, [version]);
 
   const rawNodes = useMemo(() => definition.nodes || [], [definition]);
+  // A webhook version is started by its URL, not by the Run button.
+  const webhookNode = rawNodes.find((n) => n.data?.key === 'trigger.webhook');
   const rawEdges = useMemo(() => definition.edges || [], [definition]);
 
   const initialNodes = useMemo(() => {
@@ -483,27 +484,35 @@ export const VersionDetailPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
-                <Button
-                  size="lg"
-                  onClick={handleRun}
-                  disabled={isPending}
-                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 font-semibold px-6 shadow-md transition-all"
-                >
-                  {isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : executionResult ? (
-                    <RotateCcw className="size-4" />
-                  ) : (
-                    <Play className="size-4 fill-current" />
-                  )}
-                  <span>
-                    {isPending
-                      ? 'Đang thực thi Engine...'
-                      : executionResult
-                        ? 'Chạy lại phiên bản (Rerun)'
-                        : 'Kích hoạt chạy ngay (Run)'}
-                  </span>
-                </Button>
+                {webhookNode ? (
+                  <WebhookTriggerInfo
+                    workflowId={workflowId}
+                    versionId={versionId}
+                    nodeId={webhookNode.id}
+                  />
+                ) : (
+                  <Button
+                    size="lg"
+                    onClick={handleRun}
+                    disabled={isPending}
+                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 font-semibold px-6 shadow-md transition-all"
+                  >
+                    {isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : executionResult ? (
+                      <RotateCcw className="size-4" />
+                    ) : (
+                      <Play className="size-4 fill-current" />
+                    )}
+                    <span>
+                      {isPending
+                        ? 'Đang thực thi Engine...'
+                        : executionResult
+                          ? 'Chạy lại phiên bản (Rerun)'
+                          : 'Kích hoạt chạy ngay (Run)'}
+                    </span>
+                  </Button>
+                )}
               </div>
             </div>
 

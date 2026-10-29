@@ -11,6 +11,7 @@ import { WorkflowVersion } from '@app/designer/domain/entities/workflow-version.
 import { WorkflowRepository } from '@app/designer/domain/repositories/workflow.repository';
 import { WorkflowDraftRepository } from '@app/designer/domain/repositories/workflow-draft.repository';
 import { WorkflowVersionRepository } from '@app/designer/domain/repositories/workflow-version.repository';
+import { WorkflowPublishedEvent } from '@app/designer/application/events/workflow-published.event';
 
 // Mock catalog schema data matching sample.data.json
 const catalogSchemas: Record<string, { category: string; configSchema: any }> =
@@ -121,6 +122,7 @@ describe('PublishWorkflowHandler (TDD)', () => {
   let draftRepo: InMemoryWorkflowDraftRepo;
   let versionRepo: InMemoryWorkflowVersionRepo;
   let queryBus: jest.Mocked<QueryBus>;
+  let eventBus: { publish: jest.Mock };
 
   const validDefinition = {
     nodes: [
@@ -246,11 +248,14 @@ describe('PublishWorkflowHandler (TDD)', () => {
       }),
     } as any;
 
+    eventBus = { publish: jest.fn() };
+
     handler = new PublishWorkflowHandler(
       workflowRepo,
       draftRepo,
       versionRepo,
       queryBus,
+      eventBus as any,
     );
   });
 
@@ -277,6 +282,9 @@ describe('PublishWorkflowHandler (TDD)', () => {
     expect(versionRepo.versions.length).toBe(1);
     expect(workflowRepo.workflows.get(workflowId)?.currentVersionId).toBe(
       result.versionId,
+    );
+    expect(eventBus.publish).toHaveBeenCalledWith(
+      new WorkflowPublishedEvent(workflowId, result.versionId, validDefinition),
     );
   });
 

@@ -4,6 +4,14 @@ import { PrismaModule } from '@app/database';
 import { AuthModule } from '@app/auth';
 import { ExecutionController } from './presentation/http/execution.controller';
 import { StartExecutionHandler } from './application/commands/start-execution/start-execution.command';
+import { EnqueueExecutionHandler } from './application/commands/enqueue-execution/enqueue-execution.command';
+import { WorkflowEngine } from './application/services/workflow-engine';
+import { ExecutionQueuePort } from './application/ports/execution-queue.port';
+import {
+  BullMqExecutionQueue,
+  executionQueueImports,
+} from './infrastructure/queue/execution-queue.module';
+import { ExecutionProcessor } from './infrastructure/queue/execution.processor';
 import { ExecutionRepository } from './domain/repositories/execution.repository';
 import { PrismaExecutionRepository } from './infrastructure/persistence/prisma-execution.repository';
 import { NodeCatalogPort } from './application/ports/node-catalog.port';
@@ -14,6 +22,7 @@ import { AnthropicLlmAdapter } from './infrastructure/llm/anthropic-llm.adapter'
 import { OpenAiLlmAdapter } from './infrastructure/llm/openai-llm.adapter';
 import { GeminiLlmAdapter } from './infrastructure/llm/gemini-llm.adapter';
 import { ManualTriggerExecutor } from './application/executors/manual-trigger-executor';
+import { WebhookTriggerExecutor } from './application/executors/webhook-trigger-executor';
 import { GoogleSheetReadRowsExecutor } from './application/executors/google-sheet-read-rows-executor';
 import { FilterExecutor } from './application/executors/filter-executor';
 import { GmailSendExecutor } from './application/executors/gmail-send-executor';
@@ -25,10 +34,11 @@ import {
 import { INodeExecutor } from './domain/entities/node-executor';
 
 @Module({
-  imports: [CqrsModule, PrismaModule, AuthModule],
+  imports: [CqrsModule, PrismaModule, AuthModule, ...executionQueueImports],
   controllers: [ExecutionController],
   providers: [
     ManualTriggerExecutor,
+    WebhookTriggerExecutor,
     GoogleSheetReadRowsExecutor,
     FilterExecutor,
     GmailSendExecutor,
@@ -66,6 +76,7 @@ import { INodeExecutor } from './domain/entities/node-executor';
       provide: 'NODE_EXECUTORS',
       useFactory: (
         manualTriggerExecutor: ManualTriggerExecutor,
+        webhookTriggerExecutor: WebhookTriggerExecutor,
         googleSheetReadRowsExecutor: GoogleSheetReadRowsExecutor,
         filterExecutor: FilterExecutor,
         gmailSendExecutor: GmailSendExecutor,
@@ -73,6 +84,7 @@ import { INodeExecutor } from './domain/entities/node-executor';
         llmGenerateExecutor: LlmGenerateExecutor,
       ): INodeExecutor[] => [
         manualTriggerExecutor,
+        webhookTriggerExecutor,
         googleSheetReadRowsExecutor,
         filterExecutor,
         gmailSendExecutor,
@@ -81,6 +93,7 @@ import { INodeExecutor } from './domain/entities/node-executor';
       ],
       inject: [
         ManualTriggerExecutor,
+        WebhookTriggerExecutor,
         GoogleSheetReadRowsExecutor,
         FilterExecutor,
         GmailSendExecutor,
@@ -88,7 +101,19 @@ import { INodeExecutor } from './domain/entities/node-executor';
         LlmGenerateExecutor,
       ],
     },
+    {
+      provide: WorkflowEngine,
+      useFactory: (
+        repository: ExecutionRepository,
+        executors: INodeExecutor[],
+        catalog: NodeCatalogPort,
+      ) => new WorkflowEngine(repository, executors, catalog),
+      inject: [ExecutionRepository, 'NODE_EXECUTORS', NodeCatalogPort],
+    },
+    { provide: ExecutionQueuePort, useClass: BullMqExecutionQueue },
+    ExecutionProcessor,
     StartExecutionHandler,
+    EnqueueExecutionHandler,
   ],
 })
 export class ExecutionModule {}

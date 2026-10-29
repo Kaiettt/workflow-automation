@@ -28,7 +28,9 @@ export interface NodeRunParams {
   runs: readonly NodeRun[];
   names: NodeNameIndex;
   configSchema: unknown;
-  actorId: string;
+  // Credentials are looked up for the workflow owner, also when no one
+  // pressed Run (webhook).
+  credentialOwnerId: string;
 }
 
 export interface NodeRunResult {
@@ -119,7 +121,7 @@ export class NodeRunner {
     const secret = await this.resolveCredential(
       executor,
       rawConfig,
-      params.actorId,
+      params.credentialOwnerId,
     );
     const currentItem = params.items[0] ?? { json: {} };
     const config = executor.parseConfig(
@@ -168,7 +170,7 @@ export class NodeRunner {
     const secret = await this.resolveCredential(
       executor,
       rawConfig,
-      params.actorId,
+      params.credentialOwnerId,
     );
     const output: Item[] = [];
 
@@ -222,7 +224,7 @@ export class NodeRunner {
   private async resolveCredential(
     executor: INodeExecutor,
     rawConfig: Record<string, unknown>,
-    actorId: string,
+    ownerId: string,
   ): Promise<unknown> {
     const candidate = rawConfig.credential_id;
     if (candidate === undefined) return null;
@@ -232,7 +234,7 @@ export class NodeRunner {
 
     const resolved = await this.repository.resolveCredential(
       candidate,
-      actorId,
+      ownerId,
     );
     if (!resolved) throw new Error('credential was not found');
 

@@ -6,6 +6,14 @@ export const MANUAL_TRIGGER_CONFIG_SCHEMA = {
   properties: {},
 };
 
+// No settings: the URL is generated on publish and shown by the designer
+// because of x-display.
+export const WEBHOOK_TRIGGER_CONFIG_SCHEMA = {
+  type: 'object',
+  properties: {},
+  'x-display': 'webhookUrl',
+};
+
 export const GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA = {
   type: 'object',
   required: ['credential_id', 'spreadsheet_id', 'sheet_name'],

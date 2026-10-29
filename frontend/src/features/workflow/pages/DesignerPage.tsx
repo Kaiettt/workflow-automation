@@ -289,6 +289,7 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
         onSelectNode={handleFocusNode}
       />
       <DesignerLayout
+        workflowId={workflowId}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

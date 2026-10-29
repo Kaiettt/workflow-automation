@@ -70,6 +70,7 @@ model Workflow {
   draft      WorkflowDraft?    // 1:1 — mỗi workflow có đúng 1 draft
   versions   WorkflowVersion[] @relation("WorkflowVersions")
   executions Execution[]
+  triggers   WorkflowTrigger[]
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -117,8 +118,9 @@ model WorkflowVersion {
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  workflowCurrent Workflow?   @relation("CurrentVersion")
+  workflowCurrent Workflow?         @relation("CurrentVersion")
   executions      Execution[]
+  triggers        WorkflowTrigger[]
 
   @@unique([workflowId, versionNumber]) // FR-VM-01 — không có 2 version trùng số cho cùng 1 workflow
   @@index([workflowId])
@@ -261,6 +263,43 @@ model Execution {
   @@index([workflowId, startedAt(sort: Desc)]) // FR-EM-04 danh sách execution gần nhất
   @@index([status])
   @@map("executions")
+}
+
+// ----------------------------------------------------------------------------
+// Trigger Module — workflow nào đang lắng nghe sự kiện bên ngoài
+// ----------------------------------------------------------------------------
+
+enum TriggerChannel {
+  WEBHOOK
+  MESSENGER
+  ZALO_OA
+}
+
+// Một node trigger (không phải manual) của version đang publish. Chỉ row
+// isActive = true nhận sự kiện; publish version mới sẽ tắt các row cũ.
+model WorkflowTrigger {
+  id String @id @default(uuid()) @db.Uuid
+
+  workflowId String   @map("workflow_id") @db.Uuid
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  workflowVersionId String          @map("workflow_version_id") @db.Uuid
+  workflowVersion   WorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+
+  nodeId     String         @map("node_id") @db.VarChar(100) // id node trong definition JSON
+  triggerKey String         @map("trigger_key") @db.VarChar(150) // vd. "trigger.webhook"
+  channel    TriggerChannel
+
+  // WEBHOOK: token bí mật trong URL. MESSENGER: page_id. ZALO_OA: oa_id.
+  // Unique trong số row active: partial index viết tay trong migration.
+  routingKey String @map("routing_key") @db.VarChar(255)
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([channel, routingKey, isActive])
+  @@index([workflowId])
+  @@map("workflow_triggers")
 }
 
 // ----------------------------------------------------------------------------
