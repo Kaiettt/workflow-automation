@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkflowPublishValidationError } from '../models/workflow-validation.model';
 import { useDesignerStore } from '../store/designer.store';
@@ -79,12 +80,17 @@ describe('DesignerPage publish validation', () => {
         );
     });
 
-    it('shows the publish issue, highlights its node, and focuses its properties', async () => {
+    const renderPage = () =>
         render(
-            <MemoryRouter>
-                <DesignerPage workflowId="workflow-1" />
-            </MemoryRouter>,
+            <QueryClientProvider client={new QueryClient()}>
+                <MemoryRouter>
+                    <DesignerPage workflowId="workflow-1" />
+                </MemoryRouter>
+            </QueryClientProvider>,
         );
+
+    it('shows the publish issue, highlights its node, and focuses its properties', async () => {
+        renderPage();
 
         fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
 
@@ -101,5 +107,23 @@ describe('DesignerPage publish validation', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Focus node action-1' }));
         expect(useDesignerStore.getState().selectedNodeId).toBe('action-1');
+    });
+
+    it('says when publishing turned an active workflow off', async () => {
+        mockWorkflowService.publishWorkflow.mockResolvedValue({
+            versionId: 'v2',
+            versionNumber: 2,
+            activation: {
+                active: false,
+                error: '"Messenger Trigger": the selected credential no longer exists.',
+            },
+        });
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
+
+        const alert = await screen.findByRole('alert');
+        expect(alert.textContent).toContain('Published version 2, but the workflow was turned off');
+        expect(alert.textContent).toContain('the selected credential no longer exists');
     });
 });

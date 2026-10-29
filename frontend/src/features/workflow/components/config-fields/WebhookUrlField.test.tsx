@@ -1,9 +1,9 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { WorkflowTrigger } from '../../types/trigger.types';
+import type { NodeWebhook } from '../../types/trigger.types';
 
-const mockTriggerApi = vi.hoisted(() => ({ list: vi.fn() }));
+const mockTriggerApi = vi.hoisted(() => ({ webhooks: vi.fn() }));
 vi.mock('../../api/trigger.api', () => ({ triggerApi: mockTriggerApi }));
 
 import { WebhookUrlField } from './WebhookUrlField';
@@ -15,12 +15,11 @@ const renderField = (nodeId: string) =>
     </QueryClientProvider>,
   );
 
-const hook: WorkflowTrigger = {
+const hook: NodeWebhook = {
   nodeId: 'hook',
-  triggerKey: 'trigger.webhook',
-  channel: 'WEBHOOK',
-  workflowVersionId: 'version-1',
-  webhookUrl: 'https://flow.example.com/api/webhooks/w/token-1',
+  nodeKey: 'webhook.trigger',
+  scope: 'node',
+  url: 'https://flow.example.com/api/webhooks/2f0c8a52-0000-4000-8000-000000000001',
 };
 
 describe('WebhookUrlField', () => {
@@ -29,22 +28,23 @@ describe('WebhookUrlField', () => {
   });
   afterEach(cleanup);
 
-  it('shows the URL of the published webhook node', async () => {
-    mockTriggerApi.list.mockResolvedValue([hook]);
+  it('shows the URL of the webhook node before anything is published', async () => {
+    mockTriggerApi.webhooks.mockResolvedValue([hook]);
     renderField('hook');
 
-    expect(await screen.findByDisplayValue(hook.webhookUrl as string)).toBeTruthy();
-    expect(mockTriggerApi.list).toHaveBeenCalledWith('workflow-1');
+    expect(await screen.findByDisplayValue(hook.url as string)).toBeTruthy();
+    expect(mockTriggerApi.webhooks).toHaveBeenCalledWith('workflow-1');
+    expect(screen.getByText(/while the workflow is Active/)).toBeTruthy();
     expect(
       (screen.getByRole('button', { name: 'Copy webhook URL' }) as HTMLButtonElement).disabled,
     ).toBe(false);
   });
 
-  it('asks to publish when the node has no URL yet', async () => {
-    mockTriggerApi.list.mockResolvedValue([hook]);
+  it('waits for the draft to save when the node has no URL yet', async () => {
+    mockTriggerApi.webhooks.mockResolvedValue([hook]);
     renderField('new-node');
 
-    expect(await screen.findByText('Publish the workflow to get its URL.')).toBeTruthy();
+    expect(await screen.findByText('The URL appears once the draft is saved.')).toBeTruthy();
     expect(
       (screen.getByRole('button', { name: 'Copy webhook URL' }) as HTMLButtonElement).disabled,
     ).toBe(true);

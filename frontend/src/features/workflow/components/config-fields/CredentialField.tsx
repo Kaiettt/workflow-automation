@@ -7,7 +7,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCredentials } from '../../hooks/useCredentials';
+import { useConnector, useCredentials } from '../../hooks/useCredentials';
+import { useOAuth2Popup } from '../../hooks/useOAuth2Popup';
 import { AddCredentialDialog } from '../AddCredentialDialog';
 import { FieldShell } from './FieldShell';
 
@@ -31,6 +32,9 @@ export function CredentialPicker({
 }: CredentialPickerProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: credentials = [], isLoading, isError } = useCredentials(connectorKey);
+  const { data: connector } = useConnector(connectorKey);
+  // OAuth2 credentials can be signed in again (more Pages, fresh token).
+  const reconnect = useOAuth2Popup();
 
   // A selection that no longer exists (e.g. another provider's) shows as empty.
   const selected = credentials.some((c) => c.id === value) ? value : null;
@@ -86,6 +90,21 @@ export function CredentialPicker({
           >
             + Add connection
           </Button>
+          {connector?.oauth2 && selected && (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                disabled={reconnect.pending}
+                onClick={() => void reconnect.connect(selected)}
+              >
+                {reconnect.pending ? 'Waiting for sign-in...' : 'Reconnect'}
+              </Button>
+              {reconnect.error && <p className="text-xs text-destructive">{reconnect.error}</p>}
+            </>
+          )}
           <AddCredentialDialog
             connectorKey={connectorKey}
             open={dialogOpen}

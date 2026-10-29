@@ -12,6 +12,9 @@ export const EXECUTION_QUEUE = 'executions';
 export const executionQueueImports = [
   BullModule.forRootAsync({
     useFactory: () => ({
+      // Separate key space per environment, e.g. so e2e runs are not picked
+      // up by a dev server sharing the same Redis.
+      prefix: process.env['BULLMQ_PREFIX'] || 'bull',
       connection: {
         host: process.env['REDIS_HOST'] || 'localhost',
         port: parseInt(process.env['REDIS_PORT'] || '6379', 10),

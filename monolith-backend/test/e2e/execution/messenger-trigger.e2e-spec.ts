@@ -1,7 +1,8 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 // Messenger end to end with a real HTTP server, Postgres, Redis and BullMQ.
-// Only the call to Facebook is replaced: a signed message posted to the webhook
-// must produce a reply from the Page through the fake client.
+// Only Facebook is replaced (META_GRAPH_API). Everything is configured the way
+// a user does it in the UI: credential with their own App ID / Secret →
+// Connect (OAuth2) → pick a Page → publish → activate.
 import { createHmac } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, INestApplication } from '@nestjs/common';
@@ -9,54 +10,43 @@ import request from 'supertest';
 import { DesignerModule } from '@app/designer';
 import { PrismaModule } from '@app/database';
 import { PrismaService } from '@app/database/prisma/prisma.service';
-import { ExecutionModule, MESSENGER_CLIENT } from '@app/execution';
+import { ExecutionModule } from '@app/execution';
 import { TriggersModule } from '@app/triggers';
 import { ConnectorModule } from '@app/connector';
+import { IntegrationsModule } from '@app/integrations';
+import { META_GRAPH_API } from '@app/apps';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
-import {
-  MessengerClient,
-  MessengerSendRequest,
-} from '@app/execution/application/ports/messenger-client.port';
+import { FakeMetaGraph } from '@test/support/apps/fake-meta-graph';
 
-const APP_SECRET = 'e2e-meta-app-secret';
-const VERIFY_TOKEN = 'e2e-verify-token';
-
-class FakeMessenger implements MessengerClient {
-  sent: MessengerSendRequest[] = [];
-  sendText(request: MessengerSendRequest) {
-    this.sent.push(request);
-    return Promise.resolve({ messageId: `mid.reply.${this.sent.length}` });
-  }
-}
-
-describe('Messenger trigger (e2e)', () => {
+describe('Messenger trigger and send (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  const messenger = new FakeMessenger();
+  const graph = new FakeMetaGraph();
   const ownerId = '00000000-0000-0000-0000-000000000000';
-  // Pages stay bound to earlier runs' workflows: use a fresh one every run.
-  const pageId = `page-${Date.now()}`;
+  // A fresh Meta App and Page every run, so earlier runs do not interfere.
+  const run = Date.now();
+  const appId = `app-${run}`;
+  const appSecret = `secret-${run}`;
+  const pageId = `page-${run}`;
   const previousEnv = { ...process.env };
+  const handshakes: Array<{ status: number; text: string }> = [];
 
   const server = () =>
     app.getHttpServer() as unknown as Parameters<typeof request>[0];
 
-  const sign = (raw: string) =>
-    `sha256=${createHmac('sha256', APP_SECRET).update(raw).digest('hex')}`;
-
-  const postSigned = (body: unknown) => {
+  const postSigned = (path: string, body: unknown, secret = appSecret) => {
     const raw = JSON.stringify(body);
     return request(server())
-      .post('/api/webhooks/messenger')
+      .post(path)
       .set('Content-Type', 'application/json')
-      .set('X-Hub-Signature-256', sign(raw))
+      .set(
+        'X-Hub-Signature-256',
+        `sha256=${createHmac('sha256', secret).update(raw).digest('hex')}`,
+      )
       .send(raw);
   };
 
-  const customerMessage = (
-    mid: string,
-    extra: Record<string, unknown> = {},
-  ) => ({
+  const customerMessage = (mid: string, text: string, extra = {}) => ({
     object: 'page',
     entry: [
       {
@@ -67,14 +57,53 @@ describe('Messenger trigger (e2e)', () => {
             sender: { id: 'customer-42' },
             recipient: { id: pageId },
             timestamp: Date.now(),
-            message: { mid, text: 'Shop ơi còn size M không?', ...extra },
+            message: { mid, text, ...extra },
           },
         ],
       },
     ],
   });
 
-  async function createWorkflow(name: string, credentialId: string) {
+  async function createCredential(
+    name: string,
+    clientId: string,
+    secret: string,
+  ) {
+    const res = await request(server())
+      .post('/api/connectors/facebookMessengerOAuth2/credentials')
+      .send({ name, secret: { client_id: clientId, client_secret: secret } })
+      .expect(201);
+    return res.body.data.id as string;
+  }
+
+  async function connect(credentialId: string) {
+    const auth = await request(server())
+      .get('/api/oauth2/auth')
+      .query({ credentialId })
+      .expect(200);
+    const url = new URL(auth.body.url as string);
+    expect(url.searchParams.get('redirect_uri')).toBe(
+      'http://localhost/api/oauth2/callback',
+    );
+    const state = url.searchParams.get('state');
+    const callback = await request(server())
+      .get('/api/oauth2/callback')
+      .query({ code: 'fb-code', state })
+      .expect(200);
+    expect(callback.text).toContain('"status":"success"');
+    // The state works once.
+    await request(server())
+      .get('/api/oauth2/callback')
+      .query({ code: 'fb-code', state })
+      .expect(400);
+  }
+
+  async function chatWorkflow(
+    name: string,
+    credentialId: string,
+    keywords: string,
+    replyText: string,
+  ) {
     const created = await request(server())
       .post('/api/workflows')
       .send({ name, ownerId })
@@ -89,21 +118,27 @@ describe('Messenger trigger (e2e)', () => {
               id: 'chat',
               type: 'triggerNode',
               data: {
-                key: 'trigger.messenger.message',
+                key: 'messenger.trigger',
                 name: 'Messenger Trigger',
-                config: { credential_id: credentialId },
+                config: {
+                  credential_id: credentialId,
+                  page_id: pageId,
+                  keywords,
+                },
               },
             },
             {
               id: 'reply',
               type: 'actionNode',
               data: {
-                key: 'integration.messenger.send',
+                key: 'messenger.sendMessage',
                 name: 'Reply',
+                // recipient_id keeps its default: the trigger's sender_id.
                 config: {
                   credential_id: credentialId,
-                  recipient_id: '{{$json.sender_id}}',
-                  text: 'Cảm ơn bạn, shop trả lời ngay: {{$json.text}}',
+                  page_id: pageId,
+                  recipient_id: '{{$node["Messenger Trigger"].json.sender_id}}',
+                  text: replyText,
                 },
               },
             },
@@ -112,18 +147,10 @@ describe('Messenger trigger (e2e)', () => {
         },
       })
       .expect(200);
+    await request(server())
+      .post(`/api/workflows/${workflowId}/versions`)
+      .expect(201);
     return workflowId;
-  }
-
-  async function waitForListener(workflowId: string) {
-    for (let attempt = 0; attempt < 50; attempt += 1) {
-      const row = await prisma.workflowTrigger.findFirst({
-        where: { workflowId, isActive: true },
-      });
-      if (row) return row;
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    throw new Error('Messenger trigger was never registered');
   }
 
   async function finished(executionId: string) {
@@ -139,8 +166,22 @@ describe('Messenger trigger (e2e)', () => {
   }
 
   beforeAll(async () => {
-    process.env['META_APP_SECRET'] = APP_SECRET;
-    process.env['META_VERIFY_TOKEN'] = VERIFY_TOKEN;
+    process.env['PUBLIC_BASE_URL'] = 'http://localhost';
+    graph.pages = [
+      { id: pageId, name: 'Shop E2E', accessToken: `EAApage${run}` },
+    ];
+    // Like Meta: verify the callback URL while the subscription is created.
+    graph.onSubscribeApp = async ({ callbackUrl, verifyToken }) => {
+      const res = await request(server())
+        .get(new URL(callbackUrl).pathname)
+        .query({
+          'hub.mode': 'subscribe',
+          'hub.verify_token': verifyToken,
+          'hub.challenge': 'challenge-1',
+        });
+      handshakes.push({ status: res.status, text: res.text });
+      if (res.status !== 200) throw new Error('Callback verification failed');
+    };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
@@ -149,10 +190,11 @@ describe('Messenger trigger (e2e)', () => {
         ExecutionModule,
         TriggersModule,
         ConnectorModule,
+        IntegrationsModule,
       ],
     })
-      .overrideProvider(MESSENGER_CLIENT)
-      .useValue(messenger)
+      .overrideProvider(META_GRAPH_API)
+      .useValue(graph)
       .overrideGuard(JwtAuthGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => {
@@ -183,96 +225,176 @@ describe('Messenger trigger (e2e)', () => {
     await app.close();
   });
 
-  it('answers the Meta verification challenge only with the right token', async () => {
-    const ok = await request(server())
-      .get('/api/webhooks/messenger')
-      .query({
-        'hub.mode': 'subscribe',
-        'hub.verify_token': VERIFY_TOKEN,
-        'hub.challenge': '12345',
-      })
+  it('registers the catalog of the package at startup', async () => {
+    const nodeTypes = await prisma.nodeTypeDefinition.findMany({
+      where: {
+        key: {
+          in: ['messenger.trigger', 'messenger.sendMessage', 'webhook.trigger'],
+        },
+      },
+    });
+    expect(nodeTypes.map((n) => n.key).sort()).toEqual([
+      'messenger.sendMessage',
+      'messenger.trigger',
+      'webhook.trigger',
+    ]);
+    const connectors = await request(server())
+      .get('/api/connectors')
       .expect(200);
-    expect(ok.text).toBe('12345');
-
-    await request(server())
-      .get('/api/webhooks/messenger')
-      .query({
-        'hub.mode': 'subscribe',
-        'hub.verify_token': 'wrong',
-        'hub.challenge': '12345',
-      })
-      .expect(403);
+    expect(
+      connectors.body.data.find(
+        (c: { key: string }) => c.key === 'facebookMessengerOAuth2',
+      ),
+    ).toMatchObject({
+      authType: 'OAUTH2',
+      oauth2: { redirectUrl: 'http://localhost/api/oauth2/callback' },
+    });
   });
 
-  it('replies to a customer message from the connected Page', async () => {
-    const credential = await request(server())
-      .post('/api/connectors/messenger/credentials')
-      .send({
-        name: 'Shop test Page',
-        secret: { page_id: pageId, page_access_token: 'EAAe2etokenvalue' },
-      })
-      .expect(201);
-    expect(JSON.stringify(credential.body)).not.toContain('EAAe2etokenvalue');
-    const credentialId = credential.body.data.id as string;
+  it('connects, activates, runs every matching workflow and replies through the Page', async () => {
+    const credentialId = await createCredential('Shop app', appId, appSecret);
+    await connect(credentialId);
 
-    const workflowId = await createWorkflow('Messenger bot e2e', credentialId);
+    const pages = await request(server())
+      .post('/api/node-types/messenger.trigger/options/page_id')
+      .send({ credentialId })
+      .expect(200);
+    expect(pages.body.data).toEqual([{ value: pageId, label: 'Shop E2E' }]);
+
+    const everything = await chatWorkflow(
+      'Default bot e2e',
+      credentialId,
+      '',
+      'Cảm ơn bạn đã nhắn: {{$node["Messenger Trigger"].json.text}}',
+    );
+    const prices = await chatWorkflow(
+      'Price bot e2e',
+      credentialId,
+      'giá, bảng giá',
+      'Bảng giá ở đây ạ',
+    );
+
     await request(server())
-      .post(`/api/workflows/${workflowId}/versions`)
-      .expect(201);
-    const listener = await waitForListener(workflowId);
-    expect(listener).toMatchObject({
-      channel: 'MESSENGER',
-      routingKey: pageId,
+      .post(`/api/workflows/${everything}/activate`)
+      .expect(200);
+    await request(server())
+      .post(`/api/workflows/${prices}/activate`)
+      .expect(200);
+
+    // One subscription for the Meta App, verified with the endpoint's token.
+    const endpoint = await prisma.webhookEndpoint.findUnique({
+      where: { scopeKey: `credential:${credentialId}` },
     });
+    const path = `/api/webhooks/${endpoint!.id}`;
+    expect(graph.appSubscriptions.get(appId)).toMatchObject({
+      callbackUrl: `http://localhost${path}`,
+      appToken: `${appId}|${appSecret}`,
+    });
+    expect(handshakes).toEqual([{ status: 200, text: 'challenge-1' }]);
+    expect(graph.calls).toContain(`subscribePage ${pageId} EAApage${run}`);
 
-    // Unsigned or wrongly signed calls never start anything.
     await request(server())
-      .post('/api/webhooks/messenger')
-      .send(customerMessage('m_unsigned'))
+      .post(path)
+      .send(customerMessage('m_unsigned', 'hi'))
       .expect(401);
 
-    const res = await postSigned(customerMessage(`m_${Date.now()}`)).expect(
-      200,
+    const priceRun = await postSigned(
+      path,
+      customerMessage(`m_${run}_1`, 'Cho xin BẢNG GIA'),
+    ).expect(200);
+    expect(priceRun.body.data.started).toHaveLength(2);
+    const greetRun = await postSigned(
+      path,
+      customerMessage(`m_${run}_2`, 'Xin chào'),
+    ).expect(200);
+    expect(greetRun.body.data.started).toHaveLength(1);
+
+    const executions = await Promise.all(
+      [...priceRun.body.data.started, ...greetRun.body.data.started].map(
+        (id: string) => finished(id),
+      ),
     );
-    expect(res.body.data.started).toHaveLength(1);
-    const execution = await finished(res.body.data.started[0] as string);
+    for (const execution of executions) {
+      expect(execution.status).toBe('SUCCESS');
+      expect(execution.nodeLogs.map((log) => log.nodeKey)).toEqual([
+        'messenger.trigger',
+        'messenger.sendMessage',
+      ]);
+    }
+    // Runs are processed in parallel: order is not fixed.
+    expect(graph.sent).toHaveLength(3);
+    expect(graph.sent).toEqual(
+      expect.arrayContaining([
+        {
+          pageAccessToken: `EAApage${run}`,
+          recipientId: 'customer-42',
+          text: 'Bảng giá ở đây ạ',
+        },
+        {
+          pageAccessToken: `EAApage${run}`,
+          recipientId: 'customer-42',
+          text: 'Cảm ơn bạn đã nhắn: Cho xin BẢNG GIA',
+        },
+        {
+          pageAccessToken: `EAApage${run}`,
+          recipientId: 'customer-42',
+          text: 'Cảm ơn bạn đã nhắn: Xin chào',
+        },
+      ]),
+    );
 
-    expect(execution.status).toBe('SUCCESS');
-    expect(execution.triggerType).toBe('WEBHOOK');
-    expect(execution.nodeLogs.map((log) => log.nodeKey)).toEqual([
-      'trigger.messenger.message',
-      'integration.messenger.send',
-    ]);
-    expect(messenger.sent).toEqual([
-      {
-        pageAccessToken: 'EAAe2etokenvalue',
-        recipientId: 'customer-42',
-        text: 'Cảm ơn bạn, shop trả lời ngay: Shop ơi còn size M không?',
-      },
-    ]);
-
-    // Meta re-delivering the same message, or echoing the Page reply,
-    // does not start another run.
-    const sameMid = customerMessage('m_repeat');
-    await postSigned(sameMid).expect(200);
-    const repeat = await postSigned(sameMid).expect(200);
+    // Re-delivery and the Page's own echo start nothing.
+    const repeat = await postSigned(
+      path,
+      customerMessage(`m_${run}_2`, 'Xin chào'),
+    ).expect(200);
     expect(repeat.body.data).toEqual({ started: [], ignored: 1 });
     const echo = await postSigned(
-      customerMessage('m_echo', { is_echo: true }),
+      path,
+      customerMessage(`m_${run}_echo`, 'bot', { is_echo: true }),
     ).expect(200);
     expect(echo.body.data).toEqual({ started: [], ignored: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // A second workflow cannot take the same Page.
-    const rival = await createWorkflow('Rival bot e2e', credentialId);
-    const blocked = await request(server())
-      .post(`/api/workflows/${rival}/versions`)
+    // The subscription is removed with the last active workflow.
+    await request(server())
+      .post(`/api/workflows/${everything}/deactivate`)
+      .expect(200);
+    expect(graph.appSubscriptions.has(appId)).toBe(true);
+    await request(server())
+      .post(`/api/workflows/${prices}/deactivate`)
+      .expect(200);
+    expect(graph.appSubscriptions.has(appId)).toBe(false);
+    expect(graph.calls).toContain(`unsubscribePage ${pageId}`);
+  });
+
+  it('stays off with the reason when Meta refuses the subscription', async () => {
+    const credentialId = await createCredential(
+      'Broken app',
+      `${appId}-b`,
+      'secret-b',
+    );
+    await connect(credentialId);
+    const workflowId = await chatWorkflow(
+      'Refused bot e2e',
+      credentialId,
+      '',
+      'x',
+    );
+    graph.subscribeFailure = new Error('(#100) Invalid callback URL');
+
+    const refused = await request(server())
+      .post(`/api/workflows/${workflowId}/activate`)
       .expect(400);
-    expect(blocked.body.issues).toEqual([
-      expect.objectContaining({
-        code: 'CHANNEL_ALREADY_BOUND',
-        nodeId: 'chat',
-      }),
-    ]);
-    expect(blocked.body.issues[0].message).toContain('Messenger bot e2e');
+    expect(refused.body.message).toBe(
+      '"Messenger Trigger": (#100) Invalid callback URL',
+    );
+    const state = await request(server())
+      .get(`/api/workflows/${workflowId}/activation`)
+      .expect(200);
+    expect(state.body.data.active).toBe(false);
+    expect(await prisma.workflowTrigger.count({ where: { workflowId } })).toBe(
+      0,
+    );
   });
 });

@@ -13,6 +13,8 @@ import {
 } from '../utils/node-config';
 import { ConfigField } from './config-fields/ConfigField';
 import { WebhookUrlField } from './config-fields/WebhookUrlField';
+import { TestEventPanel } from './TestEventPanel';
+import { triggerService } from '../services/trigger.service';
 
 interface PropertiesPanelProps {
   workflowId: string;
@@ -32,6 +34,7 @@ export function PropertiesPanel({
 }: PropertiesPanelProps) {
   const selectedNodeId = useDesignerStore((state) => state.selectedNodeId);
   const nodeTypes = useDesignerStore((state) => state.nodeTypes);
+  const isSaving = useDesignerStore((state) => state.isSaving);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
   const nodeType = selectedNode ? nodeTypes.find((t) => t.key === selectedNode.data?.key) : null;
@@ -110,9 +113,10 @@ export function PropertiesPanel({
   const fields = orderedProperties(nodeType.configSchema).filter(
     ([key]) => key !== 'input_schema' && key !== 'output_schema',
   );
-  const showsWebhookUrl =
-    (nodeType.configSchema as { 'x-display'?: unknown } | undefined)?.['x-display'] ===
-    'webhookUrl';
+  // Trigger nodes of integration packages receive events from outside.
+  const webhook = triggerService.webhookHint(nodeType.configSchema);
+  const required = nodeType.configSchema?.required;
+  const needsCredential = Array.isArray(required) && required.includes('credential_id');
 
   return (
     <aside className={PANEL_CLASS}>
@@ -138,20 +142,33 @@ export function PropertiesPanel({
       </div>
 
       <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">
-        {showsWebhookUrl && <WebhookUrlField workflowId={workflowId} nodeId={selectedNode.id} />}
-        {fields.length === 0 && !showsWebhookUrl && (
-          <div className="text-sm text-gray-500 italic">No configuration required.</div>
+        {webhook?.scope === 'node' && (
+          <WebhookUrlField workflowId={workflowId} nodeId={selectedNode.id} />
         )}
-        {fields.map(([key, schema]) => (
-          <ConfigField
-            key={key}
-            fieldKey={key}
-            schema={schema}
-            config={localConfig}
-            onChange={handleConfigChange}
-            onConnectOAuth={() => void handleConnect()}
+        {fields.length === 0 && !webhook ? (
+          <div className="text-sm text-gray-500 italic">No configuration required.</div>
+        ) : (
+          fields.map(([key, schema]) => (
+            <ConfigField
+              key={key}
+              nodeKey={nodeType.key}
+              fieldKey={key}
+              schema={schema}
+              config={localConfig}
+              needsCredential={needsCredential}
+              onChange={handleConfigChange}
+              onConnectOAuth={() => void handleConnect()}
+            />
+          ))
+        )}
+        {webhook && (
+          <TestEventPanel
+            key={selectedNode.id}
+            workflowId={workflowId}
+            nodeId={selectedNode.id}
+            draftSaving={isSaving}
           />
-        ))}
+        )}
       </div>
 
       <div className="p-4 border-t border-gray-200">

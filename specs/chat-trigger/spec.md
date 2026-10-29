@@ -1,192 +1,158 @@
-# Feature Specification: Chat Trigger (Messenger & Zalo OA)
+# Feature Specification: Integration Packages & App Triggers (kiểu n8n)
 
-> **Phụ thuộc:** spec `execution-item-model` (item, biểu thức, paired item) và `llm-node` (đã hoàn tất). Spec này mở rộng engine từ "chỉ chạy tay" sang "chạy khi có sự kiện từ bên ngoài".
+> **Phụ thuộc:** `execution-item-model`, `llm-node` (đã xong).
+> **Thay thế** hai bản trước: (1) node cứng `trigger.webhook` / `trigger.messenger.message` / `integration.messenger.send`; (2) node chung `trigger.app` + node "Reply" thần kỳ + Meta App cấu hình trong `.env`. Bản (2) bị loại vì người dùng không tự cấu hình được trong giao diện và không giống cách n8n làm: app nào cũng đi qua một khuôn node chung, credential nhập trên UI, workflow có công tắc **Active** và tự đăng ký webhook.
 
-## 1. Bối cảnh & Vấn đề (Context & Problem Statement)
+## 1. Bối cảnh & Vấn đề
 
-Hiện tại mọi workflow chỉ bắt đầu bằng `trigger.manual`: người dùng bấm **Run** trên trang version, request HTTP chạy đồng bộ đến khi xong. Không có cách nào để workflow **tự chạy khi khách hàng nhắn tin** vào Facebook Page hoặc Zalo Official Account (OA) — trong khi đây là kênh chăm sóc khách hàng chính của doanh nghiệp nhỏ ở Việt Nam.
+Workflow cần **tự chạy khi có sự kiện từ ứng dụng bên ngoài** (hệ thống khác gọi webhook, khách nhắn Facebook Page; sau này Zalo, Telegram, Shopify…) và **gửi dữ liệu lại** cho app đó.
 
-**Giải pháp thống nhất:** thêm **trigger nhận sự kiện từ bên ngoài** và **node gửi tin nhắn** cho hai kênh chat, xây trên một nền chung là **webhook + chạy execution nền**.
+Những gì người dùng (developer / người vận hành tự host) cần, theo mô hình n8n:
+1. **Tự cấu hình mọi thứ trong UI.** Không có bước "sửa `.env` rồi khởi động lại server" cho từng app. Ai có Meta App của riêng mình thì nhập App ID / App Secret vào credential, bấm Connect là xong.
+2. **Mỗi app là một bộ node riêng** (Messenger Trigger, Messenger Send Message…) nhưng dựng trên **một khung chung**: thêm app không phải sửa core, seed hay giao diện.
+3. **Bật/tắt workflow bằng công tắc Active.** Bật thì FlowPilot tự đăng ký webhook với app bên ngoài; tắt thì tự gỡ. Publish không còn ngầm bật lắng nghe.
+4. **Thử bằng sự kiện thật trước khi bật:** bấm "Listen for test event", nhắn thử một tin, thấy ngay JSON nhận được để viết biểu thức cho node sau.
 
-- Trigger không biết workflow sẽ làm gì với tin nhắn — nó chỉ biến một tin nhắn đến thành **một item**.
-- Trả lời, phân loại, lưu vào Sheet, gọi LLM... đều do các node sau quyết định.
+## 2. Giải pháp
 
-### Ví dụ sử dụng
+| Thành phần | Mô tả |
+|---|---|
+| **Integration package** | `libs/apps/src/<app>`: khai báo **credential type**, **trigger node** (field + vòng đời webhook `checkExists` / `create` / `delete` / `handle`) và **action node** (field + `execute`). Thêm app = thêm package + một dòng trong danh sách package. |
+| **Đồng bộ catalog khi khởi động** | Node type và credential type của các package được upsert vào `node_type_definitions` / `connectors` lúc server khởi động. Không sửa seed cho từng app. |
+| **Credential type + OAuth2 chung** | Form credential sinh từ khai báo field. Credential OAuth2: người dùng nhập App ID / App Secret của mình, form hiện **OAuth Redirect URL** để copy, bấm **Connect** mở pop-up; callback chung `GET /api/oauth2/callback` lưu token vào chính credential đó. |
+| **Webhook endpoint riêng** | Mỗi trigger có URL `/api/webhooks/<id>`. Phạm vi do package quyết: **theo node** (Webhook) hoặc **theo credential** (Messenger: một Meta App = một callback URL). URL không đổi qua các lần publish. |
+| **Công tắc Active** | `POST /api/workflows/:id/activate` / `deactivate`. Chỉ workflow đang Active nhận sự kiện, và chỉ bằng version publish hiện hành. |
+| **Dynamic options** | `POST /api/node-types/:key/options/:property` (kiểu `loadOptions` của n8n), vd. danh sách Page của credential Facebook. |
+| **Listen for test event** | Từ trigger node trong editor: chờ tối đa 2 phút một sự kiện thật theo cấu hình **bản nháp**, hiện JSON, không tạo execution. |
 
-**(a) Chatbot trả lời bằng AI**
+Package v1: **Webhook** và **Facebook Messenger**. Node cũ `trigger.app`, `chat.reply` bị thay.
+
+### Ví dụ
+
+**(a) Chatbot AI cho Page**
 ```
-Messenger Trigger → LLM → Messenger Send
-```
-- LLM `prompt`: `Bạn là nhân viên CSKH shop ABC. Trả lời ngắn gọn: {{$json.text}}`
-- Messenger Send `recipient_id`: `{{$node["Messenger Trigger"].json.sender_id}}`, `text`: `{{$json.text}}`
-
-**(b) Lọc tin khẩn rồi báo qua email**
-```
-Zalo Trigger → LLM (json) → Filter → Gmail
-```
-- LLM phân loại `{"label": "urgent" | "normal"}`, Filter `data.label = urgent`, Gmail gửi cho quản lý.
-
-**(c) Tự động trả lời cố định**
-```
-Zalo Trigger → Zalo Send
-```
-- Zalo Send `text`: `Cảm ơn bạn đã nhắn tin, shop sẽ phản hồi trong 30 phút.`
-
-**(d) Webhook chung (nền tảng cho mọi tích hợp sau này)**
-```
-Webhook Trigger → Google Sheet Append → ...
-```
-- Hệ thống bất kỳ POST JSON vào URL riêng của workflow.
-
----
-
-## 2. Hiện trạng hệ thống & Phân tích khoảng trống (Current State & Gap Analysis)
-
-### 2.1. Cơ sở dữ liệu (Prisma)
-- **Đã có:**
-  - Enum `TriggerType { SCHEDULE, WEBHOOK, MANUAL }`, cột `executions.trigger_type`.
-  - `executions.triggered_by_id` nullable (chú thích: "null với schedule/webhook").
-  - `executions.context Json?` — chưa dùng.
-  - `connectors` + `connector_credentials.encrypted_secret` (AES-256-GCM).
-- **Thiếu:**
-  - ❌ Bảng ánh xạ **"kênh bên ngoài → workflow đang lắng nghe"** (Page ID / OA ID / token webhook → workflow version).
-  - ❌ Seed connector `messenger`, `zalo_oa` và các node trigger / send.
-
-### 2.2. Backend
-- **Đã có:** `StartExecutionHandler` chạy cả workflow trong một request; `PrismaExecutionRepository.createExecution` luôn ghi `triggerType: 'MANUAL'`; Redis (`ioredis`) đã cấu hình cho module auth; file rỗng `infrastructure/queue/execution-queue.module.ts`, `execution.processor.ts` (chỗ dành sẵn cho hàng đợi).
-- **Thiếu:**
-  - ❌ **Chạy execution nền**: webhook của Meta/Zalo phải được trả `200` trong vài giây, nhưng workflow có LLM có thể chạy tới hàng chục giây.
-  - ❌ Execution không có người bấm (`actorId`) — credential phải lấy theo **chủ workflow**.
-  - ❌ Trigger nhận **dữ liệu đầu vào** (hiện `ManualTriggerExecutor` luôn trả `[{ json: {} }]`).
-  - ❌ Endpoint public nhận webhook, xác thực chữ ký, chống xử lý trùng.
-  - ❌ Đăng ký / huỷ lắng nghe khi publish version mới.
-  - ❌ Client gọi API Messenger (Graph API) và Zalo OA (Open API), làm mới access token Zalo.
-  - ❌ `NestFactory` chưa bật `rawBody` (cần để kiểm chữ ký HMAC trên body gốc).
-
-### 2.3. Frontend (`frontend/src/features/workflow`)
-- **Đã có:** palette theo category, `PropertiesPanel` render từ `configSchema`, `CredentialPicker` theo `x-connectorKeyFrom`, `AddApiKeyDialog` (chỉ 1 field `api_key`).
-- **Thiếu:**
-  - ❌ Hiển thị **URL webhook** (chỉ đọc, nút copy) trên node trigger sau khi publish.
-  - ❌ Dialog tạo credential **nhiều field** (Page ID + Page Access Token; OA ID + access token + refresh token) — sinh form từ `connectors.config_schema`.
-  - ❌ Trang version / execution hiện cột **nguồn chạy** (Manual / Webhook / Messenger / Zalo).
-  - ❌ Nút **Run** phải ẩn hoặc đổi nghĩa khi trigger không phải manual.
-
----
-
-## 3. Phạm vi (Scope)
-
-### Trong phạm vi (In-Scope)
-- **Nền tảng:** hàng đợi execution (BullMQ trên Redis sẵn có); execution `triggerType = WEBHOOK`; trigger nhận item đầu vào; bảng `workflow_triggers`; đồng bộ khi publish.
-- **Webhook chung:** node `trigger.webhook` — URL bí mật riêng cho từng workflow, nhận `POST` JSON.
-- **Messenger:** node `trigger.messenger.message` (tin nhắn văn bản và tệp đính kèm dạng URL), node `integration.messenger.send` (gửi văn bản).
-- **Zalo OA:** node `trigger.zalo.message` (sự kiện người dùng gửi tin văn bản), node `integration.zalo.send` (tin tư vấn dạng văn bản), tự làm mới access token.
-- Xác thực chữ ký webhook của cả hai nền tảng; chống trùng sự kiện.
-- Credential dạng nhiều field, nhập tay (người dùng dán token lấy từ trang quản trị của Meta / Zalo).
-
-### Ngoài phạm vi (Out-of-Scope)
-- **Kết nối Page/OA bằng nút "Đăng nhập Facebook / Zalo" (OAuth đầy đủ)** — v1 dán token tay; OAuth là bước sau.
-- Tin nhắn có nút bấm, quick reply, template, carousel, gửi ảnh / file.
-- Gửi tin chủ động ngoài cửa sổ hội thoại (Messenger message tags, Zalo tin truyền thông / ZNS).
-- Hội thoại nhiều lượt có trí nhớ (lưu lịch sử chat theo người dùng).
-- Instagram, WhatsApp, Telegram, Zalo cá nhân (Zalo cá nhân **không có API chính thức**).
-- Trigger theo lịch (`SCHEDULE`) — dùng chung hàng đợi nhưng là spec riêng.
-- Màn hình theo dõi hàng đợi, retry tay execution thất bại.
-
----
-
-## 4. Luồng trải nghiệm người dùng (UI/UX Flow)
-
-```mermaid
-flowchart TD
-    A["Kéo 'Messenger Trigger' vào canvas"] --> B{"Đã có credential Page?"}
-    B -- "Chưa" --> C["'+ Kết nối Page' → nhập Page ID + Page Access Token"]
-    C --> D["Chọn credential"]
-    B -- "Có" --> D
-    D --> E["Thêm LLM → Messenger Send, nối cạnh"]
-    E --> F["Publish"]
-    F --> G["Hệ thống đăng ký lắng nghe Page"]
-    G --> H["Khách nhắn tin vào Page"]
-    H --> I["Workflow tự chạy nền"]
-    I --> J["Xem log ở trang version (nguồn: Messenger)"]
+Messenger Trigger (Page "Shop ABC")
+  → LLM (prompt: {{$json.text}})
+  → Messenger Send Message (Page "Shop ABC",
+       Recipient ID: {{$node["Messenger Trigger"].json.sender_id}},
+       Text: {{$json.text}})
 ```
 
-### Form cấu hình node
-
-| Node | Field | Control | Ghi chú |
-|---|---|---|---|
-| Webhook Trigger | Webhook URL | Chỉ đọc + Copy | Có sau lần publish đầu; trước đó hiện "Publish để lấy URL" |
-| Messenger Trigger | Page | Credential picker (`messenger`) | Bắt buộc |
-| Messenger Send | Page | Credential picker (`messenger`) | Bắt buộc |
-| | Recipient ID | Text `fx` | Mặc định `{{$json.sender_id}}` |
-| | Text | Textarea `fx` | Bắt buộc, tối đa 2000 ký tự |
-| Zalo Trigger | Official Account | Credential picker (`zalo_oa`) | Bắt buộc |
-| Zalo Send | Official Account | Credential picker (`zalo_oa`) | Bắt buộc |
-| | User ID | Text `fx` | Mặc định `{{$json.sender_id}}` |
-| | Text | Textarea `fx` | Bắt buộc |
-
-### Item do trigger sinh ra (thống nhất giữa các kênh)
-```json
-{
-  "channel": "messenger",
-  "message_id": "m_abc...",
-  "sender_id": "6543210987654321",
-  "recipient_id": "112233445566",
-  "text": "Shop ơi còn size M không?",
-  "attachments": [],
-  "timestamp": "2026-10-29T08:15:00.000Z",
-  "raw": { }
-}
+**(b) Flow riêng cho từ khoá, chạy song song với (a)**
 ```
-`raw` giữ nguyên payload gốc để người dùng dùng các field chưa được chuẩn hoá.
+Messenger Trigger (Page "Shop ABC", Keywords: "giá, bảng giá") → Messenger Send Message ("Bảng giá: https://…")
+```
+Khách nhắn "cho mình xin bảng giá" → **cả (a) và (b) đều chạy** (như n8n: mọi trigger khớp đều chạy). Muốn (a) không trả lời câu hỏi giá thì thêm Filter vào (a). Bộ lọc từ khoá chỉ để bỏ qua tin không liên quan.
 
----
+**(c) Webhook**
+```
+Webhook (POST https://flow.example.com/api/webhooks/9b1c…) → Filter → Gmail
+```
 
-## 5. Đặc tả API (API Specification)
+## 3. Hiện trạng & Khoảng trống
 
-### 5.1. Webhook chung
-- `POST /api/webhooks/w/:token` — public, không JWT. `token` là chuỗi ngẫu nhiên 32 byte gắn với trigger.
-- Body JSON bất kỳ (tối đa 1 MB) → 1 item `{ body, headers (đã lọc), query, received_at }`.
-- Response `202 Accepted` `{ "executionId": "..." }`; `404` token không tồn tại hoặc workflow không còn lắng nghe.
+- **Giữ lại:** hàng đợi BullMQ + `WorkflowEngine`, execution `WEBHOOK` chạy nền, dedup Redis, kiểm chữ ký Meta (HMAC trên body gốc), gửi tin Graph API + map lỗi Graph, credential nhiều field mã hoá, OAuth state Redis dùng một lần, `CheckPublishTriggersQuery`.
+- **Phải đổi:** `AppDefinition` → `IntegrationPackage`; cổng `/api/webhooks/:app/:token?` → `/api/webhooks/:id`; node `trigger.app` + `chat.reply` → node riêng từng package; định tuyến độc quyền theo từ khoá + `TRIGGER_CONFLICT` → mọi trigger khớp đều chạy; listener sinh ra khi publish → sinh ra khi **Active**; Meta OAuth đọc `.env` → OAuth2 chung với App ID / Secret trong credential.
+- **Chưa có:** cột `workflows.active`, bảng `webhook_endpoints`, đồng bộ catalog, OAuth2 chung, `loadOptions`, test event, công tắc Active trên UI.
 
-### 5.2. Messenger
-- `GET /api/webhooks/messenger` — Meta xác minh: kiểm `hub.mode = subscribe` và `hub.verify_token = META_VERIFY_TOKEN`, trả nguyên `hub.challenge`; sai → `403`.
-- `POST /api/webhooks/messenger` — kiểm `X-Hub-Signature-256` (HMAC-SHA256 của body gốc với `META_APP_SECRET`); sai → `401`. Hợp lệ → luôn `200` ngay, xử lý nền.
+## 4. Phạm vi
 
-### 5.3. Zalo OA
-- `POST /api/webhooks/zalo` — kiểm chữ ký header `X-ZEvent-Signature` theo tài liệu Zalo (khoá bí mật OA); sai → `401`. Hợp lệ → `200` ngay, xử lý nền.
+### Trong phạm vi
+- Khung package trong `libs/apps` + registry; đồng bộ catalog khi khởi động.
+- Credential type: form sinh từ field; OAuth2 chung (authorize, callback, lưu token vào credential, Reconnect).
+- Webhook endpoint theo node / theo credential; ingress chung `GET|POST /api/webhooks/:id`; dedup.
+- Activate / Deactivate; publish khi đang Active chuyển listener sang version mới; đăng ký lỗi thì workflow tắt và báo lỗi.
+- `loadOptions`; Listen for test event.
+- Package **Webhook**: node `webhook.trigger`, URL riêng mỗi node, dedup theo `Idempotency-Key`.
+- Package **Facebook Messenger**: credential `facebookMessengerOAuth2`, node `messenger.trigger` (Page + Keywords tuỳ chọn), node `messenger.sendMessage` (Page, Recipient ID, Text).
+- Gỡ `trigger.app`, `chat.reply`, connector `messenger` cũ, Meta OAuth theo `.env`.
 
-### 5.4. Credential nhiều field
-- `POST /api/connectors/:connectorKey/credentials` mở rộng: body `{ name, secret: { ... } }` validate theo `connectors.config_schema`; giữ tương thích body cũ `{ name, api_key }`.
-- Không trả secret ra ngoài (giữ nguyên quy tắc hiện có).
+### Ngoài phạm vi
+- Panel kéo-thả Input/Output để map dữ liệu.
+- Chuyển node có sẵn (Google Sheet, Gmail, Filter, LLM, Aggregate) vào package.
+- Zalo OA, Telegram (package tiếp theo, cùng khuôn).
+- URL test riêng (`/webhook-test/` như n8n), "Respond to webhook", tin nhắn ảnh / nút / template.
+- App Review của Meta (việc của người sở hữu Meta App khi mở cho người ngoài).
 
-### 5.5. Trạng thái trigger
-- `GET /api/workflows/:id/triggers` → `{ triggerKey, nodeId, webhookUrl?, externalId?, isActive }[]` cho version đang chạy.
+## 5. Trải nghiệm người dùng
 
----
+### Credential "Facebook Messenger account" (OAuth2)
 
-## 6. Quy tắc nghiệp vụ (Business Rules)
+| Field | Ghi chú |
+|---|---|
+| Name | Nhãn hiển thị |
+| App ID, App Secret | Lấy trong Meta App của người dùng (App Secret ẩn) |
+| OAuth Redirect URL | Chỉ đọc + Copy (`{PUBLIC_BASE_URL}/api/oauth2/callback`), dán vào *Facebook Login → Valid OAuth Redirect URIs* |
 
-1. **Chỉ version hiện hành nhận sự kiện.** Khi publish version mới, trigger của version cũ bị tắt và trigger của version mới được bật trong cùng transaction với việc đổi `currentVersionId`.
-2. **Một Page / OA chỉ thuộc về một workflow đang chạy.** Publish workflow thứ hai dùng cùng Page/OA → lỗi validate `CHANNEL_ALREADY_BOUND` kèm tên workflow đang giữ.
-3. **Một tin nhắn = một execution.** Meta có thể gửi nhiều tin trong một request → tách thành nhiều execution.
-4. **Chống trùng:** cùng `channel + message_id` chỉ tạo execution một lần trong 24 giờ.
-5. **Bỏ qua sự kiện không phải tin nhắn của khách:** echo (tin do chính Page gửi), delivery, read, reaction, sự kiện follow. Tránh vòng lặp bot tự trả lời chính nó.
-6. **Credential lấy theo chủ workflow** (execution không có người bấm, `triggered_by_id = null`).
-7. **Không bao giờ ghi token / app secret vào log**; mở rộng `sanitizeErrorText` cho token Meta (`EAA...`) và token Zalo.
-8. **Trả lời webhook trước, chạy sau.** Không có thao tác nào gọi ra ngoài trong request webhook.
-9. Messenger chỉ cho gửi tin trong **24 giờ** kể từ tin nhắn cuối của khách; Zalo có giới hạn tương tự cho tin tư vấn. Gửi ngoài cửa sổ → node lỗi với thông báo rõ ràng, không retry.
+Nút **Save & connect** → lưu credential → pop-up Facebook → chọn Page → cho phép → pop-up đóng, credential được chọn trong node. Credential đã có: nút **Reconnect** (cấp thêm Page, làm mới token).
 
----
+### Webhook (node)
+- Ô **Webhook URL** chỉ đọc + Copy, có ngay khi thêm node (không cần publish). URL chỉ nhận sự kiện khi workflow Active, hoặc trong lúc Listen for test event.
 
-## 7. Tiêu chí chấp nhận (Acceptance Criteria)
+### Messenger Trigger (node)
+| Field | Control |
+|---|---|
+| Credential | Picker credential `facebookMessengerOAuth2` + thêm mới |
+| Page | Select, options tải từ credential (`loadOptions`) |
+| Keywords | Text, tuỳ chọn, phân tách bằng dấu phẩy. Trống = mọi tin |
 
-- Workflow `Webhook Trigger → Gmail` chạy khi `curl -X POST` vào URL webhook; execution có `trigger_type = WEBHOOK`, `triggered_by_id = null`.
-- Request webhook trả về dưới 1 giây kể cả khi workflow có node LLM.
-- Request Messenger / Zalo sai chữ ký bị từ chối, không tạo execution.
-- Gửi lại cùng một payload hai lần chỉ tạo một execution.
-- Tin echo của Page không kích hoạt workflow.
-- Publish version mới → sự kiện tiếp theo chạy version mới; version cũ không còn nhận.
-- Publish workflow thứ hai cùng Page → lỗi `CHANNEL_ALREADY_BOUND`.
-- Ví dụ (a) chạy thật với một Facebook Page thử nghiệm: nhắn tin → nhận câu trả lời từ LLM.
-- Ví dụ (c) chạy thật với một Zalo OA thử nghiệm.
-- Workflow `trigger.manual` cũ vẫn chạy đồng bộ như trước (hồi quy).
+### Messenger Send Message (node)
+| Field | Control |
+|---|---|
+| Credential, Page | Như trên |
+| Recipient ID | Biểu thức, mặc định `{{$node["Messenger Trigger"].json.sender_id}}` |
+| Text | Biểu thức, nhiều dòng |
+
+### Listen for test event (mọi trigger node có webhook)
+- Nút **Listen for test event** → "Waiting for an event…" kèm đếm ngược, nút **Stop**.
+- Có sự kiện → hiện JSON nhận được. Hết 2 phút → "No event received".
+- Dùng cấu hình **bản nháp** (chưa cần publish), không tạo execution.
+
+### Công tắc Active (header Designer)
+- Bật: cần đã publish. Lỗi (chưa publish, credential chưa kết nối, Meta từ chối đăng ký…) → công tắc giữ Tắt, hiện thông báo lỗi.
+- Đang Active mà Publish → listener chuyển sang version mới; nếu đăng ký thất bại, workflow tự tắt và màn hình publish báo lý do.
+- Danh sách workflow hiện nhãn **Active**.
+
+## 6. API
+
+| Endpoint | Auth | Mô tả |
+|---|---|---|
+| `GET /api/node-types` | — | (đã có) gồm cả node của package |
+| `GET /api/connectors` | JWT | (đã có) gồm credential type của package; OAuth2 kèm `oauth2.redirectUrl` |
+| `POST /api/connectors/:key/credentials` | JWT | (đã có) lưu field credential, cho cả credential type OAuth2 của package |
+| `GET /api/oauth2/auth?credentialId=` | JWT (chủ credential) | `{ url }` authorize cho pop-up |
+| `GET /api/oauth2/callback?code&state` | state | Đổi code lấy token, lưu vào credential; trang pop-up `postMessage` rồi đóng |
+| `POST /api/node-types/:key/options/:property` | JWT | `{ credentialId }` → `[{ value, label }]` |
+| `GET /api/workflows/:id/webhooks` | JWT (chủ) | URL webhook của các trigger theo node trong bản nháp (tạo endpoint nếu chưa có) |
+| `GET /api/workflows/:id/activation` | JWT (chủ) | `{ active, versionId }` |
+| `POST /api/workflows/:id/activate` | JWT (chủ) | Bật; `400 { message }` nếu không bật được |
+| `POST /api/workflows/:id/deactivate` | JWT (chủ) | Tắt |
+| `POST /api/workflows/:id/nodes/:nodeId/test-listen` | JWT (chủ) | `{ listenId, expiresAt }` |
+| `GET /api/test-events/:listenId` | JWT (người tạo) | `{ status: waiting \| received \| expired, event?, expiresAt }` |
+| `DELETE /api/test-events/:listenId` | JWT (người tạo) | Dừng chờ |
+| `GET \| POST /api/webhooks/:id` | do package (chữ ký / URL bí mật) | Nhận sự kiện. Mã trả về do package: Webhook `202 { started, ignored }`, Messenger `200`; sai chữ ký `401`; endpoint theo node không ai nghe `404` |
+| `POST /api/workflows/:id/versions` | JWT | (đã có) kèm `activation: { active, error? }` khi workflow đang Active |
+
+## 7. Quy tắc nghiệp vụ
+
+1. **Chỉ workflow Active nhận sự kiện**, bằng version publish hiện hành. Publish không tự bật.
+2. **Bật thất bại thì không bật gì cả:** không ghi listener, endpoint vừa đăng ký trong lần đó được gỡ lại.
+3. **Mọi listener khớp đều chạy** (mỗi listener một execution). Messenger Trigger khớp khi đúng Page và (không có từ khoá, hoặc nội dung chứa một từ khoá). So khớp không phân biệt hoa thường, dấu tiếng Việt, khoảng trắng thừa.
+4. **Phạm vi endpoint:** Webhook — một URL cho mỗi node (giữ qua publish, deactivate/activate). Messenger — một URL cho mỗi credential (một Meta App chỉ có một callback cho object `page`). Endpoint chỉ bị gỡ đăng ký khi không còn listener nào.
+5. **Bí mật lấy từ credential / endpoint, không từ `.env`:** App Secret (kiểm chữ ký, app access token) nằm trong credential; verify token sinh ngẫu nhiên khi tạo endpoint và lưu trong dữ liệu endpoint. `.env` chỉ còn `PUBLIC_BASE_URL`.
+6. **Chống trùng:** cùng endpoint + id sự kiện chỉ xử lý một lần trong 24 giờ (Webhook: header `Idempotency-Key`; Messenger: `mid`).
+7. Bỏ qua echo (tin Page tự gửi, gồm cả tin bot trả lời), delivery, read.
+8. **Credential theo chủ workflow:** node chỉ dùng được credential của chủ workflow và đúng credential type; endpoint theo credential thuộc về chủ credential.
+9. **Test event** không tạo execution, chỉ nhận sự kiện khớp đầu tiên, hết hạn sau 120 giây; endpoint được đăng ký tạm cho lần thử sẽ được gỡ khi hết hạn nếu không có listener thật.
+10. Token, secret không vào log; Messenger chỉ cho trả lời trong 24 giờ kể từ tin cuối của khách (lỗi rõ, không thử lại).
+
+## 8. Tiêu chí chấp nhận
+
+- Thêm package mới chỉ cần thư mục `libs/apps/src/<app>` + một dòng đăng ký (kiểm bằng cấu trúc: ingress, activation, catalog sync, UI không có nhánh theo tên app).
+- Khởi động server → node `webhook.trigger`, `messenger.trigger`, `messenger.sendMessage` và connector `facebookMessengerOAuth2` có trong catalog mà seed không nhắc tới.
+- Không còn biến `META_*` nào được đọc từ `.env`.
+- Webhook: URL có ngay trong editor; chưa Active → `404`; Activate → `POST` trả `202`, execution chạy nền; publish lại giữ URL.
+- Messenger: tạo credential bằng App ID / Secret, Connect (Graph giả) lưu token + Page; `loadOptions` trả danh sách Page; Activate gọi `POST /{app-id}/subscriptions` và `POST /{page-id}/subscribed_apps`; handshake đúng verify token → `200`; tin có chữ ký đúng chạy **mọi** workflow khớp; Send Message gửi bằng Page token.
+- Activate thất bại (Graph trả lỗi) → `400`, workflow vẫn tắt, không có listener.
+- Deactivate listener cuối của endpoint → gọi `delete` (gỡ subscription).
+- Listen for test event nhận JSON của tin thử, không tạo execution.

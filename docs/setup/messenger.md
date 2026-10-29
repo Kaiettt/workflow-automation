@@ -1,114 +1,82 @@
-# Kết nối Facebook Messenger
+# Facebook Messenger: cài đặt và dùng thử
 
-Hướng dẫn để workflow tự chạy khi khách nhắn tin vào Facebook Page, và trả lời lại trên Messenger.
+Mọi thứ cấu hình trong giao diện FlowPilot, giống n8n: bạn dùng **Meta App của chính mình**, nhập App ID / App Secret vào credential, bấm Connect, rồi bật công tắc **Active**. FlowPilot tự đăng ký webhook với Meta. Server chỉ cần biết địa chỉ public của nó (`PUBLIC_BASE_URL`).
 
-> Spec: `specs/chat-trigger/`. Các bước ở mục 1–3 phải do **chủ tài khoản Facebook** tự làm.
+> Spec: `specs/chat-trigger/`.
 
-## Tổng quan
+## 1. Server: địa chỉ public (một lần)
 
-```
-Khách nhắn tin vào Page
-  → Meta gọi POST {PUBLIC_BASE_URL}/api/webhooks/messenger (có chữ ký)
-  → FlowPilot tìm workflow đang lắng nghe Page đó, chạy nền
-  → Node "Send Messenger Message" trả lời qua Graph API bằng Page Access Token
-```
-
-Cần 3 giá trị:
-
-| Giá trị | Lấy ở đâu | Điền vào |
-|---|---|---|
-| App Secret | Meta App → App settings → Basic | `META_APP_SECRET` trong `monolith-backend/.env` |
-| Verify token | Tự đặt một chuỗi bất kỳ | `META_VERIFY_TOKEN` trong `.env` **và** ô Verify token trên Meta |
-| Page ID + Page Access Token | Meta App → Messenger → API Setup | Form "Connect Facebook Messenger" trong FlowPilot |
-
-## 1. Chuẩn bị Page và App
-
-1. Tạo một **Facebook Page riêng để thử** (không dùng Page thật của shop).
-2. Vào <https://developers.facebook.com>, đăng ký tài khoản developer nếu chưa có.
-3. **Create App** → chọn loại **Business** (hoặc use case "Engage with customers on Messenger").
-4. Trong App, thêm sản phẩm **Messenger**.
-5. **App settings → Basic** → bấm Show ở **App Secret** → copy vào `.env`:
-   ```
-   META_APP_SECRET=...
-   META_VERIFY_TOKEN=mot-chuoi-tu-dat
-   META_GRAPH_VERSION=v23.0
-   ```
-   `META_GRAPH_VERSION`: dùng version API đang hiển thị trên dashboard của App.
-
-## 2. Mở URL public cho backend
-
-Meta chỉ gọi được URL HTTPS public. Khi dev trên máy:
+Meta chỉ gọi được HTTPS public. Khi dev:
 
 ```bash
 cloudflared tunnel --url http://localhost:8081
 ```
 
-Lệnh in ra một URL `https://<tên>.trycloudflare.com`. Đặt nó làm `PUBLIC_BASE_URL` trong `.env` rồi **khởi động lại backend**.
+→ URL `https://<tên>.trycloudflare.com` (đổi mỗi lần chạy lại; muốn cố định thì dùng named tunnel + tên miền riêng). Ghi vào `monolith-backend/.env` rồi khởi động lại backend:
 
-> URL `trycloudflare.com` đổi mỗi lần chạy lại lệnh → phải sửa lại Callback URL ở bước 3.
-
-## 3. Cấu hình webhook trên Meta
-
-Backend và tunnel phải **đang chạy**.
-
-1. **Messenger → Messenger API Settings (hoặc Webhooks)**:
-   - Callback URL: `{PUBLIC_BASE_URL}/api/webhooks/messenger`
-   - Verify token: đúng chuỗi `META_VERIFY_TOKEN`
-   - Bấm **Verify and save**. Nếu báo lỗi: kiểm tra backend đã đọc `.env` mới chưa (khởi động lại), và URL tunnel còn sống.
-2. Phần **Webhook fields**: bật **`messages`**. (Không cần `message_echoes`.)
-3. Phần **Generate access tokens**: liên kết Page → **Generate** → copy **Page Access Token**. Ghi lại **Page ID** hiển thị cạnh tên Page.
-4. Đảm bảo Page đã được **subscribe** vào App (nút Add Subscriptions / tick `messages` cho Page).
-
-### Chế độ Development
-
-Khi App chưa qua App Review, **chỉ người có vai trò trong App** (Admin / Developer / Tester) nhắn tin mới kích hoạt webhook. Vào **App roles → Roles** để thêm tài khoản Facebook dùng để thử làm Tester. Muốn khách thật dùng được thì phải gửi App Review xin quyền `pages_messaging` — không cần cho việc thử.
-
-## 4. Tạo workflow trong FlowPilot
-
-1. Kéo **Messenger Trigger** → chọn **Facebook Page** → **+ Add connection** → nhập tên, **Page ID**, **Page Access Token** → Save.
-2. Ví dụ chatbot AI: thêm **LLM** rồi **Send Messenger Message**, nối `Messenger Trigger → LLM → Send Messenger Message`.
-   - LLM `prompt`: `Bạn là nhân viên CSKH. Trả lời ngắn gọn: {{$json.text}}`
-   - Send `Facebook Page`: cùng connection; `Recipient ID`: `{{$node["Messenger Trigger"].json.sender_id}}`; `Text`: `{{$json.text}}`
-   - Nếu node Send đứng **ngay sau** trigger, giữ mặc định `{{$json.sender_id}}`.
-3. **Publish**. Mỗi Page chỉ gắn được với **một** workflow đang chạy; nếu Page đã dùng ở workflow khác, publish báo lỗi và nêu tên workflow đó.
-4. Dùng tài khoản Tester nhắn tin vào Page → nhận câu trả lời.
-
-Dữ liệu trigger đưa vào workflow (`$json`):
-
-```json
-{
-  "channel": "messenger",
-  "message_id": "m_...",
-  "sender_id": "id của khách (theo Page)",
-  "recipient_id": "Page ID",
-  "text": "nội dung tin nhắn",
-  "attachments": [{ "type": "image", "url": "https://..." }],
-  "timestamp": "2026-10-29T08:00:00.000Z",
-  "raw": { }
-}
+```
+PUBLIC_BASE_URL=https://<tên>.trycloudflare.com
 ```
 
-## 5. Thử không cần Facebook
+Không còn biến `META_*` nào trong `.env`.
 
-Gửi một tin nhắn giả có chữ ký đúng như Meta tới backend local:
+## 2. Meta App của bạn
 
-```bash
-node scripts/simulate-messenger-webhook.mjs --page <PAGE_ID> --text "Shop còn size M không?"
+1. <https://developers.facebook.com> → **Create App** → loại **Business** (hoặc use case "Engage with customers on Messenger").
+2. Thêm hai sản phẩm: **Facebook Login** và **Messenger**.
+3. **App settings → Basic**: copy **App ID** và **App Secret**.
+
+Không cần tự cấu hình Webhooks trong dashboard: FlowPilot đăng ký khi bạn bật workflow.
+
+## 3. Credential "Facebook Messenger account"
+
+1. Trong Designer, thêm node **Messenger Trigger** → **+ Add connection**.
+2. Nhập tên, **App ID**, **App Secret**.
+3. Copy **OAuth Redirect URL** trong form (`{PUBLIC_BASE_URL}/api/oauth2/callback`), dán vào Meta App: **Facebook Login → Settings → Valid OAuth Redirect URIs** → Save.
+4. Bấm **Save & connect** → đăng nhập Facebook, chọn các Page muốn dùng, cho phép quyền `pages_show_list`, `pages_messaging`, `pages_manage_metadata`.
+5. Pop-up đóng, credential được chọn. Thêm Page sau này: chọn credential → **Reconnect**.
+
+FlowPilot lưu token dài hạn của bạn và Page token (không hết hạn) đã mã hoá trong credential.
+
+## 4. Dựng workflow
+
+```
+Messenger Trigger (Page, Keywords tuỳ chọn)
+  → LLM (prompt: {{$json.text}})
+  → Messenger Send Message (Page, Recipient ID: {{$node["Messenger Trigger"].json.sender_id}}, Text: {{$json.text}})
 ```
 
-(chạy trong `monolith-backend`, cần `META_APP_SECRET` trong `.env`). Kết quả `{"started":["<executionId>"]}` nghĩa là workflow đã chạy. Node gửi trả lời sẽ **lỗi** vì `test-customer` không phải người thật trên Messenger — bình thường khi giả lập; kiểm tra kết quả trong bảng `executions` / `execution_node_logs` (`npx prisma studio`).
+- **Page**: chọn từ danh sách Page của credential (nút ↻ để tải lại).
+- **Keywords**: để trống = mọi tin. Có từ khoá = chỉ tin chứa một trong các từ (không phân biệt hoa thường, dấu).
+- Nhiều workflow cùng Page đều chạy nếu cùng khớp (như n8n). Muốn tách nhánh thì dùng Filter.
 
-## Giới hạn
+**Listen for test event**: bấm trong node Messenger Trigger, nhắn thử cho Page trong 2 phút → thấy JSON tin nhắn (`sender_id`, `text`, `page_id`…) để viết biểu thức. Không tạo execution. Dùng cấu hình bản nháp, chưa cần publish.
 
-- Chỉ trả lời được trong **24 giờ** kể từ tin nhắn cuối của khách (luật của Messenger). Ngoài cửa sổ, node báo lỗi rõ ràng.
-- Chỉ gửi văn bản, tối đa 2000 ký tự. Chưa có nút bấm, ảnh, template.
-- Tin nhắn trùng (Meta gửi lại) và tin do chính Page gửi (kể cả câu trả lời của bot) không kích hoạt workflow.
+## 5. Publish và bật
 
-## Xử lý sự cố
+1. **Publish** (publish không tự bật lắng nghe).
+2. Bật công tắc **Active** ở header Designer. FlowPilot:
+   - gọi `POST /{app-id}/subscriptions` (object `page`, field `messages`, callback `{PUBLIC_BASE_URL}/api/webhooks/<id>`, verify token sinh ngẫu nhiên). Meta gọi lại callback để kiểm verify token;
+   - gọi `POST /{page-id}/subscribed_apps` cho Page đã chọn.
+3. Lỗi (sai App Secret, chưa thêm Messenger, callback không truy cập được…) → công tắc giữ Tắt và hiện lý do Meta trả về.
+4. Đang Active mà Publish lại → tự chuyển sang version mới; nếu không chuyển được, workflow tự tắt và báo lý do.
+5. Tắt workflow cuối cùng dùng credential → FlowPilot gỡ subscription.
 
-| Triệu chứng | Kiểm tra |
+## 6. Thử thật
+
+- Khi App còn ở chế độ Development, chỉ tài khoản có vai trò trong App (Admin / Developer / Tester) nhắn tới Page mới được Meta gửi webhook.
+- Nhắn cho Page → xem execution trong trang Versions (Run UI) / danh sách execution.
+- Messenger chỉ cho trả lời trong 24 giờ kể từ tin cuối của khách.
+
+## 7. Khi mở cho người ngoài
+
+Gửi **App Review** cho `pages_messaging`, `pages_manage_metadata`, `pages_show_list` và chuyển App sang Live. Đây là việc của người sở hữu Meta App.
+
+## Sự cố thường gặp
+
+| Hiện tượng | Nguyên nhân / cách xử lý |
 |---|---|
-| Verify and save thất bại | Backend đang chạy, `META_VERIFY_TOKEN` khớp, URL tunnel đúng và còn sống |
-| Nhắn tin không có execution | Page đã subscribe field `messages`; người nhắn có vai trò trong App; workflow đã publish; log backend có `Invalid signature` → `META_APP_SECRET` sai |
-| Node gửi lỗi "Page Access Token is invalid" | Tạo lại token, thêm connection mới và chọn lại trong node |
-| Lỗi "within 24 hours" | Khách chưa nhắn trong 24 giờ qua |
+| Pop-up báo "redirect_uri is not whitelisted" | Chưa dán OAuth Redirect URL vào Valid OAuth Redirect URIs, hoặc `PUBLIC_BASE_URL` đổi (tunnel mới) |
+| Bật Active báo lỗi callback | `PUBLIC_BASE_URL` không truy cập được từ internet, hoặc backend chưa khởi động lại sau khi đổi |
+| Bật được nhưng không có execution | Tài khoản nhắn tin không có vai trò trong App (App đang Development), hoặc tin không chứa từ khoá |
+| Send Message báo "Page … is not connected" | Page chưa được cấp khi Connect → chọn credential → **Reconnect** và chọn thêm Page |

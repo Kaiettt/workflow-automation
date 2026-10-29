@@ -1,178 +1,55 @@
-# Implementation Tasks: Chat Trigger (Messenger & Zalo OA)
+# Implementation Tasks: Integration Packages & App Triggers
 
-> Xây trên `specs/execution-item-model` và `specs/llm-node` (đã hoàn tất).
+> 🤖 Claude làm trong repo (test bằng Graph API giả). 👤 Bạn làm trên Meta / máy của bạn.
+> Không commit / push khi chưa được bạn đồng ý.
 
-## Ký hiệu người làm
+## 1. Nền tảng (giữ từ lần trước)
+- [x] 🤖 Hàng đợi BullMQ, `WorkflowEngine`, execution `WEBHOOK`, dọn execution kẹt
+- [x] 🤖 Dedup Redis, `CheckPublishTriggersQuery`, credential nhiều field mã hoá, OAuth state Redis
 
-| Ký hiệu | Ai làm | Ý nghĩa |
-|---|---|---|
-| 🤖 | **Claude** | Code, migration, seed, test, tài liệu — làm được hoàn toàn trong repo, kiểm bằng test và payload giả |
-| 👤 | **Bạn** | Cần tài khoản, quyền quản trị, giấy tờ, tên miền, hoặc thao tác trên trang của Meta / Zalo — Claude **không thể** làm thay |
-| 🤝 | **Cùng làm** | Bạn cung cấp giá trị / thao tác, Claude viết code hoặc hướng dẫn từng bước |
+## 2. Khung package (`libs/apps`)
+- [x] 🤖 Hợp đồng `IntegrationPackage` / `CredentialType` / `TriggerNode` / `ActionNode`, `PackageRegistry`, `AppApiError`
+- [x] 🤖 Sinh JSON Schema node (`x-webhook`, `x-loadOptions`, `x-enumLabels`, `x-placeholder`) và credential (`x-oauth2`)
+- [x] 🤖 Package `webhook` (`webhook.trigger`)
+- [x] 🤖 Package `messenger` (`facebookMessengerOAuth2`, `messenger.trigger`, `messenger.sendMessage`) + `MetaGraphApi` (subscriptions, subscribed_apps, OAuth, gửi tin)
+- [x] 🤖 `PackageCatalogSync` khi khởi động; seed bỏ `trigger.app`, `chat.reply`, connector `messenger` (đánh dấu `isActive = false`)
 
-**Thứ tự đề xuất:** P1 (không cần tài khoản ngoài, test được ngay bằng `curl`) → P2 Messenger → P3 Zalo.
-Việc 👤 của P2/P3 nên **bắt đầu song song ngay từ đầu** vì xét duyệt của Meta / Zalo mất từ vài ngày đến vài tuần.
+## 3. Credential & OAuth2
+- [x] 🤖 `CredentialVault` (libs/connector); lưu form credential OAuth2 của package; `oauth2.redirectUrl` trong `GET /api/connectors`
+- [x] 🤖 `GET /api/oauth2/auth`, `GET /api/oauth2/callback` chung; gỡ Meta OAuth (`META_*` trong `.env`)
+- [x] 🤖 `POST /api/node-types/:key/options/:property`
 
----
+## 4. Triggers
+- [x] 🤖 Migration viết lại: `workflows.active`, `webhook_endpoints`, `workflow_triggers` mới; áp vào DB dev
+- [x] 🤖 `EndpointRegistrar`, `ActivationService`; `activate` / `deactivate` / `activation` / `webhooks`
+- [x] 🤖 `SwitchActiveVersionCommand` từ publish và restore; publish trả `activation`
+- [x] 🤖 Ingress `GET|POST /api/webhooks/:id` (mọi listener khớp đều chạy, dedup)
+- [x] 🤖 Test event: `test-listen`, `GET|DELETE /api/test-events/:id`
+- [x] 🤖 Kiểm credential khi publish (`INVALID_CREDENTIAL`)
 
-## 0. Chuẩn bị chung
+## 5. Execution
+- [x] 🤖 Executor sinh từ package (`PassThroughTriggerExecutor`, `PackageActionExecutor` + retry)
+- [x] 🤖 Gỡ `ReplyExecutor`, `usesConversation`
 
-- [ ] 👤 **Chọn cách có URL public HTTPS** để Meta/Zalo gọi vào máy dev. Máy đã có `cloudflared`:
-  - Thử nhanh: `cloudflared tunnel --url http://localhost:8081` → URL `*.trycloudflare.com` (đổi mỗi lần chạy — **đủ cho Messenger, không đủ cho Zalo**).
-  - Ổn định (bắt buộc cho Zalo vì phải xác thực tên miền): cần **một tên miền riêng** trỏ về Cloudflare → tạo *named tunnel* (`cloudflared tunnel create`, `cloudflared tunnel route dns`).
-- [ ] 🤝 Claude viết `docs/setup/public-tunnel.md` hướng dẫn từng lệnh; bạn chạy và báo lại URL.
-- [ ] 👤 Đặt `PUBLIC_BASE_URL` trong `.env` của bạn (không commit).
+## 6. Frontend
+- [x] 🤖 Công tắc Active (shadcn `Switch`), badge Active ở danh sách
+- [x] 🤖 `LoadOptionsField`, `WebhookUrlField` (theo endpoint), `TestEventPanel`
+- [x] 🤖 Form credential OAuth2: Redirect URL, Save & connect, Reconnect
+- [x] 🤖 Gỡ `AppTriggerFields`, `useAppOAuth`, `AppTriggerInfo`; `VersionDetailPage` dùng `EventTriggerInfo`
 
----
+## 7. Kiểm thử & tài liệu
+- [x] 🤖 Unit backend 267/267 (apps, activation, ingress, test event, OAuth2, executor)
+- [x] 🤖 E2E webhook + Messenger (Graph giả) 7/7; e2e tổng 23/25 — 2 test `restore-version`, `execution-run-ui` fail ở lần publish đầu, vốn fail trên `master`
+- [x] 🤖 Lint file backend đã đổi; frontend lint (0 lỗi), test 15/15, build
+- [x] 🤖 E2E dùng BullMQ prefix riêng (`BULLMQ_PREFIX`) để server dev chạy cùng Redis không nhận job của test
+- [ ] 👤 Thử trên giao diện và với Meta thật (chưa làm)
+- [x] 🤖 `docs/setup/messenger.md`, `docs/schema/*`, `.env.example` (chỉ còn `PUBLIC_BASE_URL`)
 
-## P1. Nền tảng: Webhook + chạy execution nền
+## 8. Phần của bạn
+- [ ] 👤 Meta App của bạn: thêm **Facebook Login** + **Messenger**; dán OAuth Redirect URL từ form credential vào *Valid OAuth Redirect URIs*
+- [ ] 👤 `PUBLIC_BASE_URL` trỏ tới địa chỉ Meta gọi được (tunnel khi chạy local)
+- [ ] 👤 Tạo credential (App ID / Secret) → Save & connect → tạo workflow → Listen for test event → Activate → nhắn thử bằng tài khoản có vai trò trong App
+- [ ] 👤 *(Khi mở cho người ngoài)* App Review: `pages_messaging`, `pages_manage_metadata`, `pages_show_list`
 
-> Toàn bộ P1 Claude làm được, không cần bạn setup gì ngoài Redis đang chạy sẵn (`docker-compose up -d`).
-
-### P1.1. Database
-- [x] 🤖 Enum `TriggerChannel`, model `WorkflowTrigger` trong `schema.prisma`
-- [x] 🤖 Migration `20261029000000_add_workflow_triggers` viết tay (bảng + partial unique index `WHERE is_active`), đã chạy lên DB dev bằng `prisma db execute`; `prisma migrate diff` xác nhận DB khớp schema
-- [x] 🤖 Seed node `trigger.webhook` (`config_schema` có hint `x-display: "webhookUrl"`)
-- [x] 🤖 Cập nhật `docs/schema/schema.md`
-
-### P1.2. Execution engine
-- [x] 🤖 Tách `WorkflowEngine` khỏi `StartExecutionHandler`; manual giữ nguyên hành vi đồng bộ (test cũ không đổi kịch bản)
-- [x] 🤖 `NodeRunner`: `actorId` → `credentialOwnerId` (luôn là chủ workflow)
-- [ ] ~~Bỏ qua credential cho node TRIGGER~~ → chuyển sang P2 (trigger webhook không có credential, chỉ trigger kênh chat cần)
-- [x] 🤖 `createExecution` nhận `triggerType`, `triggeredById` (nullable), `context` (`{ triggerItems }`)
-- [x] 🤖 `WebhookTriggerExecutor` (chỉ `trigger.webhook`; Messenger / Zalo thêm ở P2/P3)
-- [x] 🤖 Cài `bullmq`, `@nestjs/bullmq`; điền `execution-queue.module.ts`, `execution.processor.ts`; `EnqueueExecutionCommand`
-- [x] 🤖 Dọn execution kẹt `RUNNING` khi khởi động (`failStaleExecutions`)
-- [x] 🤖 `.env.example`: `PUBLIC_BASE_URL`, `EXECUTION_CONCURRENCY`, `EXECUTION_STALE_MINUTES`
-
-### P1.3. Module `libs/triggers`
-- [x] 🤖 Domain: `WorkflowTrigger`, `findTriggerNodes`, `planTriggers`, `buildWebhookItem` (ẩn header `authorization`, `cookie`, `x-api-key`), repository port
-- [ ] ~~`SignatureVerifier` khung~~ → làm luôn ở P2 cùng thuật toán Meta (khung rỗng không có người dùng)
-- [x] 🤖 `WorkflowPublishedEvent` từ `PublishWorkflowHandler` và nhánh `PUBLISH_THEN_RESTORE`
-- [x] 🤖 `SyncWorkflowTriggersHandler` (giữ token webhook giữa các version)
-- [x] 🤖 `WebhooksController` `POST /api/webhooks/w/:token` → `202 { executionId }`; `rawBody: true` trong `main.ts`; giới hạn JSON 1 MB
-- [x] 🤖 Redis dedup — dùng cho header `Idempotency-Key` của webhook chung (P2/P3 dùng lại cho `message_id`)
-- [x] 🤖 `GET /api/workflows/:id/triggers` (chỉ chủ workflow)
-
-### P1.4. Frontend
-- [x] 🤖 `WebhookUrlField` (readonly + copy) trong Properties Panel, `trigger.api.ts`, `trigger.service.ts`, `useWorkflowTriggers` (tự kiểm tra lại mỗi 5s đến khi node có URL)
-- [x] 🤖 `VersionDetailPage`: version có `trigger.webhook` hiện URL (`WebhookTriggerInfo`) thay nút Run; version cũ báo không nhận request
-- [ ] ~~Cột nguồn chạy, tự làm mới khi có execution `RUNNING`~~ → chưa làm: frontend chưa có màn hình danh sách execution để gắn vào
-
-### P1.5. Kiểm thử
-- [x] 🤖 Unit (`webhook-execution.spec.ts`, `webhook-triggers.spec.ts`, 23 test): enqueue / processor, payload vào node đầu, credential theo chủ workflow, definition lỗi → FAILED, version bị xoá → FAILED, sync giữ token, tắt listener cũ, dedup, URL, quyền xem
-- [x] 🤖 E2E `webhook-trigger.e2e-spec.ts` (HTTP + Postgres + Redis + BullMQ thật): POST → 202 → execution `WEBHOOK` hoàn tất nền, header `Authorization` không vào log; publish lại → URL không đổi và chạy version mới; `Idempotency-Key` trùng → 1 lần chạy; token sai → 404
-- [x] 🤖 Hồi quy: unit backend 234/234; e2e 19/21 — 2 test fail (`restore-version`, `execution-run-ui`) **fail y hệt trên `master`** (node filter không có config bị validate publish chặn), không do P1
-- [x] 🤖 Lint các file đổi (backend), `npm run lint` + `npm test` (9/9) + `npm run build` frontend
-- [ ] 👤 Thử bằng tay: tạo workflow `Webhook Trigger → Gmail`, publish, `curl` vào URL, thấy email đến
-
----
-
-## P2. Messenger
-
-### P2.1. Setup phía Meta — 👤 **Bạn phải tự làm**
-
-> Làm theo `docs/setup/messenger.md`. **Mọi thao tác dưới đây phải do chủ tài khoản thực hiện**.
-
-- [ ] 👤 Có tài khoản Facebook cá nhân và **một Facebook Page để thử** (tạo Page mới riêng cho test, không dùng Page thật của shop)
-- [ ] 👤 Đăng ký **Meta for Developers** (developers.facebook.com), xác minh tài khoản developer
-- [ ] 👤 Tạo **App** loại Business, thêm sản phẩm **Messenger**
-- [ ] 👤 Lấy **App Secret** (App settings → Basic) → điền `META_APP_SECRET` trong `.env`
-- [ ] 👤 Tự đặt một chuỗi ngẫu nhiên làm `META_VERIFY_TOKEN` trong `.env`
-- [ ] 👤 Trong Messenger settings: liên kết Page → **Generate Page Access Token** → lưu lại (sẽ dán vào FlowPilot ở bước kết nối Page)
-- [ ] 👤 Cấu hình **Webhook**: Callback URL = `{PUBLIC_BASE_URL}/api/webhooks/messenger`, Verify token = `META_VERIFY_TOKEN` → Verify and save *(backend + tunnel phải đang chạy)*
-- [ ] 👤 Subscribe Page vào webhook, chọn field **`messages`** (không chọn `message_echoes` cho v1)
-- [ ] 👤 Kiểm `META_GRAPH_VERSION` trong `.env` khớp version API hiện hành hiển thị trên dashboard
-- [ ] 👤 **Chế độ Development:** chỉ người có vai trò trong App (Admin/Developer/Tester) nhắn tin mới kích hoạt được → thêm tài khoản Facebook dùng để test làm Tester
-- [ ] 👤 *(Chỉ khi muốn khách thật dùng được)* Gửi **App Review** xin quyền `pages_messaging` (cần video demo, chính sách quyền riêng tư, có thể cần xác minh doanh nghiệp). **Không bắt buộc để hoàn thành spec này.**
-
-### P2.2. Code — 🤖 Claude làm
-- [x] 🤖 Seed connector `messenger` (Page ID + Page Access Token), node `trigger.messenger.message`, `integration.messenger.send`
-- [x] 🤖 Kiểm chữ ký Meta `isValidMetaSignature` (HMAC-SHA256 trên body gốc, `timingSafeEqual`)
-- [x] 🤖 `GET /api/webhooks/messenger` (verify challenge), `POST /api/webhooks/messenger` (sai chữ ký → 401; hợp lệ → luôn 200, lỗi chỉ ghi log)
-- [x] 🤖 `parseMessengerMessages` (bỏ echo / delivery / read; nhiều tin trong một request → nhiều execution); dedup theo `message_id` 24h
-- [x] 🤖 `GraphMessengerClient.sendText` (Graph API `me/messages`, `messaging_type: RESPONSE`), `MessengerSendExecutor` (retry 429/5xx/rate limit/timeout 1s→2s, lỗi 24h / người dùng không nhận / token hỏng không retry, text ≤ 2000)
-- [x] 🤖 `sanitizeErrorText`: pattern `EAA...`
-- [x] 🤖 Publish bị chặn `CHANNEL_ALREADY_BOUND` (Page đang thuộc workflow khác, nêu tên workflow; hai trigger cùng Page) và `INVALID_CREDENTIAL` — qua `CheckPublishTriggersQuery` do module triggers trả lời
-- [x] 🤖 Credential nhiều field: body `{ name, secret }` validate theo `connectors.config_schema`; body cũ `{ name, api_key }` vẫn chạy
-- [ ] ~~`displayHint` (`name — page_id`) trong picker~~ → bỏ: phải giải mã mọi credential khi liệt kê; người dùng tự đặt tên connection
-- [x] 🤖 Frontend: `AddCredentialDialog` (thay `AddApiKeyDialog`) sinh form từ `configSchema`; hint `x-credentialInput: "form"`; gợi ý dùng `$node["Messenger Trigger"].json.sender_id` dưới ô Recipient ID; icon node
-- [x] 🤖 Script `scripts/simulate-messenger-webhook.mjs`: ký payload bằng `META_APP_SECRET`, POST vào local
-- [x] 🤖 Unit (Messenger: chữ ký, parse, routing, check publish, nhận sự kiện, executor, Graph lỗi, engine Messenger → LLM → Messenger, credential nhiều field); e2e `messenger-trigger.e2e-spec.ts` (HTTP + DB + Redis + queue thật, chỉ thay client Facebook)
-- [x] 🤖 Chạy thử server build thật (cổng 8091): verify challenge 200 / sai token 403, script ký đúng → 200, ký sai → 401
-- [x] 🤖 `docs/setup/messenger.md`, `docs/schema/rule-for-config-schema.md` (`x-credentialInput`, `x-display`, `description`)
-- [x] 🤖 Hồi quy: unit backend 266/266; e2e 21/23 (2 test fail có sẵn trên `master`); frontend lint + 11/11 test + build
-
-### P2.3. Chạy thật — 🤝 Cùng làm
-- [ ] 👤 Chạy backend + tunnel, verify webhook thành công trên dashboard Meta
-- [ ] 👤 Trong FlowPilot: kết nối Page (dán Page ID + Page Access Token), tạo workflow ví dụ (a) `Messenger Trigger → LLM → Messenger Send`, publish
-- [ ] 👤 Dùng tài khoản Tester nhắn tin vào Page → nhận câu trả lời
-- [ ] 🤝 Bạn gửi log / ảnh lỗi nếu có; Claude chẩn đoán và sửa
-
----
-
-## P3. Zalo OA
-
-### P3.1. Setup phía Zalo — 👤 **Bạn phải tự làm**
-
-> Zalo khắt khe hơn Meta: OA phải được **xác thực**, tên miền webhook phải được **xác minh**. Nên bắt đầu sớm.
-
-- [ ] 👤 Có tài khoản Zalo, tạo **Zalo Official Account** (oa.zalo.me)
-- [ ] 👤 **Xác thực OA** (thường cần giấy phép kinh doanh / giấy tờ tổ chức; OA chưa xác thực bị giới hạn tính năng gửi tin). *Đây là bước có thể chặn tiến độ — kiểm tra điều kiện sớm.*
-- [ ] 👤 Đăng ký **Zalo for Developers** (developers.zalo.me), tạo **Ứng dụng**, liên kết với OA
-- [ ] 👤 Lấy **App ID**, **App Secret**, **OA Secret Key** → điền `ZALO_APP_ID`, `ZALO_APP_SECRET`, `ZALO_OA_SECRET_KEY`
-- [ ] 👤 **Xác minh tên miền** của `PUBLIC_BASE_URL` (Zalo yêu cầu đặt file / meta tag xác minh) → **cần named tunnel với tên miền riêng** (mục 0)
-- [ ] 👤 Cấu hình **Webhook URL** = `{PUBLIC_BASE_URL}/api/webhooks/zalo`, bật sự kiện **người dùng gửi tin nhắn văn bản**
-- [ ] 👤 Cấp quyền cho ứng dụng truy cập OA → lấy **Access Token** và **Refresh Token** của OA (qua luồng cấp quyền hoặc công cụ API Explorer của Zalo)
-- [ ] 👤 Dùng một tài khoản Zalo khác **quan tâm (follow) OA** để test
-
-### P3.2. Xác minh tài liệu — 🤝 Cùng làm
-> Tài liệu Zalo thay đổi theo phiên bản; spec này **chưa khẳng định** các chi tiết dưới đây. Claude đọc tài liệu công khai, bạn đối chiếu với những gì thấy trên trang quản trị.
-
-- [ ] 🤝 Công thức chữ ký `X-ZEvent-Signature` (thứ tự ghép chuỗi, khoá nào)
-- [ ] 🤝 Endpoint + header gửi tin tư vấn (Open API v3)
-- [ ] 🤝 Endpoint làm mới token, thời hạn access token / refresh token
-- [ ] 🤝 Giới hạn cửa sổ gửi tin tư vấn sau tin nhắn cuối của người dùng
-- [ ] 🤖 Ghi kết quả vào mục "Ghi chú xác minh" cuối file này
-
-### P3.3. Code — 🤖 Claude làm
-- [ ] 🤖 Seed connector `zalo_oa`, node `trigger.zalo.message`, `integration.zalo.send`
-- [ ] 🤖 `SignatureVerifier.verifyZalo` + chống replay theo timestamp
-- [ ] 🤖 `POST /api/webhooks/zalo`, `ZaloEventMapper` (`user_send_text`)
-- [ ] 🤖 `ZaloOaClient.sendText`, `ZaloSendExecutor`
-- [ ] 🤖 `ZaloTokenService`: refresh trước hạn, ghi đè cả 2 token, khoá Redis chống refresh song song
-- [ ] 🤖 `ConnectorCredentialRepository.updateSecret` + `CredentialRefreshPort`
-- [ ] 🤖 `sanitizeErrorText`: pattern token Zalo
-- [ ] 🤖 Script `scripts/simulate-zalo-webhook.ts`
-- [ ] 🤖 Unit + e2e theo `design.md` mục 6
-- [ ] 🤖 `docs/setup/zalo-oa.md`
-
-### P3.4. Chạy thật — 🤝 Cùng làm
-- [ ] 👤 Kết nối OA trong FlowPilot (OA ID + 2 token), tạo workflow ví dụ (c) `Zalo Trigger → Zalo Send`, publish
-- [ ] 👤 Nhắn tin từ tài khoản đã follow OA → nhận trả lời tự động
-- [ ] 👤 Để credential qua ít nhất một lần hết hạn access token → xác nhận tự refresh vẫn gửi được
-
----
-
-## 4. Tổng kết phân công
-
-| Hạng mục | 🤖 Claude | 👤 Bạn |
-|---|---|---|
-| Hàng đợi, engine, webhook chung (P1) | Toàn bộ | Chạy thử 1 lần bằng `curl` |
-| Code Messenger / Zalo | Toàn bộ, test bằng payload giả có chữ ký | — |
-| Tài khoản, App, Page, OA | Viết hướng dẫn | **Tạo và quản trị** |
-| Secret (`META_APP_SECRET`, token Page, khoá Zalo) | Không bao giờ thấy / nhập | **Tự điền vào `.env` và form** |
-| Tên miền + tunnel ổn định | Viết hướng dẫn lệnh | **Mua / trỏ tên miền, chạy tunnel** |
-| Xác thực OA, App Review Meta | — | **Nộp hồ sơ** |
-| Kiểm thử với tin nhắn thật | Chẩn đoán log, sửa lỗi | **Nhắn tin, gửi lại kết quả** |
-
-## 5. Rủi ro
-
-- **Xác thực Zalo OA** có thể không làm được với tài khoản sinh viên / cá nhân → P3 dừng ở mức "code xong, test bằng payload giả". P1 và P2 không phụ thuộc.
-- **Messenger ở chế độ Development** chỉ nhận tin từ Tester — đủ để demo, không đủ cho người dùng thật nếu không qua App Review.
-- **Tunnel tạm `trycloudflare.com`** đổi URL mỗi lần chạy → phải cấu hình lại webhook trên Meta mỗi lần.
-- Webhook public là bề mặt tấn công mới → chữ ký, giới hạn body, dedup là bắt buộc, không phải tuỳ chọn.
-
-## 6. Ghi chú xác minh (điền khi làm P3.2)
-
-_(trống)_
+## 9. Sau này
+- [ ] Panel kéo-thả Input/Output; chuyển Sheet / Gmail / Filter / LLM vào package; Zalo OA, Telegram

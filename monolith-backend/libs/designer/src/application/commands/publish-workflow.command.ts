@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import {
+  CommandBus,
   CommandHandler,
+  CommandHandlerNotFoundException,
   EventBus,
   ICommandHandler,
   QueryBus,
@@ -15,6 +17,10 @@ import { WorkflowDraft } from '../../domain/entities/workflow-draft.entity';
 import { GetNodeConfigSchemasQuery } from '@app/node-library/application/queries/get-node-config-schemas.query';
 import { WorkflowPublishedEvent } from '../events/workflow-published.event';
 import { CheckPublishTriggersQuery } from '../queries/check-publish-triggers.query';
+import {
+  SwitchActiveVersionCommand,
+  SwitchActiveVersionResult,
+} from './switch-active-version.command';
 import {
   extractNodeCatalogKeys,
   validateWorkflowDraft,
@@ -37,11 +43,16 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     private readonly workflowVersionRepo: WorkflowVersionRepository,
     private readonly queryBus: QueryBus,
     private readonly eventBus: EventBus,
+    private readonly commandBus: CommandBus,
   ) {}
 
-  async execute(
-    command: PublishWorkflowCommand,
-  ): Promise<{ versionId: string; versionNumber: number }> {
+  async execute(command: PublishWorkflowCommand): Promise<{
+    versionId: string;
+    versionNumber: number;
+    // Set when the workflow is active: its listeners moved to the new version,
+    // or (active: false) that failed and the workflow was turned off.
+    activation?: { active: boolean; error?: string };
+  }> {
     const { workflowId, publishedById } = command;
 
     const existingWorkflow = await this.workflowRepo.findById(workflowId);
@@ -115,9 +126,12 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
       new WorkflowPublishedEvent(workflowId, newVersion.id, draft.definition),
     );
 
+    const activation = await switchActiveVersion(this.commandBus, workflowId);
+
     return {
       versionId: newVersion.id,
       versionNumber: newVersion.versionNumber,
+      ...(activation ? { activation } : {}),
     };
   }
 
@@ -143,5 +157,21 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
   ) {
     draft.validationErrors = { issues };
     await this.workflowDraftRepo.upsert(draft);
+  }
+}
+
+// Without the triggers module loaded (e.g. a test app) nothing listens.
+export async function switchActiveVersion(
+  commandBus: CommandBus,
+  workflowId: string,
+): Promise<SwitchActiveVersionResult> {
+  try {
+    return await commandBus.execute<
+      SwitchActiveVersionCommand,
+      SwitchActiveVersionResult
+    >(new SwitchActiveVersionCommand(workflowId));
+  } catch (error) {
+    if (error instanceof CommandHandlerNotFoundException) return null;
+    throw error;
   }
 }

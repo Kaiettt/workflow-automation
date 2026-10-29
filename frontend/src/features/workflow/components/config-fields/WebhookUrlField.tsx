@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useWorkflowTriggers } from '../../hooks/useWorkflowTriggers';
+import { useNodeWebhooks } from '../../hooks/useWorkflowTriggers';
 import { triggerService } from '../../services/trigger.service';
 import { FieldShell } from './FieldShell';
 
@@ -11,11 +11,12 @@ interface WebhookUrlFieldProps {
   nodeId: string;
 }
 
-// Read-only: the URL is created when the workflow is published.
+// Read-only URL of a webhook trigger node; it exists as soon as the node is
+// saved in the draft and stays the same across publishes.
 export function WebhookUrlField({ workflowId, nodeId }: WebhookUrlFieldProps) {
-  const { data: triggers, isLoading } = useWorkflowTriggers(workflowId, nodeId);
+  const { data: webhooks, isLoading } = useNodeWebhooks(workflowId, nodeId);
   const [copied, setCopied] = useState(false);
-  const url = triggerService.findForNode(triggers, nodeId)?.webhookUrl ?? null;
+  const url = triggerService.findForNode(webhooks, nodeId)?.url ?? null;
 
   const copy = () => {
     if (!url) return;
@@ -29,10 +30,10 @@ export function WebhookUrlField({ workflowId, nodeId }: WebhookUrlFieldProps) {
   };
 
   const hint = url
-    ? 'POST JSON to this URL to run the published version. It stays the same when you publish again.'
+    ? 'Receives POST requests while the workflow is Active, or while listening for a test event.'
     : isLoading
       ? 'Loading…'
-      : 'Publish the workflow to get its URL.';
+      : 'The URL appears once the draft is saved.';
 
   return (
     <FieldShell id="webhook-url" label="Webhook URL" hint={hint}>
@@ -41,7 +42,7 @@ export function WebhookUrlField({ workflowId, nodeId }: WebhookUrlFieldProps) {
           id="webhook-url"
           readOnly
           value={url ?? ''}
-          placeholder="Not published yet"
+          placeholder="Saving…"
           className="font-mono text-xs"
           onFocus={(e) => e.target.select()}
         />

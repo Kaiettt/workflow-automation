@@ -60,7 +60,10 @@ import { useWorkflowVersion } from '../hooks/useWorkflowVersions';
 import { useStartExecution } from '../hooks/useStartExecution';
 import type { ExecutionResult } from '../types/execution.types';
 import { countItems } from '../utils/node-config';
-import { WebhookTriggerInfo } from '../components/WebhookTriggerInfo';
+import { EventTriggerInfo } from '../components/EventTriggerInfo';
+import { triggerService } from '../services/trigger.service';
+import { workflowService } from '../services/workflow.service';
+import { useQuery } from '@tanstack/react-query';
 
 // --- Custom Interactive Canvas Node ---
 interface RunnerNodeData extends Record<string, unknown> {
@@ -194,10 +197,15 @@ function mapDefinitionNodeToRunner(
   let iconType: RunnerNodeData['iconType'] = 'action';
   let detail = key;
 
-  if (key.startsWith('trigger.') || key.includes('webhook') || key.includes('manual')) {
+  if (
+    key.startsWith('trigger.') ||
+    key.endsWith('.trigger') ||
+    key.includes('webhook') ||
+    key.includes('manual')
+  ) {
     category = 'Trigger';
     iconType = 'webhook';
-    detail = key === 'trigger.webhook' ? 'POST webhook URL' : 'trigger.manual';
+    detail = key;
   } else if (key.startsWith('logic.') || key.includes('filter')) {
     category = 'Logic';
     iconType = 'filter';
@@ -265,8 +273,16 @@ export const VersionDetailPage: React.FC = () => {
   }, [version]);
 
   const rawNodes = useMemo(() => definition.nodes || [], [definition]);
-  // A webhook version is started by its URL, not by the Run button.
-  const webhookNode = rawNodes.find((n) => n.data?.key === 'trigger.webhook');
+  // A version with an event trigger (a node type with x-webhook) is started
+  // by its events while the workflow is Active, not by the Run button.
+  const { data: catalog = [] } = useQuery({
+    queryKey: ['node-types'],
+    queryFn: () => workflowService.getNodeTypes(),
+    staleTime: Infinity,
+  });
+  const eventTriggerNode = rawNodes.find((n) =>
+    triggerService.webhookHint(catalog.find((t) => t.key === n.data?.key)?.configSchema),
+  );
   const rawEdges = useMemo(() => definition.edges || [], [definition]);
 
   const initialNodes = useMemo(() => {
@@ -484,11 +500,11 @@ export const VersionDetailPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
-                {webhookNode ? (
-                  <WebhookTriggerInfo
+                {eventTriggerNode ? (
+                  <EventTriggerInfo
                     workflowId={workflowId}
                     versionId={versionId}
-                    nodeId={webhookNode.id}
+                    triggerName={String(eventTriggerNode.data?.name ?? eventTriggerNode.id)}
                   />
                 ) : (
                   <Button

@@ -1,4 +1,9 @@
-import { CommandHandler, EventBus, ICommandHandler } from '@nestjs/cqrs';
+import {
+  CommandBus,
+  CommandHandler,
+  EventBus,
+  ICommandHandler,
+} from '@nestjs/cqrs';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@app/database/prisma/prisma.service';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
@@ -7,6 +12,7 @@ import { WorkflowVersionRepository } from '../../domain/repositories/workflow-ve
 import { RestoreStrategy } from '../../presentation/http/dtos/restore-version.dto';
 import { Prisma } from '@prisma/client';
 import { WorkflowPublishedEvent } from '../events/workflow-published.event';
+import { switchActiveVersion } from './publish-workflow.command';
 
 export class RestoreVersionCommand {
   constructor(
@@ -38,6 +44,7 @@ export class RestoreVersionHandler implements ICommandHandler<RestoreVersionComm
     private readonly workflowVersionRepo: WorkflowVersionRepository,
     private readonly prisma: PrismaService,
     private readonly eventBus: EventBus,
+    private readonly commandBus: CommandBus,
   ) {}
 
   async execute(command: RestoreVersionCommand): Promise<RestoreVersionResult> {
@@ -144,6 +151,8 @@ export class RestoreVersionHandler implements ICommandHandler<RestoreVersionComm
           currentDraft.definition,
         ),
       );
+      // An active workflow now listens with the version just published.
+      await switchActiveVersion(this.commandBus, workflowId);
     }
 
     return {

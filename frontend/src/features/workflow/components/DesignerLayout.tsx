@@ -1,5 +1,6 @@
 import { Sidebar } from './Sidebar';
 import { PropertiesPanel } from './PropertiesPanel';
+import { ActiveToggle } from './ActiveToggle';
 import { Canvas } from './Canvas';
 import { useDesignerStore } from '../store/designer.store';
 import { Button } from '@/components/ui/button';
@@ -84,6 +85,8 @@ export function DesignerLayout({
             </Button>
           )}
 
+          <ActiveToggle workflowId={workflowId} />
+          <div className="h-4 w-px bg-border" />
           {isSaving ? (
             <span className="text-xs text-muted-foreground italic">Saving...</span>
           ) : (

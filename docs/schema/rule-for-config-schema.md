@@ -84,8 +84,12 @@ Ngoài JSON Schema gốc, cố định 1 bộ `x-*` key dùng xuyên suốt:
 | `x-propertyOrder: ["a", "b", ...]` | `config_schema` (ở gốc schema, cạnh `properties`) | Thứ tự hiển thị các field trong form. Bắt buộc phải khai báo vì **JSONB của Postgres không giữ thứ tự key** (sắp lại theo độ dài), nên thứ tự viết trong `properties` bị mất. Field không được liệt kê hiện sau cùng |
 | `x-multiline: true` | `config_schema` | UI render textarea thay vì ô một dòng (prompt dài) |
 | `x-placeholderByField: { field, values }` | `config_schema` | UI hiện gợi ý (placeholder) lấy từ `values[<giá trị hiện tại của field>]` — vd. gợi ý tên model theo provider |
-| `x-credentialInput: "form"` | `config_schema`, field có `x-connectorKey` | Credential được **nhập vào form** sinh từ `connectors.config_schema` (vd. Page ID + Page Access Token của Messenger) thay vì nút đăng nhập OAuth. Không có hint này, `x-connectorKey` render nút OAuth (Google) |
-| `x-display: "webhookUrl"` | `config_schema` (ở gốc schema) | Properties Panel hiện URL webhook (chỉ đọc, có nút copy) của node trigger, lấy từ `GET /api/workflows/:id/triggers` sau khi publish |
+| `x-credentialInput: "form"` | `config_schema`, field có `x-connectorKey` | Credential được tạo bằng **form** sinh từ `connectors.config_schema` (API key, hoặc App ID / App Secret của credential OAuth2 rồi bấm Connect) và chọn trong picker. Không có hint này, `x-connectorKey` render nút OAuth Google cũ |
+| `x-webhook: { scope }` | `config_schema` (ở gốc schema) | Node trigger của integration package: nhận sự kiện qua `/api/webhooks/<id>`. `scope: "node"` → Properties Panel hiện Webhook URL riêng của node; mọi node có hint này có nút **Listen for test event** |
+| `x-loadOptions: true` | `config_schema`, field | Lựa chọn tải từ server với credential đang chọn: `POST /api/node-types/:key/options/:field` `{ credentialId }` (vd. danh sách Page) |
+| `x-enumLabels: { value: label }` | `config_schema`, field có `enum` | Nhãn hiển thị cho từng giá trị enum |
+| `x-placeholder` | `config_schema`, field chuỗi | Gợi ý trong ô nhập |
+| `x-oauth2: true` | `connectors.config_schema` (ở gốc schema) | Credential type OAuth2 của package: form có App ID / App Secret, hiện OAuth Redirect URL, sau khi lưu mở pop-up đăng nhập; token được callback chung `GET /api/oauth2/callback` ghi vào credential |
 | `description` | `config_schema`, field kiểu chuỗi | Gợi ý riêng hiện dưới ô nhập, thay cho gợi ý biểu thức chung |
 | `default` | `config_schema` (JSON Schema chuẩn) | Engine điền giá trị này khi config **thiếu** key (`applySchemaDefaults`); UI điền sẵn khi thêm node lên canvas. Default có thể là biểu thức, vd. Gmail `to` = `{{$json.email}}` |
 | `x-secret: true` | `config_schema` (hiếm khi cần, vì secret thường đã nằm ở `credential_id`) | Field này bị **mask khi ghi vào `execution_node_logs.input`** — bổ sung lớp bảo vệ nếu 1 node nào đó lỡ cần nhập secret trực tiếp (không qua credential) |
@@ -141,3 +145,9 @@ Biểu thức (không phải JavaScript, chỉ truy cập dữ liệu):
 → Đây chính là ranh giới rõ ràng giữa "phần mở rộng bằng data" (bước 1) và "phần bắt buộc phải code" (bước 2) mà câu hỏi trước bạn đặt ra — schema thiết kế đúng sẽ giữ engine ổn định vĩnh viễn, chỉ có catalog và executor tăng theo số connector.
 
 Bạn muốn mình cập nhật `execute-node.ts` để áp dụng `x-refType`/`x-secret`/`x-allowExpression` thật sự (thay vì chỉ mô tả), hay viết phần Ajv validate trước publish?
+
+---
+
+## F. Integration packages (node của app bên ngoài)
+
+Node Webhook, Messenger… **không** khai báo trong seed. Mỗi app là một package trong `libs/apps/src/<app>` khai báo credential type, trigger node (field + vòng đời webhook `checkExists` / `create` / `delete` / `handle`) và action node (field + `execute`). Khi server khởi động, `PackageCatalogSync` sinh `config_schema` (các hint ở mục B) và upsert vào `node_type_definitions` / `connectors`. Thêm app = thêm package + một dòng trong `libs/apps/src/packages.ts`; không sửa engine, ingress, activation hay Designer. Chi tiết: `specs/chat-trigger/design.md`.

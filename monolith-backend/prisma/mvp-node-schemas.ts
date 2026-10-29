@@ -6,14 +6,6 @@ export const MANUAL_TRIGGER_CONFIG_SCHEMA = {
   properties: {},
 };
 
-// No settings: the URL is generated on publish and shown by the designer
-// because of x-display.
-export const WEBHOOK_TRIGGER_CONFIG_SCHEMA = {
-  type: 'object',
-  properties: {},
-  'x-display': 'webhookUrl',
-};
-
 export const GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA = {
   type: 'object',
   required: ['credential_id', 'spreadsheet_id', 'sheet_name'],
@@ -146,63 +138,6 @@ export const API_KEY_CONNECTOR_CONFIG_SCHEMA = {
       title: 'API Key',
       'x-secret': true,
       'x-testable': true,
-    },
-  },
-};
-
-// Facebook Page connection, typed in by the user (copied from the Meta app
-// dashboard). page_id routes incoming messages to the workflow; it is not a secret.
-export const MESSENGER_CONNECTOR_CONFIG_SCHEMA = {
-  type: 'object',
-  required: ['page_id', 'page_access_token'],
-  'x-propertyOrder': ['page_id', 'page_access_token'],
-  properties: {
-    page_id: { type: 'string', title: 'Page ID' },
-    page_access_token: {
-      type: 'string',
-      title: 'Page Access Token',
-      'x-secret': true,
-    },
-  },
-};
-
-// x-credentialInput: the credential is typed into a form (not an OAuth pop-up).
-const MESSENGER_CREDENTIAL_FIELD = {
-  type: 'string',
-  title: 'Facebook Page',
-  'x-refType': 'credential',
-  'x-connectorKey': 'messenger',
-  'x-credentialInput': 'form',
-};
-
-// Starts the workflow for every text message a customer sends to the Page.
-export const MESSENGER_TRIGGER_CONFIG_SCHEMA = {
-  type: 'object',
-  required: ['credential_id'],
-  properties: { credential_id: MESSENGER_CREDENTIAL_FIELD },
-};
-
-// After another node (e.g. LLM) $json is that node's output, so the reply
-// usually needs {{$node["<trigger name>"].json.sender_id}} instead of the default.
-export const MESSENGER_SEND_CONFIG_SCHEMA = {
-  type: 'object',
-  required: ['credential_id', 'recipient_id', 'text'],
-  'x-propertyOrder': ['credential_id', 'recipient_id', 'text'],
-  properties: {
-    credential_id: MESSENGER_CREDENTIAL_FIELD,
-    recipient_id: {
-      type: 'string',
-      title: 'Recipient ID',
-      description:
-        'Who gets the reply. {{$json.sender_id}} works right after the trigger; after another node (e.g. LLM) use {{$node["Messenger Trigger"].json.sender_id}}.',
-      'x-allowExpression': true,
-      default: '{{$json.sender_id}}',
-    },
-    text: {
-      type: 'string',
-      title: 'Text',
-      'x-allowExpression': true,
-      'x-multiline': true,
     },
   },
 };

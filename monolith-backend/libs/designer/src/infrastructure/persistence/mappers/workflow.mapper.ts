@@ -13,6 +13,7 @@ export class WorkflowMapper {
       prismaWorkflow.currentVersionId,
       prismaWorkflow.createdAt,
       prismaWorkflow.updatedAt,
+      prismaWorkflow.active,
     );
   }
 }

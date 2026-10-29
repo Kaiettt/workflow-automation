@@ -67,10 +67,14 @@ model Workflow {
   currentVersionId String?          @unique @map("current_version_id") @db.Uuid
   currentVersion   WorkflowVersion? @relation("CurrentVersion", fields: [currentVersionId], references: [id])
 
-  draft      WorkflowDraft?    // 1:1 — mỗi workflow có đúng 1 draft
-  versions   WorkflowVersion[] @relation("WorkflowVersions")
-  executions Execution[]
-  triggers   WorkflowTrigger[]
+  // Công tắc Active: chỉ workflow đang bật mới nhận sự kiện (bằng currentVersion).
+  active Boolean @default(false)
+
+  draft            WorkflowDraft?    // 1:1 — mỗi workflow có đúng 1 draft
+  versions         WorkflowVersion[] @relation("WorkflowVersions")
+  executions       Execution[]
+  triggers         WorkflowTrigger[]
+  webhookEndpoints WebhookEndpoint[]
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -214,6 +218,8 @@ model ConnectorCredential {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  webhookEndpoints WebhookEndpoint[]
+
   @@index([connectorId, ownerId])
   @@map("connector_credentials")
 }
@@ -266,17 +272,37 @@ model Execution {
 }
 
 // ----------------------------------------------------------------------------
-// Trigger Module — workflow nào đang lắng nghe sự kiện bên ngoài
+// Trigger Module — webhook endpoint và listener của workflow đang Active
 // ----------------------------------------------------------------------------
 
-enum TriggerChannel {
-  WEBHOOK
-  MESSENGER
-  ZALO_OA
+// Một URL /api/webhooks/<id>. Phạm vi do integration package quyết định:
+// mỗi trigger node một URL (scope_key "node:<workflowId>:<nodeId>") hoặc mỗi
+// credential một URL ("credential:<credentialId>", vd. một Meta App chỉ có một
+// callback). Row được giữ lại để URL không đổi qua các lần publish / bật tắt.
+model WebhookEndpoint {
+  id       String @id @default(uuid()) @db.Uuid
+  scopeKey String @unique @map("scope_key") @db.VarChar(255)
+  nodeKey  String @map("node_key") @db.VarChar(150) // trigger node type của package
+
+  workflowId   String?              @map("workflow_id") @db.Uuid
+  workflow     Workflow?            @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  credentialId String?              @map("credential_id") @db.Uuid
+  credential   ConnectorCredential? @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  ownerId      String               @map("owner_id") @db.Uuid
+
+  data       Json    @default("{}") // do package quản lý: verify token, Page đã đăng ký…
+  registered Boolean @default(false) // đã đăng ký (create) với app bên ngoài
+
+  listeners WorkflowTrigger[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("webhook_endpoints")
 }
 
-// Một node trigger (không phải manual) của version đang publish. Chỉ row
-// isActive = true nhận sự kiện; publish version mới sẽ tắt các row cũ.
+// Một trigger node của workflow đang Active, nghe trên một endpoint. Chỉ tồn
+// tại khi workflow Active; publish khi đang Active thay bằng node của version mới.
 model WorkflowTrigger {
   id String @id @default(uuid()) @db.Uuid
 
@@ -286,19 +312,19 @@ model WorkflowTrigger {
   workflowVersionId String          @map("workflow_version_id") @db.Uuid
   workflowVersion   WorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
 
-  nodeId     String         @map("node_id") @db.VarChar(100) // id node trong definition JSON
-  triggerKey String         @map("trigger_key") @db.VarChar(150) // vd. "trigger.webhook"
-  channel    TriggerChannel
+  nodeId  String @map("node_id") @db.VarChar(100) // id node trong definition JSON
+  nodeKey String @map("node_key") @db.VarChar(150)
 
-  // WEBHOOK: token bí mật trong URL. MESSENGER: page_id. ZALO_OA: oa_id.
-  // Unique trong số row active: partial index viết tay trong migration.
-  routingKey String @map("routing_key") @db.VarChar(255)
+  endpointId String          @map("endpoint_id") @db.Uuid
+  endpoint   WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
 
-  isActive  Boolean  @default(true) @map("is_active")
+  credentialId String? @map("credential_id") @db.Uuid
+  parameters   Json    @default("{}") // config của node (không gồm credential_id)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  @@index([channel, routingKey, isActive])
-  @@index([workflowId])
+  @@unique([workflowId, nodeId])
+  @@index([endpointId])
   @@map("workflow_triggers")
 }
 

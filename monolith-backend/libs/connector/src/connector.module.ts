@@ -10,6 +10,7 @@ import { ConnectorRepository } from './domain/repositories/connector.repository'
 import { PrismaConnectorRepository } from './infrastructure/persistence/prisma-connector.repository';
 import { ConnectorCredentialRepository } from './domain/repositories/connector-credential.repository';
 import { PrismaConnectorCredentialRepository } from './infrastructure/persistence/prisma-connector-credential.repository';
+import { CredentialVault } from './application/credential-vault';
 
 const QueryHandlers = [GetConnectorsHandler, ListCredentialsHandler];
 
@@ -29,7 +30,12 @@ const Repositories = [
 @Module({
   imports: [CqrsModule, PrismaModule, AuthModule],
   controllers: [ConnectorsController],
-  providers: [...QueryHandlers, ...CommandHandlers, ...Repositories],
-  exports: [...Repositories],
+  providers: [
+    ...QueryHandlers,
+    ...CommandHandlers,
+    ...Repositories,
+    CredentialVault,
+  ],
+  exports: [...Repositories, CredentialVault],
 })
 export class ConnectorModule {}

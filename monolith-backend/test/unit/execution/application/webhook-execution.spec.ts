@@ -29,9 +29,16 @@ import {
 } from '@test/support/execution/start-execution.test-support';
 import type { Job } from 'bullmq';
 
+// The Webhook package's trigger node.
+const WEBHOOK_TRIGGER = 'webhook.trigger';
+
 const webhookTrigger = {
   id: 'hook',
-  data: { key: NodeKeys.TRIGGER_WEBHOOK, name: 'Incoming', config: {} },
+  data: {
+    key: WEBHOOK_TRIGGER,
+    name: 'Incoming',
+    config: {},
+  },
 };
 const urgentOnly = {
   id: 'filter',
@@ -72,7 +79,7 @@ function setup(definition: unknown) {
     repository,
     [
       new ManualTriggerExecutor(),
-      new PassThroughTriggerExecutor(NodeKeys.TRIGGER_WEBHOOK),
+      new PassThroughTriggerExecutor(WEBHOOK_TRIGGER),
       new FilterExecutor(),
       new GmailSendExecutor(() => ({ users: { messages: { send } } })),
     ],
@@ -134,7 +141,7 @@ describe('Webhook executions', () => {
 
     expect(status).toBe(ExecutionStatus.SUCCESS);
     expect(repository.finishedStatus).toBe(ExecutionStatus.SUCCESS);
-    const triggerLog = logOf(repository.logs, NodeKeys.TRIGGER_WEBHOOK);
+    const triggerLog = logOf(repository.logs, WEBHOOK_TRIGGER);
     expect(jsonOf(triggerLog?.output)).toEqual([order('urgent').json]);
     expect(send).toHaveBeenCalledTimes(1);
     expect(decode(send, 0)).toContain('To: kiet@gmail.com');
@@ -178,7 +185,7 @@ describe('Webhook executions', () => {
   });
 
   it('starts the flow with an empty item when a webhook workflow gets no payload', async () => {
-    const executor = new PassThroughTriggerExecutor(NodeKeys.TRIGGER_WEBHOOK);
+    const executor = new PassThroughTriggerExecutor(WEBHOOK_TRIGGER);
     await expect(executor.execute({ items: [] })).resolves.toEqual([
       { json: {} },
     ]);

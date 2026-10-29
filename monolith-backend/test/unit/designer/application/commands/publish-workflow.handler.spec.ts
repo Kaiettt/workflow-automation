@@ -13,7 +13,11 @@ import { WorkflowDraftRepository } from '@app/designer/domain/repositories/workf
 import { WorkflowVersionRepository } from '@app/designer/domain/repositories/workflow-version.repository';
 import { WorkflowPublishedEvent } from '@app/designer/application/events/workflow-published.event';
 import { CheckPublishTriggersQuery } from '@app/designer/application/queries/check-publish-triggers.query';
-import { QueryHandlerNotFoundException } from '@nestjs/cqrs';
+import {
+  CommandHandlerNotFoundException,
+  QueryHandlerNotFoundException,
+} from '@nestjs/cqrs';
+import { SwitchActiveVersionCommand } from '@app/designer/application/commands/switch-active-version.command';
 
 // Mock catalog schema data matching sample.data.json
 const catalogSchemas: Record<string, { category: string; configSchema: any }> =
@@ -125,6 +129,7 @@ describe('PublishWorkflowHandler (TDD)', () => {
   let versionRepo: InMemoryWorkflowVersionRepo;
   let queryBus: jest.Mocked<QueryBus>;
   let eventBus: { publish: jest.Mock };
+  let commandBus: { execute: jest.Mock };
 
   const validDefinition = {
     nodes: [
@@ -251,6 +256,8 @@ describe('PublishWorkflowHandler (TDD)', () => {
     } as any;
 
     eventBus = { publish: jest.fn() };
+    // The triggers module answers null for a workflow that is not active.
+    commandBus = { execute: jest.fn().mockResolvedValue(null) };
 
     handler = new PublishWorkflowHandler(
       workflowRepo,
@@ -258,6 +265,7 @@ describe('PublishWorkflowHandler (TDD)', () => {
       versionRepo,
       queryBus,
       eventBus as any,
+      commandBus as any,
     );
   });
 
@@ -288,6 +296,58 @@ describe('PublishWorkflowHandler (TDD)', () => {
     expect(eventBus.publish).toHaveBeenCalledWith(
       new WorkflowPublishedEvent(workflowId, result.versionId, validDefinition),
     );
+    expect(commandBus.execute).toHaveBeenCalledWith(
+      new SwitchActiveVersionCommand(workflowId),
+    );
+    expect(result.activation).toBeUndefined();
+  });
+
+  it('reports how an active workflow moved to the new version', async () => {
+    const workflowId = 'wf-active';
+    workflowRepo.workflows.set(
+      workflowId,
+      Workflow.create({ id: workflowId, name: 'Bot', ownerId: 'user-1' }),
+    );
+    draftRepo.drafts.set(
+      workflowId,
+      WorkflowDraft.create(workflowId, validDefinition),
+    );
+    commandBus.execute.mockResolvedValue({
+      active: false,
+      error: '"Messenger Trigger": the selected credential no longer exists.',
+    });
+
+    const result = await handler.execute(
+      new PublishWorkflowCommand(workflowId, 'user-1'),
+    );
+
+    expect(result.versionNumber).toBe(1);
+    expect(result.activation).toEqual({
+      active: false,
+      error: '"Messenger Trigger": the selected credential no longer exists.',
+    });
+  });
+
+  it('publishes when no module switches listeners', async () => {
+    const workflowId = 'wf-no-switch-module';
+    workflowRepo.workflows.set(
+      workflowId,
+      Workflow.create({ id: workflowId, name: 'Plain', ownerId: 'user-1' }),
+    );
+    draftRepo.drafts.set(
+      workflowId,
+      WorkflowDraft.create(workflowId, validDefinition),
+    );
+    commandBus.execute.mockRejectedValue(
+      new CommandHandlerNotFoundException('SwitchActiveVersionCommand'),
+    );
+
+    const result = await handler.execute(
+      new PublishWorkflowCommand(workflowId, 'user-1'),
+    );
+
+    expect(result.versionNumber).toBe(1);
+    expect(result.activation).toBeUndefined();
   });
 
   it('should reject publish with the trigger issues found by the triggers module', async () => {

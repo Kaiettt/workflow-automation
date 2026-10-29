@@ -195,9 +195,16 @@ export const WorkflowListPage: React.FC = () => {
                     </TableCell>
 
                     <TableCell>
-                      <Badge variant="outline" className="font-mono text-[11px] uppercase">
-                        {wf.status || 'DRAFT'}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="outline" className="font-mono text-[11px] uppercase">
+                          {wf.status || 'DRAFT'}
+                        </Badge>
+                        {wf.active && (
+                          <Badge variant="secondary" className="text-[11px] text-emerald-700">
+                            Active
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
 
                     <TableCell className="hidden md:table-cell text-xs text-muted-foreground">

@@ -34,9 +34,16 @@ export class CreateApiKeyCredentialHandler implements ICommandHandler<CreateApiK
         `Connector "${command.connectorKey}" was not found`,
       );
     }
-    if (connector.authType !== ConnectorAuthType.API_KEY) {
+    // OAuth2 credential types of integration packages start from a form too
+    // (App ID / App Secret); their tokens are added by the OAuth2 callback.
+    const isPackageOAuth2 =
+      connector.authType === ConnectorAuthType.OAUTH2 &&
+      (connector.configSchema as { 'x-oauth2'?: unknown } | null)?.[
+        'x-oauth2'
+      ] === true;
+    if (connector.authType !== ConnectorAuthType.API_KEY && !isPackageOAuth2) {
       throw new BadRequestException(
-        `Connector "${connector.key}" does not use an API key`,
+        `Connector "${connector.key}" is not created from a form`,
       );
     }
 

@@ -1,86 +1,42 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { CheckPublishTriggersQuery } from '@app/designer/application/queries/check-publish-triggers.query';
 import type { PublishValidationIssue } from '@app/designer/application/utils';
-import { WorkflowTriggerRepository } from '../../domain/workflow-trigger.repository';
-import {
-  findTriggerNodes,
-  TriggerChannel,
-} from '../../domain/workflow-trigger';
-import { findMessengerPage } from '../messenger-page';
+import { CREDENTIAL_FIELD, PackageRegistry } from '@app/apps';
+import { CredentialVault } from '@app/connector/application/credential-vault';
+import { definitionNodes } from '../../domain/definition-nodes';
 
-const CREDENTIAL_PROBLEMS = {
-  NOT_FOUND: 'The selected Facebook Page connection no longer exists.',
-  WRONG_CONNECTOR: 'Select a Facebook Page connection for this trigger.',
-  NO_PAGE_ID: 'The Facebook Page connection has no Page ID.',
-} as const;
-
-// A Facebook Page can feed only one workflow: Meta sends each message once.
+// Stops a version whose package nodes point at a credential the owner does
+// not have, or of the wrong type (a missing one is a required-field issue).
 @QueryHandler(CheckPublishTriggersQuery)
 export class CheckPublishTriggersHandler implements IQueryHandler<CheckPublishTriggersQuery> {
-  constructor(private readonly repository: WorkflowTriggerRepository) {}
+  constructor(
+    private readonly registry: PackageRegistry,
+    private readonly vault: CredentialVault,
+  ) {}
 
   async execute(
     query: CheckPublishTriggersQuery,
   ): Promise<PublishValidationIssue[]> {
     const issues: PublishValidationIssue[] = [];
-    const pagesInThisWorkflow = new Set<string>();
-
-    for (const node of findTriggerNodes(query.definition)) {
-      // A missing credential is already reported as a required field.
-      if (node.channel !== TriggerChannel.MESSENGER || !node.credentialId) {
+    for (const node of definitionNodes(query.definition)) {
+      const credentialType = this.registry.node(node.key)?.credentialType;
+      const chosen = node.config[CREDENTIAL_FIELD];
+      if (!credentialType || typeof chosen !== 'string' || chosen === '') {
         continue;
       }
-      const page = await findMessengerPage(
-        this.repository,
-        node.credentialId,
-        query.ownerId,
-      );
-      if ('error' in page) {
-        issues.push(
-          issue(
-            'INVALID_CREDENTIAL',
-            node.nodeId,
-            CREDENTIAL_PROBLEMS[page.error],
-          ),
-        );
-        continue;
-      }
-
-      if (pagesInThisWorkflow.has(page.pageId)) {
-        issues.push(
-          issue(
-            'CHANNEL_ALREADY_BOUND',
-            node.nodeId,
-            'Another Messenger trigger in this workflow already uses this Facebook Page.',
-          ),
-        );
-        continue;
-      }
-      pagesInThisWorkflow.add(page.pageId);
-
-      const listener = await this.repository.findActive(
-        TriggerChannel.MESSENGER,
-        page.pageId,
-      );
-      if (listener && listener.workflowId !== query.workflowId) {
-        const name =
-          (await this.repository.findWorkflowName(listener.workflowId)) ??
-          'another workflow';
-        issues.push(
-          issue(
-            'CHANNEL_ALREADY_BOUND',
-            node.nodeId,
-            `This Facebook Page is already used by the workflow "${name}". Remove its Messenger trigger and publish it again, or pick another Page.`,
-          ),
-        );
+      const stored = await this.vault.findOwned(chosen, query.ownerId);
+      if (!stored || stored.connectorKey !== credentialType) {
+        issues.push({
+          severity: 'error',
+          code: 'INVALID_CREDENTIAL',
+          nodeId: node.id,
+          field: CREDENTIAL_FIELD,
+          message: stored
+            ? 'The selected credential belongs to another app.'
+            : 'The selected credential no longer exists. Pick another one.',
+        });
       }
     }
     return issues;
   }
 }
-
-const issue = (
-  code: string,
-  nodeId: string,
-  message: string,
-): PublishValidationIssue => ({ code, severity: 'error', message, nodeId });

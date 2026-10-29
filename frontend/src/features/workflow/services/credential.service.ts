@@ -33,6 +33,7 @@ export const credentialService = {
       key,
       title: propertyTitle(key, property),
       secret: property['x-secret'] === true,
+      ...(typeof property.description === 'string' ? { description: property.description } : {}),
     }));
     return fields.length > 0 ? fields : [API_KEY_FIELD];
   },

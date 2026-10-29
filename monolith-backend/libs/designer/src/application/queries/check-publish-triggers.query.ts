@@ -1,6 +1,6 @@
 // Asked while publishing; answered by the triggers module. Returns issues that
-// would stop the version from receiving events (e.g. a Facebook Page another
-// workflow already listens on). Result: PublishValidationIssue[].
+// would stop the version's integration nodes from working (e.g. a credential
+// the owner no longer has). Result: PublishValidationIssue[].
 export class CheckPublishTriggersQuery {
   constructor(
     readonly workflowId: string,

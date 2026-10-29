@@ -1,4 +1,4 @@
-import { MessageCircle, Play, Send, Settings, Sparkles, Webhook } from 'lucide-react';
+import { MessageCircle, Play, Reply, Send, Settings, Sparkles, Webhook, Zap } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 interface NodeIconProps {
@@ -14,6 +14,8 @@ const ICONS: Record<string, LucideIcon> = {
   webhook: Webhook,
   'message-circle': MessageCircle,
   send: Send,
+  zap: Zap,
+  reply: Reply,
 };
 
 // The catalog gives either an image URL or the name of a built-in icon.

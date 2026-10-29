@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { triggerKeys } from '../hooks/useWorkflowTriggers';
 import { useNodesState, useEdgesState, useReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import { workflowService } from '../services/workflow.service';
@@ -73,6 +75,7 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
   const onBack = propOnBack || (() => navigate('/workflows'));
 
   const { setCenter, getNode } = useReactFlow();
+  const queryClient = useQueryClient();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -203,14 +206,27 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
     await saveDraft(nodes, edges);
 
     try {
-      await workflowService.publishWorkflow(workflowId);
+      const published = await workflowService.publishWorkflow(workflowId);
       setPublishValidation(null);
       setValidationDialogOpen(false);
       useDesignerStore.getState().setValidationIssues([]);
       setNodes((currentNodes) => updateValidationHighlights(currentNodes, []));
+      void queryClient.invalidateQueries({ queryKey: triggerKeys.activation(workflowId) });
+      if (published.activation && !published.activation.active) {
+        // The new version could not listen: the server turned the workflow off.
+        setPublishValidation({
+          message: `Published version ${published.versionNumber}, but the workflow was turned off: ${published.activation.error ?? 'its triggers could not listen'}. Fix it, publish, then activate again.`,
+          issues: [],
+        });
+        setValidationDialogOpen(true);
+        return;
+      }
+      const followUp = published.activation?.active
+        ? `Workflow published! Version ${published.versionNumber} is now listening.`
+        : 'Workflow published successfully!';
       if (
         window.confirm(
-          'Workflow published successfully! Would you like to view the version history and run it?',
+          `${followUp} Would you like to view the version history and run it?`,
         )
       ) {
         navigate(`/workflows/${workflowId}/versions`);
