@@ -41,9 +41,10 @@ export function formatFieldLabel(field?: string): string {
   if (!field) return '';
   if (KNOWN_FIELD_LABELS[field]) return KNOWN_FIELD_LABELS[field];
   return field
-    .replace(/_/g, ' ')
     .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (str) => str.toUpperCase())
+    .split(/[_\s]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
     .trim();
 }
 
