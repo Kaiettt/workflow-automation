@@ -1,0 +1,144 @@
+@startuml Authentication
+title Authentication: Register with OTP, Login, Token Refresh and Password Reset
+autonumber
+
+actor User
+boundary "Auth Modal" as UI
+participant "HTTP Client\n(Axios interceptors)" as Http
+control "Auth Controller" as Controller
+control "Auth Handlers (CQRS)" as Handlers
+participant "Email Service\n(Nodemailer SMTP)" as Mail
+database "Redis" as Redis
+database "PostgreSQL" as DB
+
+== Register (two-step OTP verification) ==
+User -> UI: Fill Sign Up form (name, email, password, role)
+UI -> UI: Check password strength and confirmation match
+UI -> Http: POST /api/v1/auth/send-register-otp { email }
+Http -> Controller: Forward request
+Controller -> Handlers: SendRegisterOtpCommand(email)
+Handlers -> DB: Find user by email
+alt Email already registered
+    Handlers --> Controller: 409 Conflict
+    Controller --> UI: Email already exists
+    UI --> User: Suggest signing in instead
+else Email available
+    Handlers -> Handlers: Generate 6-digit OTP
+    Handlers -> Redis: SET otp:register:{email} EX 300
+    Handlers -> Mail: Send verification email
+    Mail --> User: OTP delivered to inbox
+    Handlers --> Controller: OTP sent
+    Controller --> UI: 200 OK
+    UI --> User: Show OTP input with countdown
+end
+
+User -> UI: Enter 6-digit OTP
+UI -> Http: POST /api/v1/auth/verify-otp { email, otp, type: register }
+Http -> Controller: Forward request
+Controller -> Handlers: VerifyOtpCommand
+Handlers -> Redis: GET otp:register:{email}
+alt OTP wrong or expired
+    Handlers --> Controller: 400 Bad Request
+    Controller --> UI: Invalid or expired OTP
+    UI --> User: Show error and Resend OTP option
+else OTP matches
+    Handlers -> Redis: DEL otp:register:{email}
+    Handlers -> Redis: SET otp:verified:register:{email} EX 900
+    Handlers --> Controller: Verified
+    Controller --> UI: 200 OK
+    UI -> Http: POST /api/v1/auth/register { name, email, password, role }
+    Http -> Controller: Forward request
+    Controller -> Handlers: RegisterCommand
+    Handlers -> Redis: Check otp:verified:register:{email}
+    Handlers -> Handlers: Hash password with bcrypt (10 rounds)
+    Handlers -> DB: Insert user with role
+    Handlers -> Handlers: Sign accessToken (15m) and refreshToken (7d)
+    Handlers -> Redis: SET refresh_token:{userId} EX 7d
+    Handlers --> Controller: User + token pair
+    Controller --> UI: 201 Created
+    UI -> UI: Save user and tokens in auth.store
+    UI --> User: Show avatar, name and role in navbar
+end
+
+== Login ==
+User -> UI: Enter email and password
+UI -> Http: POST /api/v1/auth/login
+Http -> Controller: Forward request
+Controller -> Handlers: LoginCommand
+Handlers -> DB: Find user by email
+alt User missing or bcrypt compare fails
+    Handlers --> Controller: 401 Unauthorized
+    Controller --> UI: Invalid credentials
+    UI --> User: Show error
+else Credentials valid
+    Handlers -> Handlers: Sign accessToken (sub, email, role)
+    Handlers -> Redis: SET refresh_token:{userId} EX 7d
+    Handlers --> Controller: User + token pair
+    Controller --> UI: 200 OK
+    UI -> UI: Persist session in auth.store
+    UI --> User: Signed in
+end
+
+== Authenticated request and silent token refresh ==
+UI -> Http: Any API call (e.g. GET /api/v1/auth/me)
+Http -> Http: Inject Authorization: Bearer {accessToken}
+Http -> Controller: Request with JWT
+alt Access token valid
+    Controller --> Http: 200 OK + data
+    Http --> UI: Response
+else Access token expired
+    Controller --> Http: 401 Unauthorized
+    Http -> Controller: POST /api/v1/auth/refresh { refreshToken }
+    Controller -> Handlers: RefreshTokenCommand
+    Handlers -> Redis: Compare with refresh_token:{userId}
+    Handlers -> DB: Check user is still active
+    alt Refresh token valid
+        Handlers -> Redis: Store rotated refresh token
+        Handlers --> Controller: New token pair
+        Controller --> Http: 200 OK
+        Http -> Http: Update auth.store
+        Http -> Controller: Replay original request with new token
+        Controller --> Http: 200 OK + data
+        Http --> UI: Response
+    else Refresh token invalid or expired
+        Controller --> Http: 401 Unauthorized
+        Http -> UI: logout()
+        UI --> User: Session ended, show Sign In
+    end
+end
+
+== Forgot and reset password ==
+User -> UI: Open Forgot Password, enter email
+UI -> Http: POST /api/v1/auth/forgot-password { email }
+Http -> Controller: Forward request
+Controller -> Handlers: ForgotPasswordCommand
+Handlers -> DB: Find user by email
+alt User not found
+    Handlers --> Controller: 404 Not Found
+    Controller --> UI: Email not registered
+else User exists
+    Handlers -> Redis: SET otp:reset:{email} EX 300
+    Handlers -> Mail: Send password reset OTP
+    Mail --> User: Reset OTP delivered
+    Handlers --> Controller: OTP sent
+    Controller --> UI: 200 OK
+end
+
+User -> UI: Enter OTP, new password and confirmation
+UI -> Http: POST /api/v1/auth/reset-password { email, otp, newPassword }
+Http -> Controller: Forward request
+Controller -> Handlers: ResetPasswordCommand
+Handlers -> Redis: GET otp:reset:{email}
+alt OTP wrong or expired
+    Handlers --> Controller: 400 Bad Request
+    Controller --> UI: Invalid or expired OTP
+else OTP matches
+    Handlers -> Handlers: Hash new password with bcrypt
+    Handlers -> DB: Update user password hash
+    Handlers -> Redis: DEL otp:reset:{email}
+    Handlers --> Controller: Password updated
+    Controller --> UI: 200 OK
+    UI --> User: Ask to sign in with the new password
+end
+
+@enduml

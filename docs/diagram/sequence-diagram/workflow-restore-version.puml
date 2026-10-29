@@ -1,0 +1,74 @@
+@startuml WorkflowRestoreVersion
+title Restore a Published Workflow Version into the Draft
+autonumber
+
+actor User
+boundary "Version History Sheet" as UI
+boundary "Restore Conflict Dialog" as Dialog
+control "Workflow Versions Controller" as Controller
+control "Restore Version Handler" as Handler
+participant "Prisma Workflow Repository" as Repo
+database "PostgreSQL" as DB
+
+User -> UI: Open version history
+UI -> Controller: GET /api/workflows/{id}/versions
+Controller -> DB: Load versions of workflow
+DB --> Controller: versionNumber, publishedAt, publishedBy
+Controller --> UI: Version list
+UI --> User: Show versions with Run and Restore buttons
+
+User -> UI: Click Restore on version Vk
+UI -> Controller: GET /api/workflows/{id}/draft/status
+Controller -> DB: Compare draft with current published version
+DB --> Controller: Draft and current version
+Controller --> UI: { hasUnpublishedChanges }
+
+alt No unpublished changes
+    UI -> UI: strategy = OVERWRITE
+else Draft has unpublished changes
+    UI -> Dialog: Open conflict dialog
+    Dialog --> User: Choose how to keep current draft
+    alt User cancels
+        User -> Dialog: Cancel
+        Dialog --> UI: Close, nothing changes
+    else User confirms a strategy
+        User -> Dialog: PUBLISH_THEN_RESTORE / BACKUP_THEN_RESTORE / OVERWRITE
+        Dialog --> UI: strategy (+ backupWorkflowName / publishComment)
+    end
+end
+
+UI -> Controller: POST /api/workflows/{id}/versions/{versionId}/restore\n{ strategy, backupWorkflowName?, publishComment? }
+Note right of UI: The request never carries a definition;\nthe backend reads it from workflow_versions
+Controller -> Handler: RestoreVersionCommand(workflowId, versionId, userId, strategy)
+Handler -> Repo: findWorkflowWithDraftAndVersion(workflowId, versionId)
+Repo -> DB: Load workflow, draft and target version
+DB --> Repo: Records
+Repo --> Handler: { workflow, draft, targetVersion }
+
+alt Workflow/version missing, version of another workflow, or not owner
+    Handler --> Controller: 404 Not Found / 403 Forbidden / 400 Bad Request
+    Controller --> UI: Return error
+    UI --> User: Show error toast
+else Restore allowed
+    Handler -> Repo: restoreVersion(params)
+    Repo -> DB: BEGIN transaction
+    alt PUBLISH_THEN_RESTORE
+        Repo -> DB: Insert WorkflowVersion from current draft\n(versionNumber = max + 1)
+    else BACKUP_THEN_RESTORE
+        Repo -> DB: Insert backup Workflow + Draft cloned from current draft
+    else OVERWRITE
+        Note over Repo, DB: No backup is created
+    end
+    Repo -> DB: Update draft.definition = targetVersion.definition
+    Note right of DB: Existing workflow_versions rows are never modified
+    Repo -> DB: COMMIT
+    DB --> Repo: Updated draft
+    Repo --> Handler: RestoreResult
+    Handler --> Controller: RestoreResultDto
+    Controller --> UI: 200 OK { definition, strategyUsed, ... }
+    UI -> UI: Invalidate draft and versions queries
+    UI -> UI: Load nodes, edges, viewport into canvas store
+    UI --> User: Show success toast
+end
+
+@enduml

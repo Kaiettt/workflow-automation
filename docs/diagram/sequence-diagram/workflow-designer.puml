@@ -1,0 +1,92 @@
+@startuml WorkflowDesigner
+title Workflow Designer: Open, Build Graph, Configure Nodes and Autosave
+autonumber
+
+actor User
+boundary "Workflow Designer\n(React Flow canvas)" as UI
+participant "Designer Store\n(Zustand)" as Store
+control "Workflows Controller" as Controller
+control "Node Types Controller" as CatalogCtrl
+control "Designer Handlers (CQRS)" as Handlers
+database "PostgreSQL\n(Prisma)" as DB
+
+== Open designer ==
+alt Create a new workflow
+    User -> UI: Click Create Workflow
+    UI -> Controller: POST /api/workflows
+    Controller -> Handlers: CreateWorkflowCommand
+    Handlers -> DB: Insert workflows row (status = DRAFT)
+    DB --> Handlers: workflowId
+    Handlers --> Controller: Created workflow
+    Controller --> UI: 201 Created + workflowId
+else Open an existing workflow
+    User -> UI: Select workflow from dashboard
+end
+
+UI -> Controller: GET /api/workflows/{workflowId}/draft
+Controller -> Handlers: GetWorkflowDraftQuery
+Handlers -> DB: Find workflow_drafts by workflowId
+alt Draft exists
+    DB --> Handlers: Saved definition
+    Handlers --> Controller: { nodes, edges, viewport }
+    Controller --> UI: 200 OK + definition
+    UI -> Store: Load nodes, edges and viewport
+else No draft yet
+    DB --> Handlers: No record
+    Handlers --> Controller: Not Found
+    Controller --> UI: 404 Not Found
+    UI -> Store: Initialize empty graph
+end
+
+UI -> CatalogCtrl: GET /api/node-types
+CatalogCtrl -> DB: Load node_type_definitions
+DB --> CatalogCtrl: key, category, icon, configSchema
+CatalogCtrl --> UI: Node catalog
+UI --> User: Render palette grouped by category and the canvas
+
+== Build the graph ==
+loop Until the user leaves the designer
+    alt Add node
+        User -> UI: Drag node type from palette onto canvas
+        UI -> Store: Add node { id, type, position, data: { key, name, config } }
+        Note right of Store: config is pre-filled with configSchema defaults
+    else Move node
+        User -> UI: Drag node to a new position
+        UI -> Store: Update node position
+    else Connect nodes
+        User -> UI: Drag from source handle to target handle
+        UI -> Store: Add edge { source, target }
+    else Configure node
+        User -> UI: Select node
+        UI -> Store: Set selectedNodeId
+        UI --> User: Open Properties Panel built from configSchema
+        User -> UI: Edit field values
+        UI -> Store: Update node.data.config
+    else Delete node or edge
+        User -> UI: Select element and press Delete
+        UI -> Store: Remove node with its edges, or remove edge
+    end
+
+    group Autosave (debounced)
+    Store -> UI: Graph changed
+    UI -> UI: Debounce ~2 seconds
+    UI --> User: Show Saving...
+    UI -> Controller: PUT /api/workflows/{workflowId}/draft\n{ definition: { nodes, edges, viewport } }
+    Controller -> Handlers: SaveDraftCommand
+    Handlers -> DB: Verify workflow exists
+    alt Workflow missing
+        Handlers --> Controller: Not Found
+        Controller --> UI: 404 Not Found
+        UI --> User: Show save error
+    else Workflow exists
+        Handlers -> DB: Upsert the single draft for this workflow
+        Note right of DB: Drafts are saved as-is;\nvalidation happens only on publish
+        DB --> Handlers: updatedAt
+        Handlers --> Controller: Save confirmation
+        Controller --> UI: 200 OK + updatedAt
+        UI --> User: Show Saved
+    end
+    end
+end
+
+@enduml
