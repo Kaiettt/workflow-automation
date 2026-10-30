@@ -2,12 +2,15 @@ import { useCallback, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
+  BackgroundVariant,
+  MarkerType,
   Controls,
   MiniMap,
   addEdge,
   useReactFlow,
 } from '@xyflow/react';
 import type {
+  DefaultEdgeOptions,
   Node,
   Edge,
   OnNodesChange,
@@ -21,6 +24,7 @@ import { TriggerNode } from './nodes/TriggerNode';
 import { ActionNode } from './nodes/ActionNode';
 import { useDesignerStore } from '../store/designer.store';
 import { getDefaultConfig, uniqueNodeName } from '../utils/node-config';
+import { outputOfHandle, resolveOutputs } from '../utils/node-outputs';
 
 interface CanvasProps {
   nodes: Node[];
@@ -36,6 +40,46 @@ function CanvasContent({ nodes, edges, onNodesChange, onEdgesChange, setNodes, s
   const { screenToFlowPosition } = useReactFlow();
   const setSelectedNodeId = useDesignerStore((state) => state.setSelectedNodeId);
   const catalogNodeTypes = useDesignerStore((state) => state.nodeTypes);
+
+  // Edges look the same whether new or saved: smooth step, arrow at the end.
+  const defaultEdgeOptions = useMemo<DefaultEdgeOptions>(
+    () => ({
+      type: 'smoothstep',
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8', width: 18, height: 18 },
+    }),
+    [],
+  );
+  const miniMapColor = useCallback(
+    (node: Node) =>
+      (Array.isArray(catalogNodeTypes) &&
+        catalogNodeTypes.find((nt) => nt.key === node.data?.key)?.color) ||
+      '#94a3b8',
+    [catalogNodeTypes],
+  );
+
+  // Edges leaving a named output show its name (not saved, only drawn).
+  const labelledEdges = useMemo(
+    () =>
+      edges.map((edge) => {
+        const key = outputOfHandle(edge.sourceHandle);
+        if (key === null) return edge;
+        const source = nodes.find((node) => node.id === edge.source);
+        const schema = Array.isArray(catalogNodeTypes)
+          ? catalogNodeTypes.find((nt) => nt.key === source?.data?.key)?.configSchema
+          : undefined;
+        const label = resolveOutputs(schema, source?.data?.config).find((o) => o.key === key)?.label;
+        return label
+          ? {
+              ...edge,
+              label,
+              labelStyle: { fontSize: 10, fill: '#475569' },
+              labelBgStyle: { fill: '#f8fafc' },
+              labelBgPadding: [4, 2] as [number, number],
+            }
+          : edge;
+      }),
+    [edges, nodes, catalogNodeTypes],
+  );
 
   const nodeTypes = useMemo<NodeTypes>(() => {
     const map: NodeTypes = {
@@ -113,7 +157,7 @@ function CanvasContent({ nodes, edges, onNodesChange, onEdgesChange, setNodes, s
     <div className="flex-1 h-full w-full bg-gray-50 relative" ref={reactFlowWrapper}>
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={labelledEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -121,6 +165,7 @@ function CanvasContent({ nodes, edges, onNodesChange, onEdgesChange, setNodes, s
         onDragOver={onDragOver}
         deleteKeyCode={['Backspace', 'Delete']}
         nodeTypes={nodeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
         onSelectionChange={(params) => {
           if (params.nodes.length > 0) {
             setSelectedNodeId(params.nodes[0].id);
@@ -130,9 +175,16 @@ function CanvasContent({ nodes, edges, onNodesChange, onEdgesChange, setNodes, s
         }}
         fitView
       >
-        <Background color="#ccc" gap={16} />
-        <Controls />
-        <MiniMap zoomable pannable />
+        <Background variant={BackgroundVariant.Dots} color="#cbd5e1" gap={20} size={1.5} />
+        <Controls showInteractive={false} />
+        <MiniMap
+          zoomable
+          pannable
+          nodeColor={miniMapColor}
+          nodeStrokeWidth={0}
+          nodeBorderRadius={4}
+          maskColor="rgba(241, 245, 249, 0.7)"
+        />
       </ReactFlow>
     </div>
   );
