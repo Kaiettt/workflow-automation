@@ -22,7 +22,8 @@ export interface ExecutionRecord {
 export interface NodeLogRecord {
   nodeId: string;
   nodeKey: string;
-  status: ExecutionStatus;
+  // SKIPPED: no incoming edge was activated, so the node did not run.
+  status: ExecutionStatus | 'SKIPPED';
   input: unknown;
   output: unknown;
   errorMessage?: string;

@@ -6,6 +6,15 @@ export interface Item {
   pairedItem?: number;
 }
 
+// An item sent to one named output of a node (IF: "true" / "false", Switch:
+// one per rule). Plain items go to the main output.
+export class RoutedItem {
+  constructor(
+    readonly output: string,
+    readonly json: ItemJson,
+  ) {}
+}
+
 export function isPlainObject(
   value: unknown,
 ): value is Record<string, unknown> {

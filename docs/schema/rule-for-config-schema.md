@@ -86,6 +86,7 @@ Ngoài JSON Schema gốc, cố định 1 bộ `x-*` key dùng xuyên suốt:
 | `x-placeholderByField: { field, values }` | `config_schema` | UI hiện gợi ý (placeholder) lấy từ `values[<giá trị hiện tại của field>]` — vd. gợi ý tên model theo provider |
 | `x-credentialInput: "form"` | `config_schema`, field có `x-connectorKey` | Credential được tạo bằng **form** sinh từ `connectors.config_schema` (API key, hoặc App ID / App Secret của credential OAuth2 rồi bấm Connect) và chọn trong picker. Không có hint này, `x-connectorKey` render nút OAuth Google cũ |
 | `x-webhook: { scope }` | `config_schema` (ở gốc schema) | Node trigger của integration package: nhận sự kiện qua `/api/webhooks/<id>`. `scope: "node"` → Properties Panel hiện Webhook URL riêng của node; mọi node có hint này có nút **Listen for test event** |
+| `x-outputs` | `config_schema` (ở gốc schema) | Node có nhiều đầu ra. `{ static: [{ key, label }] }` (IF: `true` / `false`) hoặc `{ fromConfig: "rules", labelField: "label", fallback: true }` (một đầu ra `rule_<i>` cho mỗi phần tử của list trong config, thêm `fallback`). Không khai báo = một đầu ra `main`. Cạnh nối từ đầu ra có tên lưu `sourceHandle: "out:<key>"` |
 | `x-loadOptions: true` | `config_schema`, field | Lựa chọn tải từ server với credential đang chọn: `POST /api/node-types/:key/options/:field` `{ credentialId }` (vd. danh sách Page) |
 | `x-enumLabels: { value: label }` | `config_schema`, field có `enum` | Nhãn hiển thị cho từng giá trị enum |
 | `x-placeholder` | `config_schema`, field chuỗi | Gợi ý trong ô nhập |
@@ -116,6 +117,8 @@ Dữ liệu giữa các node luôn là `Item[]`, `Item = { json, pairedItem? }`.
 |---|---|---|
 | `per_item` | Gọi `executeItem` một lần cho **mỗi** item; resolve config theo item đó; gán `pairedItem`. Trả `null`/`[]` → bỏ item | Filter, Gmail |
 | `once` | Resolve config một lần, gọi `execute` với toàn bộ `Item[]` | Manual Trigger, Google Sheet, Aggregate |
+
+**Đồ thị và nhánh.** Workflow là đồ thị có hướng không chu trình, một node bắt đầu. Một node có thể rẽ ra nhiều node và nhiều node có thể gộp lại một node. Engine chạy theo thứ tự topo; một cạnh **được kích hoạt** khi node nguồn đã chạy và đầu ra mà cạnh xuất phát có item (đầu ra `main` luôn được kích hoạt, kể cả rỗng, để Filter lọc hết vẫn cho node sau chạy). Node không có cạnh vào nào được kích hoạt thì ghi log `SKIPPED` và không chạy; node phía sau nó cũng vậy. Node gộp chạy một lần với item của các cạnh đã kích hoạt. Executor gửi item vào đầu ra có tên bằng `new RoutedItem(output, json)`; item thường đi vào `main`. Item trả vào đầu ra node không có làm node `FAILED`.
 
 Output của một node **chỉ chứa kết quả của chính node đó** (trừ Filter trả nguyên item); dữ liệu node trước lấy bằng `$node[...]`.
 

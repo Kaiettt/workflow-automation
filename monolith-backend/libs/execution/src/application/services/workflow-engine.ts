@@ -5,11 +5,19 @@ import {
   TriggerType,
 } from '../../domain/constants/execution.constants';
 import {
-  getExecutionOrder,
+  buildGraphPlan,
+  edgeOutput,
+  GraphPlan,
+  MAIN_OUTPUT,
   WorkflowDefinition,
 } from '../../domain/entities/workflow-execution.entity';
+import { resolveOutputs } from '@app/shared/utils/node-outputs';
 import { INodeExecutor } from '../../domain/entities/node-executor';
-import { buildNodeNameIndex, NodeRun } from '../../domain/entities/run-state';
+import {
+  buildNodeNameIndex,
+  ItemSource,
+  NodeRun,
+} from '../../domain/entities/run-state';
 import { Item } from '../../domain/models/item';
 import { NodeCatalogPort } from '../ports/node-catalog.port';
 import { NodeRunner } from './node-runner';
@@ -39,8 +47,8 @@ export class WorkflowEngine {
   }
 
   // Throws when the definition cannot be run, before anything is stored.
-  executionOrder(definition: unknown): string[] {
-    return getExecutionOrder(definition);
+  plan(definition: unknown): GraphPlan {
+    return buildGraphPlan(definition);
   }
 
   async createExecution(input: StartRunInput, startedAt: Date) {
@@ -85,7 +93,7 @@ export class WorkflowEngine {
     version: WorkflowVersionForExecution,
     triggerItems: Item[],
   ): Promise<ExecutionStatus> {
-    const order = this.executionOrder(version.definition);
+    const { order, incoming } = this.plan(version.definition);
     const definition = version.definition as WorkflowDefinition;
     const nodes = new Map(definition.nodes.map((node) => [node.id, node]));
     const names = buildNodeNameIndex(definition.nodes);
@@ -99,17 +107,70 @@ export class WorkflowEngine {
     ]);
 
     const runs: NodeRun[] = [];
-    let items: Item[] = triggerItems;
+    // Items per output of the nodes that ran; nodes that were skipped are absent.
+    const produced = new Map<
+      string,
+      { outputs: Map<string, Item[]>; offsets: Map<string, number> }
+    >();
     let status = ExecutionStatus.SUCCESS;
 
     for (const nodeId of order) {
       const node = nodes.get(nodeId)!;
+      const configSchema = configSchemas.get(node.data?.key);
+
+      // An edge is active when its source ran and sent items to the output it
+      // leaves from; the main output of a single-output node is always active,
+      // even when empty, so a filter that drops everything still lets the next
+      // node run.
+      let items: Item[] = triggerItems;
+      const inputSources: ItemSource[] = [];
+      const edges = incoming.get(nodeId) ?? [];
+      if (edges.length > 0) {
+        items = [];
+        let activated = false;
+        for (const edge of edges) {
+          const upstream = produced.get(edge.source);
+          const key = edgeOutput(edge);
+          const sent = upstream?.outputs.get(key);
+          if (!upstream || !sent) continue;
+          if (key !== MAIN_OUTPUT && sent.length === 0) continue;
+          const offset = upstream.offsets.get(key) ?? 0;
+          sent.forEach((item, index) => {
+            items.push(item);
+            inputSources.push({ nodeId: edge.source, index: offset + index });
+          });
+          activated = true;
+        }
+        if (!activated) {
+          const now = new Date();
+          await this.repository.saveNodeLog(executionId, {
+            nodeId: node.id,
+            nodeKey: node.data?.key ?? 'unknown',
+            status: 'SKIPPED',
+            input: [],
+            output: null,
+            startedAt: now,
+            finishedAt: now,
+          });
+          continue;
+        }
+      }
+
+      const rawConfig =
+        node.data?.config &&
+        typeof node.data.config === 'object' &&
+        !Array.isArray(node.data.config)
+          ? (node.data.config as Record<string, unknown>)
+          : {};
+      const outputDefs = resolveOutputs(configSchema, rawConfig);
       const result = await this.runner.run({
         node,
         items,
+        inputSources: edges.length > 0 ? inputSources : undefined,
+        outputKeys: outputDefs.map((def) => def.key),
         runs,
         names,
-        configSchema: configSchemas.get(node.data?.key),
+        configSchema,
         credentialOwnerId: version.workflowOwnerId,
       });
 
@@ -119,13 +180,20 @@ export class WorkflowEngine {
         status = ExecutionStatus.FAILED;
         break;
       }
+      const offsets = new Map<string, number>();
+      let offset = 0;
+      for (const [key, sent] of result.outputs) {
+        offsets.set(key, offset);
+        offset += sent.length;
+      }
+      produced.set(node.id, { outputs: result.outputs, offsets });
       runs.push({
         nodeId: node.id,
         nodeName: typeof node.data.name === 'string' ? node.data.name : node.id,
         input: items,
+        inputSources: edges.length > 0 ? inputSources : undefined,
         output: result.output,
       });
-      items = result.output;
     }
     return status;
   }

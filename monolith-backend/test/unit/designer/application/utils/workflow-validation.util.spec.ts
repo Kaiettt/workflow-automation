@@ -134,4 +134,108 @@ describe('Workflow Validation Utils', () => {
       );
     });
   });
+
+  describe('graph shape', () => {
+    const catalogMap = new Map<
+      string,
+      { category: string; configSchema: unknown }
+    >([
+      ['trigger.manual', { category: 'TRIGGER', configSchema: {} }],
+      ['data.aggregate', { category: 'DATA_PROCESSING', configSchema: {} }],
+      [
+        'logic.if',
+        {
+          category: 'LOGIC',
+          configSchema: {
+            'x-outputs': {
+              static: [
+                { key: 'true', label: 'True' },
+                { key: 'false', label: 'False' },
+              ],
+            },
+          },
+        },
+      ],
+    ]);
+    const node = (id: string, key: string) => ({
+      id,
+      type: key === 'trigger.manual' ? 'triggerNode' : 'actionNode',
+      data: { key, config: {} },
+    });
+    const codes = (definition: object) =>
+      validateWorkflowDraft(definition, catalogMap).issues.map(
+        (issue) => issue.code,
+      );
+
+    it('accepts a branch that joins again', () => {
+      expect(
+        codes({
+          nodes: [
+            node('t', 'trigger.manual'),
+            node('if', 'logic.if'),
+            node('a', 'data.aggregate'),
+            node('b', 'data.aggregate'),
+            node('j', 'data.aggregate'),
+          ],
+          edges: [
+            { source: 't', target: 'if' },
+            { source: 'if', target: 'a', sourceHandle: 'out:true' },
+            { source: 'if', target: 'b', sourceHandle: 'out:false' },
+            { source: 'a', target: 'j' },
+            { source: 'b', target: 'j' },
+          ],
+        }),
+      ).toEqual([]);
+    });
+
+    it('rejects a loop', () => {
+      expect(
+        codes({
+          nodes: [
+            node('t', 'trigger.manual'),
+            node('a', 'data.aggregate'),
+            node('b', 'data.aggregate'),
+          ],
+          edges: [
+            { source: 't', target: 'a' },
+            { source: 'a', target: 'b' },
+            { source: 'b', target: 'a' },
+          ],
+        }),
+      ).toContain('GRAPH_CYCLE');
+    });
+
+    it('rejects two start nodes', () => {
+      expect(
+        codes({
+          nodes: [
+            node('t', 'trigger.manual'),
+            node('a', 'data.aggregate'),
+            node('b', 'data.aggregate'),
+            node('c', 'data.aggregate'),
+          ],
+          edges: [
+            { source: 't', target: 'a' },
+            { source: 'b', target: 'c' },
+          ],
+        }),
+      ).toContain('MULTIPLE_START');
+    });
+
+    it('rejects a connection from an output the node does not have', () => {
+      expect(
+        codes({
+          nodes: [
+            node('t', 'trigger.manual'),
+            node('if', 'logic.if'),
+            node('a', 'data.aggregate'),
+          ],
+          edges: [
+            { source: 't', target: 'if' },
+            { source: 'if', target: 'a', sourceHandle: 'out:maybe' },
+          ],
+        }),
+      ).toContain('UNKNOWN_OUTPUT');
+    });
+  });
 });

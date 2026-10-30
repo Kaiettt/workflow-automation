@@ -50,7 +50,7 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
 
   private checkExecutionOrder(definition: unknown): void {
     try {
-      this.engine.executionOrder(definition);
+      this.engine.plan(definition);
     } catch (error) {
       throw new BadRequestException(
         error instanceof Error ? error.message : 'Invalid workflow definition',

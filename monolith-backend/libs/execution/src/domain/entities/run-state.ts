@@ -2,10 +2,19 @@ import { NodeReferenceError, PairedItemError } from '../expression/errors';
 import { ExpressionContext } from '../expression/template';
 import { Item, ItemJson } from '../models/item';
 
+// Where an input item came from: `index` is its position in the `output` of node `nodeId`.
+export interface ItemSource {
+  nodeId: string;
+  index: number;
+}
+
 export interface NodeRun {
   nodeId: string;
   nodeName: string;
   input: Item[];
+  // Parallel to `input`. Without it the input is taken to be the output of the
+  // run before this one (a plain chain).
+  inputSources?: ItemSource[];
   output: Item[];
 }
 
@@ -49,16 +58,17 @@ function findRunIndex(
   return runIndex;
 }
 
-// `runs` are the nodes that already ran, in order; the node being executed
-// received `runs[last].output` as input. `currentIndex` is the position of the
-// current item in that input.
+// `runs` are the nodes that already ran, parents before children. `currentIndex`
+// is the position of the current item in the input of the node being executed;
+// `currentSources` says where that input came from (without it, from the last run).
 export function createExpressionContext(params: {
   runs: readonly NodeRun[];
   names: NodeNameIndex;
   currentItem: Item;
   currentIndex: number;
+  currentSources?: readonly ItemSource[];
 }): ExpressionContext {
-  const { runs, names, currentItem, currentIndex } = params;
+  const { runs, names, currentItem, currentIndex, currentSources } = params;
 
   return {
     currentItem,
@@ -71,25 +81,33 @@ export function createExpressionContext(params: {
 
     getPairedJson(nodeName: string): ItemJson {
       const targetPos = findRunIndex(runs, names, nodeName);
-      let index = currentIndex;
-      for (let pos = runs.length - 1; pos >= targetPos; pos -= 1) {
-        const item = runs[pos].output[index];
-        if (item === undefined) {
-          throw new PairedItemError(
-            `There is no item to pair with node "${nodeName}"`,
-          );
-        }
+      const noItem = () =>
+        new PairedItemError(`There is no item to pair with node "${nodeName}"`);
+      const last = runs[runs.length - 1];
+      // Walk from the current item back through the nodes that produced it.
+      let source: ItemSource | undefined =
+        currentSources?.[currentIndex] ??
+        (last ? { nodeId: last.nodeId, index: currentIndex } : undefined);
+      while (source) {
+        const sourceNodeId: string = source.nodeId;
+        const pos = runs.findIndex((run) => run.nodeId === sourceNodeId);
+        const item = pos === -1 ? undefined : runs[pos].output[source.index];
+        if (item === undefined) throw noItem();
         if (pos === targetPos) return item.json;
         if (item.pairedItem === undefined) {
           throw new PairedItemError(
             `Cannot tell which item of node "${nodeName}" matches the current item. Use $node["${nodeName}"].all to read all of its items`,
           );
         }
-        index = item.pairedItem;
+        const run = runs[pos];
+        const parent: NodeRun | undefined = runs[pos - 1];
+        source =
+          run.inputSources?.[item.pairedItem] ??
+          (parent
+            ? { nodeId: parent.nodeId, index: item.pairedItem }
+            : undefined);
       }
-      throw new PairedItemError(
-        `There is no item to pair with node "${nodeName}"`,
-      );
+      throw noItem();
     },
   };
 }

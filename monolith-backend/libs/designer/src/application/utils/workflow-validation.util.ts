@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
 
+import { resolveOutputs } from '@app/shared/utils/node-outputs';
+
 export interface PublishValidationIssue {
   code: string;
   severity: 'error';
@@ -187,8 +189,93 @@ export function validateWorkflowDraft(
     }
   }
 
+  issues.push(...validateGraphShape(nodes, edges, nodeTypesByKey));
+
   return {
     isValid: issues.length === 0,
     issues,
   };
+}
+
+/**
+ * The flow must have one start node and no cycle, and every edge must leave
+ * from an output its node still has (a Switch rule may have been deleted).
+ */
+function validateGraphShape(
+  nodes: any[],
+  edges: any[],
+  nodeTypesByKey: Map<string, { configSchema: unknown }>,
+): PublishValidationIssue[] {
+  const issues: PublishValidationIssue[] = [];
+  const valid = edges.filter(
+    (edge: any) =>
+      typeof edge?.source === 'string' && typeof edge?.target === 'string',
+  );
+
+  const incoming = new Map<string, number>();
+  const outgoing = new Map<string, string[]>();
+  const involved = new Set<string>();
+  for (const edge of valid) {
+    incoming.set(edge.target, (incoming.get(edge.target) ?? 0) + 1);
+    outgoing.set(edge.source, [
+      ...(outgoing.get(edge.source) ?? []),
+      edge.target,
+    ]);
+    involved.add(edge.source);
+    involved.add(edge.target);
+  }
+
+  const starts = [...involved].filter((id) => !incoming.has(id));
+  if (starts.length > 1) {
+    issues.push({
+      code: 'MULTIPLE_START',
+      severity: 'error',
+      message:
+        'Workflow must start from a single node; more than one node has no incoming connection.',
+    });
+  }
+
+  // Kahn: whatever cannot be ordered is on, or behind, a cycle.
+  const waiting = new Map(incoming);
+  const ready = starts.slice();
+  let ordered = 0;
+  while (ready.length > 0) {
+    const id = ready.shift()!;
+    ordered += 1;
+    for (const target of outgoing.get(id) ?? []) {
+      const left = (waiting.get(target) ?? 0) - 1;
+      waiting.set(target, left);
+      if (left === 0) ready.push(target);
+    }
+  }
+  if (ordered < involved.size) {
+    issues.push({
+      code: 'GRAPH_CYCLE',
+      severity: 'error',
+      message: 'Workflow connections must not form a loop.',
+    });
+  }
+
+  const nodesById = new Map(nodes.map((node: any) => [node.id, node]));
+  for (const edge of valid) {
+    const handle = edge.sourceHandle;
+    if (typeof handle !== 'string' || !handle.startsWith('out:')) continue;
+    const source = nodesById.get(edge.source);
+    const key = source ? getNodeKey(source) : undefined;
+    const nodeType = key ? nodeTypesByKey.get(key) : undefined;
+    if (!source || !nodeType) continue;
+    const outputs = resolveOutputs(
+      nodeType.configSchema,
+      source.data?.config ?? {},
+    );
+    if (!outputs.some((output) => `out:${output.key}` === handle)) {
+      issues.push({
+        code: 'UNKNOWN_OUTPUT',
+        severity: 'error',
+        nodeId: source.id,
+        message: `A connection leaves ${source.data?.name ?? source.id} from an output that no longer exists.`,
+      });
+    }
+  }
+  return issues;
 }

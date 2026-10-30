@@ -71,7 +71,7 @@ interface RunnerNodeData extends Record<string, unknown> {
   category: string;
   iconType: 'webhook' | 'filter' | 'database' | 'mail' | 'action';
   detail: string;
-  status: 'idle' | 'running' | 'success' | 'failed';
+  status: 'idle' | 'running' | 'success' | 'failed' | 'skipped';
   hasTarget: boolean;
   hasSource: boolean;
   outputSummary?: string;
@@ -102,6 +102,7 @@ const RunnerNodeComponent: React.FC<NodeProps<Node<RunnerNodeData>>> = ({ data }
       return 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-emerald-500/10';
     if (data.status === 'failed')
       return 'border-rose-500 ring-2 ring-rose-500/20 shadow-rose-500/10';
+    if (data.status === 'skipped') return 'border-dashed border-border opacity-60';
     return 'border-border hover:border-border/80';
   };
 
@@ -144,6 +145,9 @@ const RunnerNodeComponent: React.FC<NodeProps<Node<RunnerNodeData>>> = ({ data }
           )}
           {data.status === 'failed' && (
             <XCircle className="size-3.5 text-rose-500 ml-1 shrink-0" />
+          )}
+          {data.status === 'skipped' && (
+            <span className="ml-1 shrink-0 text-[10px] text-muted-foreground">Skipped</span>
           )}
         </div>
 
@@ -327,6 +331,17 @@ export const VersionDetailPage: React.FC = () => {
                   outputSummary: `✓ Thành công (${log.durationMs ?? 0}ms)`,
                   errorMessage: undefined,
                   durationMs: log.durationMs ?? undefined,
+                },
+              };
+            } else if (log.status === 'SKIPPED') {
+              return {
+                ...n,
+                data: {
+                  ...n.data,
+                  status: 'skipped',
+                  outputSummary: undefined,
+                  errorMessage: undefined,
+                  durationMs: undefined,
                 },
               };
             } else {
@@ -693,6 +708,7 @@ export const VersionDetailPage: React.FC = () => {
                         executionResult.nodeLogs.map((log, index) => {
                           const isExpanded = !!expandedNodes[log.nodeId];
                           const isNodeSuccess = log.status === 'SUCCESS';
+                          const isNodeSkipped = log.status === 'SKIPPED';
 
                           return (
                             <React.Fragment key={log.id || log.nodeId}>
@@ -736,6 +752,13 @@ export const VersionDetailPage: React.FC = () => {
                                     >
                                       <CheckCircle2 className="size-3" />
                                       <span>SUCCESS ({log.durationMs ?? 0}ms)</span>
+                                    </Badge>
+                                  ) : isNodeSkipped ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="gap-1 text-[11px] text-muted-foreground"
+                                    >
+                                      <span>SKIPPED</span>
                                     </Badge>
                                   ) : (
                                     <Badge

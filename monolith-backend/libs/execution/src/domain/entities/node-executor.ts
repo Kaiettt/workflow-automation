@@ -1,4 +1,4 @@
-import { Item, ItemJson } from '../models/item';
+import { Item, ItemJson, RoutedItem } from '../models/item';
 
 interface NodeExecutorBase<TConfig> {
   readonly key: string;
@@ -12,8 +12,12 @@ interface NodeExecutorBase<TConfig> {
   expectedConnectorKey?(rawConfig: Record<string, unknown>): string | null;
 }
 
+// What a per-item node returns for one input item.
+export type ItemResult = ItemJson | RoutedItem;
+
 // The engine calls the node once per input item. Returning an object yields one
-// item, an array yields several, null or [] drops the item.
+// item, an array yields several, null or [] drops the item. A RoutedItem sends
+// the item to a named output instead of the main one.
 export interface IPerItemExecutor<
   TConfig = unknown,
 > extends NodeExecutorBase<TConfig> {
@@ -29,7 +33,7 @@ export interface IPerItemExecutor<
     config: TConfig;
     item: Item;
     credential: unknown;
-  }): Promise<ItemJson | ItemJson[] | null>;
+  }): Promise<ItemResult | ItemResult[] | null>;
 }
 
 // The engine calls the node once with every input item.
