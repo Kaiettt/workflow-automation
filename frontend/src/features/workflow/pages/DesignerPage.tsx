@@ -13,6 +13,7 @@ import {
   WorkflowPublishValidationError,
   type WorkflowValidationIssue,
 } from '../models/workflow-validation.model';
+import { resolveOutputs, outputOfHandle } from '../utils/node-outputs';
 
 interface DesignerPageProps {
   workflowId?: string;
@@ -194,7 +195,17 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
         return n;
       })
     );
-  }, [setNodes]);
+    // A deleted Switch rule takes its connections with it.
+    const schema = useDesignerStore.getState().nodeTypes.find((t) => t.key === data.key)?.configSchema;
+    const kept = new Set(resolveOutputs(schema, data.config).map((output) => output.key));
+    setEdges((eds) => {
+      const next = eds.filter((edge) => {
+        const output = edge.source === nodeId ? outputOfHandle(edge.sourceHandle) : null;
+        return output === null || kept.has(output);
+      });
+      return next.length === eds.length ? eds : next;
+    });
+  }, [setNodes, setEdges]);
 
   const handlePublish = async () => {
     setIsPublishing(true);

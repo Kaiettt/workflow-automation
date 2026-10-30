@@ -115,8 +115,9 @@ evaluate(conditions: Condition[], combine: 'and' | 'or', opts: { ignoreCase, ign
 
 ### 3.3. Switch (`logic.switch`)
 - Config: `rules[]` (`{ label, conditions[], combine }`), `mode: 'first' | 'all'`, `fallback: boolean`, `ignore_case`, `ignore_accents`.
-- `x-outputs: { fromConfig: 'rules', labelField: 'label', fallback: true }`. Key đầu ra là `rule_<index>` (không dùng nhãn làm key để đổi tên luật không làm đứt cạnh); fallback là `fallback`.
-- Xoá luật ở giữa: frontend đổi `sourceHandle` của các cạnh phía sau cho khớp chỉ số mới.
+- `x-outputs: { fromConfig: 'rules', labelField: 'label', fallback: true }`. Mỗi luật có `id` ngẫu nhiên (frontend sinh khi thêm luật, schema đánh dấu `x-rowId`), key đầu ra là `rule_<id>`: đổi tên, đổi thứ tự hay xoá luật khác không làm đứt cạnh. Luật không có `id` (nhập tay) dùng `rule_<vị trí>`. Đầu ra `fallback` luôn có.
+- Xoá một luật: frontend xoá các cạnh nối từ đầu ra đó (`DesignerPage.handleNodeDataChange`); nếu vẫn sót thì publish báo `UNKNOWN_OUTPUT`.
+- Biểu thức trong danh sách: `resolveConfig` đi vào mảng object theo `items` của schema (đường dẫn lỗi dạng `rules[0].conditions[1].value2`).
 
 ### 3.4. Edit Fields (`data.set`)
 - Config: `fields[]` (`{ name, value }`, `value` cho phép biểu thức, `name` là đường dẫn chấm `a.b`), `keep_other_fields: boolean` (mặc định `true`).

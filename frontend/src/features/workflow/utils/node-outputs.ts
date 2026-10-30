@@ -32,8 +32,9 @@ export function resolveOutputs(schema: unknown, config: unknown): OutputDef[] {
     const labelField = typeof spec.labelField === 'string' ? spec.labelField : 'label';
     const outputs = entries.map((entry, index): OutputDef => {
       const label = isRecord(entry) ? entry[labelField] : undefined;
+      const id = isRecord(entry) ? entry.id : undefined;
       return {
-        key: `rule_${index}`,
+        key: typeof id === 'string' && id ? `rule_${id}` : `rule_${index}`,
         label: typeof label === 'string' && label.trim() ? label : `Rule ${index + 1}`,
       };
     });

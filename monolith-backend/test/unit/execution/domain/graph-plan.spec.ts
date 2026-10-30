@@ -130,4 +130,11 @@ describe('resolveOutputs', () => {
       { key: FALLBACK_OUTPUT, label: 'Fallback' },
     ]);
   });
+
+  it('names a rule output after its id when it has one', () => {
+    const schema = { 'x-outputs': { fromConfig: 'rules' } };
+    expect(
+      resolveOutputs(schema, { rules: [{ id: 'b' }, {}] }).map((o) => o.key),
+    ).toEqual(['rule_b', 'rule_1']);
+  });
 });

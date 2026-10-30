@@ -26,30 +26,58 @@ export function applySchemaDefaults(
   return config;
 }
 
-// Resolves {{...}} only in string fields the schema marks with x-allowExpression.
+// Resolves {{...}} in a value, going into lists of objects (conditions, rules,
+// fields) by their `items` schema. Only string fields the schema marks with
+// x-allowExpression are touched.
+function resolveValue(
+  value: unknown,
+  schema: unknown,
+  ctx: ExpressionContext,
+  path: string,
+): unknown {
+  if (!isPlainObject(schema)) return value;
+  if (typeof value === 'string') {
+    if (schema['x-allowExpression'] !== true || !value.includes('{{')) {
+      return value;
+    }
+    try {
+      return evaluateTemplate(parseTemplate(value), ctx);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new ExpressionError(`Config "${path}": ${reason}`);
+    }
+  }
+  if (Array.isArray(value)) {
+    const items = schema['items'];
+    return isPlainObject(items)
+      ? value.map((entry, index) =>
+          resolveValue(entry, items, ctx, `${path}[${index}]`),
+        )
+      : value;
+  }
+  if (isPlainObject(value)) {
+    const properties = schema['properties'];
+    if (!isPlainObject(properties)) return value;
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        resolveValue(entry, properties[key], ctx, `${path}.${key}`),
+      ]),
+    );
+  }
+  return value;
+}
+
 export function resolveConfig(
   rawConfig: Record<string, unknown>,
   configSchema: unknown,
   ctx: ExpressionContext,
 ): Record<string, unknown> {
   const properties = schemaProperties(configSchema);
-  const config = { ...rawConfig };
-  for (const [key, value] of Object.entries(rawConfig)) {
-    const schema = properties[key];
-    if (
-      !isPlainObject(schema) ||
-      schema['x-allowExpression'] !== true ||
-      typeof value !== 'string' ||
-      !value.includes('{{')
-    ) {
-      continue;
-    }
-    try {
-      config[key] = evaluateTemplate(parseTemplate(value), ctx);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new ExpressionError(`Config "${key}": ${reason}`);
-    }
-  }
-  return config;
+  return Object.fromEntries(
+    Object.entries(rawConfig).map(([key, value]) => [
+      key,
+      resolveValue(value, properties[key], ctx, key),
+    ]),
+  );
 }

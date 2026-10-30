@@ -28,6 +28,14 @@ describe('resolveOutputs', () => {
       { key: 'fallback', label: 'Fallback' },
     ]);
   });
+
+  it('names a rule output after its id so reordering keeps the connections', () => {
+    const schema = { 'x-outputs': { fromConfig: 'rules', fallback: false } };
+    expect(resolveOutputs(schema, { rules: [{ id: 'b' }, { id: 'a' }] }).map((o) => o.key)).toEqual([
+      'rule_b',
+      'rule_a',
+    ]);
+  });
 });
 
 describe('outputOfHandle', () => {

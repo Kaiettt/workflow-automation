@@ -1,12 +1,15 @@
 import {
   Filter,
+  GitBranch,
   Layers,
   MessageCircle,
+  Pencil,
   Play,
   Reply,
   Send,
   Settings,
   Sparkles,
+  Split,
   Webhook,
   Zap,
 } from 'lucide-react';
@@ -29,6 +32,9 @@ const ICONS: Record<string, LucideIcon> = {
   reply: Reply,
   filter: Filter,
   layers: Layers,
+  'git-branch': GitBranch,
+  split: Split,
+  pencil: Pencil,
 };
 
 const FALLBACK_COLOR = '#6b7280';

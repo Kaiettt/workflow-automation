@@ -14,6 +14,9 @@ export const NodeKeys = {
   GOOGLE_SHEET_READ_ROWS: 'integration.google_sheet.readRows',
   TRIGGER_MANUAL: 'trigger.manual',
   LOGIC_FILTER: 'logic.filter',
+  LOGIC_IF: 'logic.if',
+  LOGIC_SWITCH: 'logic.switch',
+  DATA_SET: 'data.set',
   DATA_AGGREGATE: 'data.aggregate',
   AI_LLM_GENERATE: 'ai.llm.generate',
 } as const;

@@ -16,10 +16,10 @@
 - [ ] 🤖 Chạy toàn bộ e2e hiện có (kỳ vọng như trước: chỉ 2 test fail sẵn trên `master`)
 
 ## P2. IF / Switch / Edit Fields
-- [ ] 🤖 `domain/conditions.ts` (toán tử, AND/OR, bỏ hoa thường / dấu, giới hạn regex)
-- [ ] 🤖 `logic.if`, `logic.switch` (mode first / all, fallback), `data.set` + seed node type
-- [ ] 🤖 Frontend: field danh sách điều kiện / luật / trường; Switch đổi `sourceHandle` khi xoá luật
-- [ ] 🤖 Unit cho từng toán tử và executor; e2e: trigger → Switch → hai nhánh gửi Messenger khác nhau
+- [x] 🤖 `domain/conditions.ts` (toán tử, AND/OR, bỏ hoa thường / dấu, giới hạn regex)
+- [x] 🤖 `logic.if`, `logic.switch` (mode first / all), `data.set` + seed node type; biểu thức trong config dạng danh sách (`rules[0].conditions[1].value2`)
+- [x] 🤖 Frontend: `ListField` (danh sách điều kiện / luật / trường), `BooleanField`; xoá luật Switch thì xoá cạnh nối từ đầu ra đó
+- [x] 🤖 Unit cho từng toán tử, executor và luồng chatbot; e2e: webhook → Switch → hai nhánh, nhánh kia `SKIPPED`; publish chặn cạnh từ luật đã xoá
 
 ## P3. Chat Memory
 - [ ] 🤖 Tham số `context { workflowId, executionId }` cho executor

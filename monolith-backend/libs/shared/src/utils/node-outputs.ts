@@ -11,8 +11,11 @@ export interface OutputDef {
 
 export const FALLBACK_OUTPUT = 'fallback';
 
-export function ruleOutputKey(index: number): string {
-  return `rule_${index}`;
+// A rule with an id keeps its output when rules are reordered or deleted;
+// without one the output is named by its position.
+export function ruleOutputKey(entry: unknown, index: number): string {
+  const id = isPlainObject(entry) ? entry.id : undefined;
+  return typeof id === 'string' && id ? `rule_${id}` : `rule_${index}`;
 }
 
 // The outputs a node has, from the `x-outputs` of its config schema:
@@ -37,7 +40,7 @@ export function resolveOutputs(
     const outputs = entries.map((entry, index): OutputDef => {
       const label = isPlainObject(entry) ? entry[labelField] : undefined;
       return {
-        key: ruleOutputKey(index),
+        key: ruleOutputKey(entry, index),
         label:
           typeof label === 'string' && label.trim()
             ? label

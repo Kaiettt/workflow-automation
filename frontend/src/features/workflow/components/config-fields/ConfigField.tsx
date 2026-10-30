@@ -2,11 +2,15 @@ import { placeholderFor, propertyTitle } from '../../utils/node-config';
 import type { PropertySchema } from '../../utils/node-config';
 import { CredentialPicker, OAuthField } from './CredentialField';
 import { LoadOptionsField } from './LoadOptionsField';
+import { BooleanField } from './BooleanField';
 import { EnumField } from './EnumField';
+import { ListField } from './ListField';
 import { NumberField } from './NumberField';
 import { TextField } from './TextField';
 
 interface ConfigFieldProps {
+  // Keeps element ids apart when the same field appears in several list rows.
+  idPrefix?: string;
   nodeKey: string;
   fieldKey: string;
   schema: PropertySchema;
@@ -19,6 +23,7 @@ interface ConfigFieldProps {
 
 // Picks the control for one config field from its JSON Schema and x-* hints.
 export function ConfigField({
+  idPrefix = '',
   nodeKey,
   fieldKey,
   schema,
@@ -27,10 +32,17 @@ export function ConfigField({
   onChange,
   onConnectOAuth,
 }: ConfigFieldProps) {
-  const id = `field-${fieldKey}`;
+  const id = `${idPrefix}field-${fieldKey}`;
   const label = propertyTitle(fieldKey, schema);
   const value = config[fieldKey];
   const change = (next: unknown) => onChange(fieldKey, next);
+
+  // Hidden while a sibling field has one of the listed values (an "is empty"
+  // condition has nothing to compare to).
+  const hideWhen = schema['x-hideWhen'] as { field?: string; in?: unknown[] } | undefined;
+  if (hideWhen?.field && Array.isArray(hideWhen.in) && hideWhen.in.includes(config[hideWhen.field])) {
+    return null;
+  }
 
   if (typeof schema['x-connectorKeyFrom'] === 'string') {
     const provider = config[schema['x-connectorKeyFrom']];
@@ -80,6 +92,29 @@ export function ConfigField({
         credentialId={typeof credentialId === 'string' && credentialId ? credentialId : undefined}
         needsCredential={needsCredential}
         value={typeof value === 'string' ? value : ''}
+        hint={typeof schema.description === 'string' ? schema.description : undefined}
+        onChange={change}
+      />
+    );
+  }
+  if (schema.type === 'array' && typeof schema.items === 'object' && schema.items !== null) {
+    return (
+      <ListField
+        id={id}
+        label={label}
+        nodeKey={nodeKey}
+        itemSchema={schema.items as PropertySchema}
+        rows={Array.isArray(value) ? (value as Record<string, unknown>[]) : []}
+        onChange={change}
+      />
+    );
+  }
+  if (schema.type === 'boolean') {
+    return (
+      <BooleanField
+        id={id}
+        label={label}
+        value={value === true}
         hint={typeof schema.description === 'string' ? schema.description : undefined}
         onChange={change}
       />

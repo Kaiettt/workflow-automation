@@ -26,6 +26,9 @@ import { packageExecutors } from './application/executors/package-action-executo
 import { AppsModule, PackageRegistry } from '@app/apps';
 import { GoogleSheetReadRowsExecutor } from './application/executors/google-sheet-read-rows-executor';
 import { FilterExecutor } from './application/executors/filter-executor';
+import { IfExecutor } from './application/executors/if-executor';
+import { SwitchExecutor } from './application/executors/switch-executor';
+import { SetFieldsExecutor } from './application/executors/set-fields-executor';
 import { GmailSendExecutor } from './application/executors/gmail-send-executor';
 import { AggregateExecutor } from './application/executors/aggregate-executor';
 import {
@@ -47,6 +50,9 @@ import { INodeExecutor } from './domain/entities/node-executor';
     ManualTriggerExecutor,
     GoogleSheetReadRowsExecutor,
     FilterExecutor,
+    IfExecutor,
+    SwitchExecutor,
+    SetFieldsExecutor,
     GmailSendExecutor,
     AggregateExecutor,
     AnthropicLlmAdapter,
@@ -84,6 +90,9 @@ import { INodeExecutor } from './domain/entities/node-executor';
         manualTriggerExecutor: ManualTriggerExecutor,
         googleSheetReadRowsExecutor: GoogleSheetReadRowsExecutor,
         filterExecutor: FilterExecutor,
+        ifExecutor: IfExecutor,
+        switchExecutor: SwitchExecutor,
+        setFieldsExecutor: SetFieldsExecutor,
         gmailSendExecutor: GmailSendExecutor,
         aggregateExecutor: AggregateExecutor,
         llmGenerateExecutor: LlmGenerateExecutor,
@@ -92,6 +101,9 @@ import { INodeExecutor } from './domain/entities/node-executor';
         manualTriggerExecutor,
         googleSheetReadRowsExecutor,
         filterExecutor,
+        ifExecutor,
+        switchExecutor,
+        setFieldsExecutor,
         gmailSendExecutor,
         aggregateExecutor,
         llmGenerateExecutor,
@@ -102,6 +114,9 @@ import { INodeExecutor } from './domain/entities/node-executor';
         ManualTriggerExecutor,
         GoogleSheetReadRowsExecutor,
         FilterExecutor,
+        IfExecutor,
+        SwitchExecutor,
+        SetFieldsExecutor,
         GmailSendExecutor,
         AggregateExecutor,
         LlmGenerateExecutor,

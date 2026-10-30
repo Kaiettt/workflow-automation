@@ -29,6 +29,165 @@ export const FILTER_CONFIG_SCHEMA = {
   },
 };
 
+const CONDITION_ITEM = {
+  type: 'object',
+  'x-propertyOrder': ['value1', 'operator', 'value2'],
+  properties: {
+    value1: { type: 'string', title: 'Value', 'x-allowExpression': true },
+    operator: {
+      type: 'string',
+      default: 'contains',
+      enum: [
+        'equals',
+        'not_equals',
+        'contains',
+        'not_contains',
+        'starts_with',
+        'ends_with',
+        'regex',
+        'is_empty',
+        'is_not_empty',
+        'gt',
+        'lt',
+      ],
+      'x-enumLabels': {
+        equals: 'equals',
+        not_equals: 'does not equal',
+        contains: 'contains',
+        not_contains: 'does not contain',
+        starts_with: 'starts with',
+        ends_with: 'ends with',
+        regex: 'matches regex',
+        is_empty: 'is empty',
+        is_not_empty: 'is not empty',
+        gt: 'is greater than',
+        lt: 'is less than',
+      },
+    },
+    value2: {
+      type: 'string',
+      title: 'Compare to',
+      'x-allowExpression': true,
+      'x-hideWhen': { field: 'operator', in: ['is_empty', 'is_not_empty'] },
+    },
+  },
+};
+
+const COMBINE = {
+  type: 'string',
+  enum: ['and', 'or'],
+  default: 'and',
+  title: 'Combine conditions',
+  'x-enumLabels': { and: 'All must match (AND)', or: 'Any can match (OR)' },
+};
+const IGNORE_CASE = { type: 'boolean', default: true, title: 'Ignore case' };
+const IGNORE_ACCENTS = {
+  type: 'boolean',
+  default: true,
+  title: 'Ignore accents',
+  description: 'Treat "giá" and "gia" as the same word',
+};
+
+// Sends each item to the "true" or "false" output.
+export const IF_CONFIG_SCHEMA = {
+  type: 'object',
+  required: ['conditions'],
+  'x-propertyOrder': ['conditions', 'combine', 'ignore_case', 'ignore_accents'],
+  'x-outputs': {
+    static: [
+      { key: 'true', label: 'True' },
+      { key: 'false', label: 'False' },
+    ],
+  },
+  properties: {
+    conditions: {
+      type: 'array',
+      title: 'Conditions',
+      default: [{ value1: '{{$json.text}}', operator: 'contains', value2: '' }],
+      items: CONDITION_ITEM,
+    },
+    combine: COMBINE,
+    ignore_case: IGNORE_CASE,
+    ignore_accents: IGNORE_ACCENTS,
+  },
+};
+
+// One output per rule (named by the rule's id) plus "fallback" for items that match none.
+export const SWITCH_CONFIG_SCHEMA = {
+  type: 'object',
+  required: ['rules'],
+  'x-propertyOrder': ['rules', 'mode', 'ignore_case', 'ignore_accents'],
+  'x-outputs': { fromConfig: 'rules', labelField: 'label', fallback: true },
+  properties: {
+    rules: {
+      type: 'array',
+      title: 'Rules',
+      items: {
+        type: 'object',
+        'x-rowId': true,
+        'x-propertyOrder': ['label', 'conditions', 'combine'],
+        properties: {
+          label: {
+            type: 'string',
+            title: 'Output name',
+            'x-placeholder': 'e.g. Price question',
+          },
+          conditions: {
+            type: 'array',
+            title: 'Conditions',
+            default: [
+              { value1: '{{$json.text}}', operator: 'contains', value2: '' },
+            ],
+            items: CONDITION_ITEM,
+          },
+          combine: COMBINE,
+        },
+      },
+    },
+    mode: {
+      type: 'string',
+      enum: ['first', 'all'],
+      default: 'first',
+      title: 'Which rules',
+      'x-enumLabels': {
+        first: 'First match only',
+        all: 'Every matching rule',
+      },
+    },
+    ignore_case: IGNORE_CASE,
+    ignore_accents: IGNORE_ACCENTS,
+  },
+};
+
+// Adds or overwrites fields on every item; a field name may be a path such as "customer.name".
+export const SET_CONFIG_SCHEMA = {
+  type: 'object',
+  'x-propertyOrder': ['fields', 'keep_other_fields'],
+  properties: {
+    fields: {
+      type: 'array',
+      title: 'Fields',
+      items: {
+        type: 'object',
+        'x-propertyOrder': ['name', 'value'],
+        properties: {
+          name: {
+            type: 'string',
+            title: 'Name',
+            'x-placeholder': 'e.g. reply',
+          },
+          value: { type: 'string', title: 'Value', 'x-allowExpression': true },
+        },
+      },
+    },
+    keep_other_fields: {
+      type: 'boolean',
+      default: true,
+      title: 'Keep the other fields',
+    },
+  },
+};
+
 // `to` defaults to the item's email so workflows published before the field existed keep working.
 export const GMAIL_SEND_CONFIG_SCHEMA = {
   type: 'object',

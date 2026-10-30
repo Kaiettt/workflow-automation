@@ -28,14 +28,20 @@ import { GoogleSheetReadRowsExecutor } from '@app/execution/application/executor
 import { FilterExecutor } from '@app/execution/application/executors/filter-executor';
 import { GmailSendExecutor } from '@app/execution/application/executors/gmail-send-executor';
 import { AggregateExecutor } from '@app/execution/application/executors/aggregate-executor';
+import { IfExecutor } from '@app/execution/application/executors/if-executor';
+import { SwitchExecutor } from '@app/execution/application/executors/switch-executor';
+import { SetFieldsExecutor } from '@app/execution/application/executors/set-fields-executor';
 import { LlmGenerateExecutor } from '@app/execution/application/executors/llm-generate-executor';
 import {
   AGGREGATE_CONFIG_SCHEMA,
   FILTER_CONFIG_SCHEMA,
   GMAIL_SEND_CONFIG_SCHEMA,
   GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA,
+  IF_CONFIG_SCHEMA,
   LLM_GENERATE_CONFIG_SCHEMA,
   MANUAL_TRIGGER_CONFIG_SCHEMA,
+  SET_CONFIG_SCHEMA,
+  SWITCH_CONFIG_SCHEMA,
 } from '../../../prisma/mvp-node-schemas';
 
 export const CREDENTIAL_ID = '33333333-3333-3333-3333-333333333331';
@@ -119,6 +125,9 @@ export class FakeCatalog extends NodeCatalogPort {
         [NodeKeys.GMAIL_SEND, GMAIL_SEND_CONFIG_SCHEMA],
         [NodeKeys.DATA_AGGREGATE, AGGREGATE_CONFIG_SCHEMA],
         [NodeKeys.AI_LLM_GENERATE, LLM_GENERATE_CONFIG_SCHEMA],
+        [NodeKeys.LOGIC_IF, IF_CONFIG_SCHEMA],
+        [NodeKeys.LOGIC_SWITCH, SWITCH_CONFIG_SCHEMA],
+        [NodeKeys.DATA_SET, SET_CONFIG_SCHEMA],
       ]),
     );
   }
@@ -254,6 +263,9 @@ export function build(definition: unknown, options: BuildOptions = {}) {
         },
       })),
       new FilterExecutor(),
+      new IfExecutor(),
+      new SwitchExecutor(),
+      new SetFieldsExecutor(),
       new GmailSendExecutor(() => ({ users: { messages: { send } } })),
       new AggregateExecutor(),
       new LlmGenerateExecutor(

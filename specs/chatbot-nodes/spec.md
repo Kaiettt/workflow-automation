@@ -38,7 +38,7 @@ Dựng được chatbot Messenger thực tế mà không cần viết code:
 
 ### P2. Node logic và dữ liệu
 - **IF** (`logic.if`): đầu ra `true` / `false`, một hoặc nhiều điều kiện nối bằng AND/OR.
-- **Switch** (`logic.switch`): danh sách luật, mỗi luật là một đầu ra có nhãn, cộng đầu ra `fallback`. Item đi vào luật khớp đầu tiên (tuỳ chọn: mọi luật khớp).
+- **Switch** (`logic.switch`): danh sách luật, mỗi luật là một đầu ra có nhãn, luôn có thêm đầu ra `fallback` (không nối thì item không khớp luật nào bị bỏ qua). Item đi vào luật khớp đầu tiên (tuỳ chọn: mọi luật khớp).
 - Toán tử dùng chung: `equals`, `not_equals`, `contains`, `not_contains`, `starts_with`, `ends_with`, `regex`, `is_empty`, `is_not_empty`, `gt`, `lt`. Tuỳ chọn bỏ qua hoa thường và dấu (dùng lại `matchesKeywords` / chuẩn hoá đã có).
 - **Edit Fields** (`data.set`): đặt các trường `tên = giá trị` (cho phép biểu thức), tuỳ chọn giữ hay bỏ trường cũ.
 
