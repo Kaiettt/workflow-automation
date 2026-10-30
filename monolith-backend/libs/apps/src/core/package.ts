@@ -132,6 +132,9 @@ interface NodeBase {
   color: string;
   // Adds a credential_id field limited to this credential type.
   credentialType?: string;
+  // The credential is optional and its type is chosen by another field of the
+  // node: that field holds one of `types` (a credential type key) or "none".
+  credentialTypeFrom?: { field: string; types: string[] };
   properties: NodeProperty[];
 }
 

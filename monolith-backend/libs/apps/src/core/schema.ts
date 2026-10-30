@@ -25,6 +25,17 @@ export function nodeConfigSchema(node: PackageNode): Record<string, unknown> {
     properties[property.name] = propertySchema(property);
     if (property.required) required.push(property.name);
     order.push(property.name);
+    // Right after the field that decides its type, hidden while that is "none".
+    if (node.credentialTypeFrom?.field === property.name) {
+      properties[CREDENTIAL_FIELD] = {
+        type: 'string',
+        title: 'Credential',
+        'x-refType': 'credential',
+        'x-connectorKeyFrom': property.name,
+        'x-hideWhen': { field: property.name, in: ['none', ''] },
+      };
+      order.push(CREDENTIAL_FIELD);
+    }
   }
 
   return {

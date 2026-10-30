@@ -177,10 +177,11 @@ Lý do: dữ liệu tạm, cần nhanh, tự hết hạn. Nếu về sau cần x
 ## 6. HTTP Request (P5)
 
 Package mới `libs/apps/src/http` (`http.request`), đăng ký trong `packages.ts`.
-- Credential type tuỳ chọn: `httpHeaderAuth` (`name`, `value`), `httpBearerAuth` (`token`), `httpBasicAuth` (`user`, `password`). Node có `credentialType` dạng lựa chọn: hợp đồng hiện chỉ cho một `credentialType` cố định, nên thêm `credentialTypes?: string[]` + property `authentication` (`none | header | bearer | basic`) và kiểm khớp ở `PackageActionExecutor`.
+- Credential type tuỳ chọn: `httpHeaderAuth` (`name`, `value`), `httpBearerAuth` (`token`), `httpBasicAuth` (`user`, `password`). Hợp đồng chỉ cho một `credentialType` cố định, nên thêm `credentialTypeFrom: { field, types }`: field `authentication` có giá trị `none` hoặc đúng khoá của một credential type, `credential_id` dùng `x-connectorKeyFrom: 'authentication'` (như LLM chọn theo provider) và ẩn khi là `none`; `PackageActionExecutor.expectedConnectorKey` suy ra connector từ giá trị đó.
 - Property: `method`, `url`, `query[]`, `headers[]`, `body_type: none | json | form | raw`, `body`, `timeout_ms` (mặc định 30 000, tối đa 120 000), `response_format: auto | json | text`, `fail_on_error_status` (mặc định `true`).
-- Dùng `fetch` của Node, giới hạn kích thước phản hồi 5 MB.
-- **Chặn SSRF:** phân giải DNS trước, từ chối `localhost`, `127.0.0.0/8`, `10/8`, `172.16/12`, `192.168/16`, `169.254/16`, `::1`, `fc00::/7`, `fe80::/10`, `0.0.0.0`; không tự theo redirect, tự theo tối đa 5 lần và kiểm lại từng lần. Biến môi trường `HTTP_REQUEST_ALLOW_PRIVATE=true` để tắt khi dev.
+- Dùng `node:http(s)` trực tiếp (`libs/apps/src/http/safe-request.ts`), giới hạn phản hồi 5 MB, không giải nén (gửi `Accept-Encoding: identity`).
+- **Chặn SSRF:** phân giải DNS, từ chối nếu **bất kỳ** địa chỉ nào thuộc dải `0/8`, `10/8`, `100.64/10`, `127/8`, `169.254/16`, `172.16/12`, `192.0.0/24`, `192.168/16`, `198.18/15`, `224/4`, `240/4`, `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, `64:ff9b::/96` (kể cả IPv4 viết trong IPv6); kết nối đúng địa chỉ đã kiểm (không phân giải lại nên DNS rebinding không lách được). Redirect tự theo tối đa 5 lần, mỗi bước kiểm lại, đổi host thì bỏ `Authorization` / `Cookie`. URL có `user:pass@` bị từ chối. `HTTP_REQUEST_ALLOW_PRIVATE=true` để tắt khi dev.
+- Retry: chỉ GET / HEAD / PUT / DELETE khi timeout, mạng rớt, 429 hoặc 5xx; POST / PATCH không thử lại vì có thể đã chạy.
 - Output: `{ status, headers, body }`. Lỗi 5xx / 429 / timeout là `retryable` (dùng retry sẵn có của `PackageActionExecutor`).
 
 ## 7. Gợi ý tên node (P6)

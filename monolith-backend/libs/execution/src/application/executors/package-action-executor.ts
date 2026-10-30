@@ -49,8 +49,13 @@ export class PackageActionExecutor implements IPerItemExecutor<Parameters> {
     return parameters;
   }
 
-  expectedConnectorKey(): string | null {
-    return this.node.credentialType ?? null;
+  expectedConnectorKey(rawConfig: Record<string, unknown>): string | null {
+    if (this.node.credentialType) return this.node.credentialType;
+    const from = this.node.credentialTypeFrom;
+    const chosen = from ? rawConfig[from.field] : undefined;
+    return from && typeof chosen === 'string' && from.types.includes(chosen)
+      ? chosen
+      : null;
   }
 
   async executeItem(params: {

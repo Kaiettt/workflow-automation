@@ -36,9 +36,9 @@
 - [ ] 👤 Thử với Page thật: bấm quick reply / nút, xem workflow chạy lại
 
 ## P5. HTTP Request
-- [ ] 🤖 Package `http` + 3 credential type; `credentialTypes` trong hợp đồng và `PackageActionExecutor`
-- [ ] 🤖 Chặn SSRF (DNS, redirect), `HTTP_REQUEST_ALLOW_PRIVATE`, giới hạn 5 MB, timeout
-- [ ] 🤖 Unit (server giả, các dải IP bị chặn)
+- [x] 🤖 Package `http` + 3 credential type; hợp đồng `credentialTypeFrom` (credential chọn theo field `authentication`) và `PackageActionExecutor.expectedConnectorKey` theo config
+- [x] 🤖 Chặn SSRF (kiểm mọi địa chỉ DNS trả về, kết nối đúng địa chỉ đã kiểm, tự theo redirect và kiểm từng bước), `HTTP_REQUEST_ALLOW_PRIVATE`, giới hạn 5 MB, timeout
+- [x] 🤖 Unit (server thật cục bộ, các dải IP bị chặn, dựng request, xác thực, lỗi) + e2e (webhook → HTTP Request với credential bearer; bị chặn khi tắt cho phép địa chỉ nội bộ)
 
 ## P6. Sửa nhỏ
 - [ ] 🤖 Gợi ý tên node gần đúng trong lỗi biểu thức

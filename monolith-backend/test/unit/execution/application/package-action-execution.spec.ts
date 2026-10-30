@@ -204,7 +204,7 @@ describe('action nodes of integration packages', () => {
         createPackages({ metaGraph: new FakeMetaGraph() }),
       ).action('messenger.sendMessage')!,
     );
-    expect(executor.expectedConnectorKey()).toBe('facebookMessengerOAuth2');
+    expect(executor.expectedConnectorKey({})).toBe('facebookMessengerOAuth2');
     await expect(
       executor.executeItem({
         config: { page_id: 'page-1', recipient_id: 'c', text: 'hi' },

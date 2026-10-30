@@ -398,9 +398,10 @@ describe('Messenger chatbot features', () => {
       const schema = nodeConfigSchema(send) as {
         properties: Record<string, Record<string, unknown>>;
       };
-      for (const [name, property] of Object.entries(schema.properties)) {
-        if (property['x-hideWhen'] && typeof property.default === 'string') {
-          expect(property.default).not.toContain('{{', name);
+      for (const property of Object.values(schema.properties)) {
+        const value = property.default;
+        if (property['x-hideWhen'] && typeof value === 'string') {
+          expect(value.includes('{{')).toBe(false);
         }
       }
     });
