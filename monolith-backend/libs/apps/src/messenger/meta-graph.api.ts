@@ -14,7 +14,11 @@ export interface AppSubscription {
   object: string;
   callbackUrl: string;
   active: boolean;
+  // Event kinds the app receives, e.g. messages, messaging_postbacks.
+  fields: string[];
 }
+
+export type SenderAction = 'typing_on' | 'typing_off' | 'mark_seen';
 
 // The Facebook Graph API calls the Messenger package makes; replaced by a fake
 // in tests. The Meta App (id + secret) is the user's own, from the credential.
@@ -34,11 +38,17 @@ export interface MetaGraphApi {
   // Pages the user granted, each with a Page token (never expires when it
   // comes from a long-lived user token).
   listPages(userToken: string): Promise<FacebookPage[]>;
-  sendText(
+  // `message` is the Send API message object: text (with quick_replies) or an attachment.
+  sendMessage(
     pageAccessToken: string,
     recipientId: string,
-    text: string,
+    message: Record<string, unknown>,
   ): Promise<{ messageId: string }>;
+  sendAction(
+    pageAccessToken: string,
+    recipientId: string,
+    action: SenderAction,
+  ): Promise<void>;
   // App webhook subscription (app token = "{app-id}|{app-secret}").
   listAppSubscriptions(
     appId: string,
@@ -54,12 +64,16 @@ export interface MetaGraphApi {
     },
   ): Promise<void>;
   unsubscribeApp(appId: string, appToken: string): Promise<void>;
-  // Which apps receive a Page's events.
-  pageSubscribedAppIds(
+  // Which apps receive a Page's events, and which kinds.
+  pageSubscribedApps(
     pageId: string,
     pageAccessToken: string,
-  ): Promise<string[]>;
-  subscribePage(pageId: string, pageAccessToken: string): Promise<void>;
+  ): Promise<Array<{ id: string; fields: string[] }>>;
+  subscribePage(
+    pageId: string,
+    pageAccessToken: string,
+    fields: string[],
+  ): Promise<void>;
   unsubscribePage(pageId: string, pageAccessToken: string): Promise<void>;
 }
 
@@ -112,7 +126,11 @@ export class HttpMetaGraphApi implements MetaGraphApi {
     }));
   }
 
-  async sendText(pageAccessToken: string, recipientId: string, text: string) {
+  async sendMessage(
+    pageAccessToken: string,
+    recipientId: string,
+    message: Record<string, unknown>,
+  ) {
     const data = await this.call<{ message_id?: string }>(
       'post',
       'me/messages',
@@ -121,20 +139,39 @@ export class HttpMetaGraphApi implements MetaGraphApi {
         recipient: { id: recipientId },
         // A reply to a message the customer sent (allowed for 24 hours).
         messaging_type: 'RESPONSE',
-        message: { text },
+        message,
       },
     );
     return { messageId: data.message_id ?? '' };
   }
 
+  async sendAction(
+    pageAccessToken: string,
+    recipientId: string,
+    action: SenderAction,
+  ) {
+    await this.call(
+      'post',
+      'me/messages',
+      { access_token: pageAccessToken },
+      { recipient: { id: recipientId }, sender_action: action },
+    );
+  }
+
   async listAppSubscriptions(appId: string, appToken: string) {
     const data = await this.call<{
-      data?: Array<{ object: string; callback_url: string; active: boolean }>;
+      data?: Array<{
+        object: string;
+        callback_url: string;
+        active: boolean;
+        fields?: Array<{ name: string }>;
+      }>;
     }>('get', `${appId}/subscriptions`, { access_token: appToken });
     return (data.data ?? []).map((subscription) => ({
       object: subscription.object,
       callbackUrl: subscription.callback_url,
       active: subscription.active,
+      fields: (subscription.fields ?? []).map((field) => field.name),
     }));
   }
 
@@ -164,19 +201,24 @@ export class HttpMetaGraphApi implements MetaGraphApi {
     });
   }
 
-  async pageSubscribedAppIds(pageId: string, pageAccessToken: string) {
-    const data = await this.call<{ data?: Array<{ id: string }> }>(
-      'get',
-      `${pageId}/subscribed_apps`,
-      { access_token: pageAccessToken },
-    );
-    return (data.data ?? []).map((app) => app.id);
+  async pageSubscribedApps(pageId: string, pageAccessToken: string) {
+    const data = await this.call<{
+      data?: Array<{ id: string; subscribed_fields?: string[] }>;
+    }>('get', `${pageId}/subscribed_apps`, { access_token: pageAccessToken });
+    return (data.data ?? []).map((app) => ({
+      id: app.id,
+      fields: app.subscribed_fields ?? [],
+    }));
   }
 
-  async subscribePage(pageId: string, pageAccessToken: string) {
+  async subscribePage(
+    pageId: string,
+    pageAccessToken: string,
+    fields: string[],
+  ) {
     await this.call('post', `${pageId}/subscribed_apps`, {
       access_token: pageAccessToken,
-      subscribed_fields: 'messages',
+      subscribed_fields: fields.join(','),
     });
   }
 

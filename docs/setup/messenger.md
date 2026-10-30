@@ -48,7 +48,40 @@ Messenger Trigger (Page, Keywords tuỳ chọn)
 
 - **Page**: chọn từ danh sách Page của credential (nút ↻ để tải lại).
 - **Keywords**: để trống = mọi tin. Có từ khoá = chỉ tin chứa một trong các từ (không phân biệt hoa thường, dấu).
-- Nhiều workflow cùng Page đều chạy nếu cùng khớp (như n8n). Muốn tách nhánh thì dùng Filter.
+- **Events**: Messages and button clicks (mặc định) / Messages only / Button clicks only. Bấm nút hoặc quick reply sinh sự kiện có `payload`.
+- Nhiều workflow cùng Page đều chạy nếu cùng khớp (như n8n). Muốn tách nhánh thì dùng IF / Switch.
+
+### Output của Messenger Trigger
+
+| Field | Ý nghĩa |
+|---|---|
+| `type` | `message` (khách nhắn) hoặc `postback` (khách bấm nút) |
+| `text` | nội dung tin; với postback là tiêu đề nút |
+| `payload` | payload của nút (postback) hoặc của quick reply khách vừa chọn; `null` nếu khách tự gõ |
+| `sender_id`, `page_id`, `message_id`, `attachments`, `timestamp`, `raw` | như trước |
+
+### Gửi tin (Messenger Send Message)
+
+| Message type | Cần điền | Giới hạn của Meta |
+|---|---|---|
+| Text | Text | 2000 ký tự |
+| Text with quick replies | Text + danh sách (Title, Payload) | tối đa 13, Title 20 ký tự; biến mất sau khi khách chọn |
+| Text with buttons | Text + danh sách nút: *Send a payload back* (Title, Payload) hoặc *Open a link* (Title, Link) | tối đa 3 nút, Text 640 ký tự |
+| Image, video, audio or file | File type + File URL (link công khai) | |
+
+**Messenger Sender Action** hiện "đang gõ…" (`typing_on`), tắt (`typing_off`) hoặc đánh dấu đã xem (`mark_seen`); đặt trước node LLM để khách thấy bot đang trả lời.
+
+Ví dụ chatbot:
+
+```
+Messenger Trigger
+  → Chat Memory (load) → Switch (khách nhắn "giá" / "nhân viên" / còn lại)
+      giá       → Send Message (quick replies: Áo, Quần)
+      nhân viên → Send Message "Mình chuyển cho nhân viên nhé"
+      còn lại   → Sender Action (typing_on) → LLM (history = {{$json.history}}) → Send Message → Chat Memory (save)
+```
+
+Khách bấm quick reply `SHIRTS` → Messenger Trigger chạy lại với `payload = SHIRTS`; dùng Switch với điều kiện `{{$json.payload}} equals SHIRTS`.
 
 **Listen for test event**: bấm trong node Messenger Trigger, nhắn thử cho Page trong 2 phút → thấy JSON tin nhắn (`sender_id`, `text`, `page_id`…) để viết biểu thức. Không tạo execution. Dùng cấu hình bản nháp, chưa cần publish.
 
@@ -56,8 +89,8 @@ Messenger Trigger (Page, Keywords tuỳ chọn)
 
 1. **Publish** (publish không tự bật lắng nghe).
 2. Bật công tắc **Active** ở header Designer. FlowPilot:
-   - gọi `POST /{app-id}/subscriptions` (object `page`, field `messages`, callback `{PUBLIC_BASE_URL}/api/webhooks/<id>`, verify token sinh ngẫu nhiên). Meta gọi lại callback để kiểm verify token;
-   - gọi `POST /{page-id}/subscribed_apps` cho Page đã chọn.
+   - gọi `POST /{app-id}/subscriptions` (object `page`, field `messages` và `messaging_postbacks`, callback `{PUBLIC_BASE_URL}/api/webhooks/<id>`, verify token sinh ngẫu nhiên). Meta gọi lại callback để kiểm verify token;
+   - gọi `POST /{page-id}/subscribed_apps` (cùng hai field) cho Page đã chọn. Workflow bật từ trước khi có nút bấm tự đăng ký lại khi bạn Active / Publish lần kế tiếp.
 3. Lỗi (sai App Secret, chưa thêm Messenger, callback không truy cập được…) → công tắc giữ Tắt và hiện lý do Meta trả về.
 4. Đang Active mà Publish lại → tự chuyển sang version mới; nếu không chuyển được, workflow tự tắt và báo lý do.
 5. Tắt workflow cuối cùng dùng credential → FlowPilot gỡ subscription.
@@ -66,7 +99,8 @@ Messenger Trigger (Page, Keywords tuỳ chọn)
 
 - Khi App còn ở chế độ Development, chỉ tài khoản có vai trò trong App (Admin / Developer / Tester) nhắn tới Page mới được Meta gửi webhook.
 - Nhắn cho Page → xem execution trong trang Versions (Run UI) / danh sách execution.
-- Messenger chỉ cho trả lời trong 24 giờ kể từ tin cuối của khách.
+- Messenger chỉ cho trả lời trong 24 giờ kể từ tin cuối của khách; ngoài hạn node Send Message báo lỗi rõ ràng và không thử lại.
+- Sự kiện bấm nút cần Meta App đã đăng ký field `messaging_postbacks` (FlowPilot tự làm); không cần quyền thêm.
 
 ## 7. Khi mở cho người ngoài
 

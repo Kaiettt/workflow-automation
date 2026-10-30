@@ -45,9 +45,22 @@ function propertySchema(property: NodeProperty): Record<string, unknown> {
         ? 'string'
         : property.type === 'number'
           ? 'number'
-          : property.type,
+          : property.type === 'collection'
+            ? 'array'
+            : property.type,
     title: property.displayName,
   };
+  if (property.type === 'collection') {
+    const fields = property.fields ?? [];
+    schema.items = {
+      type: 'object',
+      'x-propertyOrder': fields.map((field) => field.name),
+      properties: Object.fromEntries(
+        fields.map((field) => [field.name, propertySchema(field)]),
+      ),
+    };
+  }
+  if (property.hideWhen) schema['x-hideWhen'] = property.hideWhen;
   if (property.description) schema.description = property.description;
   if (property.default !== undefined) schema.default = property.default;
   if (property.placeholder) schema['x-placeholder'] = property.placeholder;

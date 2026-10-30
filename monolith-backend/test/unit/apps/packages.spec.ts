@@ -83,13 +83,17 @@ describe('integration packages', () => {
         'credential_id',
         'page_id',
         'recipient_id',
-        'text',
       ]);
       expect(schema['x-propertyOrder']).toEqual([
         'credential_id',
         'page_id',
         'recipient_id',
+        'message_type',
         'text',
+        'quick_replies',
+        'buttons',
+        'attachment_type',
+        'attachment_url',
       ]);
       expect(schema.properties.credential_id).toMatchObject({
         'x-refType': 'credential',
@@ -380,7 +384,7 @@ describe('integration packages', () => {
         {
           pageAccessToken: 'EAApage2',
           recipientId: 'customer-1',
-          text: 'Chào bạn',
+          message: { text: 'Chào bạn' },
         },
       ]);
       expect(output).toEqual({

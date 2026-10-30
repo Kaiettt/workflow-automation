@@ -9,10 +9,19 @@ import {
   WebhookLifecycleContext,
 } from '../core/package';
 import { header, matchesKeywords } from '../core/text';
-import { GRAPH_VERSION, MetaGraphApi } from './meta-graph.api';
+import { GRAPH_VERSION, MetaGraphApi, SenderAction } from './meta-graph.api';
 
 export const MESSENGER_CREDENTIAL = 'facebookMessengerOAuth2';
 const MAX_TEXT_LENGTH = 2000;
+// Send API limits: https://developers.facebook.com/docs/messenger-platform/send-messages
+const MAX_QUICK_REPLIES = 13;
+const MAX_BUTTONS = 3;
+const MAX_TITLE_LENGTH = 20;
+const MAX_BUTTON_TEXT_LENGTH = 640;
+const MAX_PAYLOAD_LENGTH = 1000;
+// What the Meta App and each Page are subscribed to: customer messages and
+// clicks on buttons (postbacks).
+const SUBSCRIBED_FIELDS = ['messages', 'messaging_postbacks'];
 
 interface StoredPage {
   id: string;
@@ -27,8 +36,10 @@ interface MessagingEvent {
     mid?: unknown;
     text?: unknown;
     is_echo?: unknown;
+    quick_reply?: { payload?: unknown };
     attachments?: Array<{ type?: unknown; payload?: { url?: unknown } }>;
   };
+  postback?: { mid?: unknown; title?: unknown; payload?: unknown };
 }
 
 // Facebook Page messages through the user's own Meta App: App ID and App
@@ -109,12 +120,25 @@ export function createMessengerPackage(
     properties: [
       pageProperty,
       {
+        name: 'events',
+        displayName: 'Events',
+        type: 'options',
+        default: 'all',
+        options: [
+          { value: 'all', label: 'Messages and button clicks' },
+          { value: 'message', label: 'Messages only' },
+          { value: 'postback', label: 'Button clicks only' },
+        ],
+        description:
+          'A button click (postback) starts the workflow with its payload',
+      },
+      {
         name: 'keywords',
         displayName: 'Keywords',
         type: 'string',
         placeholder: 'e.g. giá, bảng giá',
         description:
-          'Optional. Only messages containing one of these words (comma separated; case and accents do not matter). Empty: every message.',
+          'Optional. Only events whose text or payload contains one of these words (comma separated; case and accents do not matter). Empty: every event.',
       },
     ],
     webhook: {
@@ -127,15 +151,19 @@ export function createMessengerPackage(
         const subscriptions = await graph.listAppSubscriptions(appId, appToken);
         const subscribed = subscriptions.some(
           (s) =>
-            s.object === 'page' && s.callbackUrl === context.url && s.active,
+            s.object === 'page' &&
+            s.callbackUrl === context.url &&
+            s.active &&
+            hasAll(s.fields, SUBSCRIBED_FIELDS),
         );
         if (!subscribed) return false;
         for (const page of listenedPages(context)) {
-          const apps = await graph.pageSubscribedAppIds(
+          const apps = await graph.pageSubscribedApps(
             page.id,
             page.access_token,
           );
-          if (!apps.includes(appId)) return false;
+          const ours = apps.find((app) => app.id === appId);
+          if (!ours || !hasAll(ours.fields, SUBSCRIBED_FIELDS)) return false;
         }
         return true;
       },
@@ -145,11 +173,15 @@ export function createMessengerPackage(
         await graph.subscribeApp(appId, appToken, {
           callbackUrl: context.url,
           verifyToken: asText(context.data.verify_token),
-          fields: ['messages'],
+          fields: SUBSCRIBED_FIELDS,
         });
         const subscribed = new Set(stringList(context.data.pages));
         for (const page of listenedPages(context)) {
-          await graph.subscribePage(page.id, page.access_token);
+          await graph.subscribePage(
+            page.id,
+            page.access_token,
+            SUBSCRIBED_FIELDS,
+          );
           subscribed.add(page.id);
         }
         context.data.pages = [...subscribed];
@@ -202,56 +234,164 @@ export function createMessengerPackage(
         return { status: 200, events: parseMessengerEvents(request.body) };
       },
 
-      accepts: (event, parameters) =>
-        event.json.page_id === parameters.page_id &&
-        matchesKeywords(asText(event.json.text), parameters.keywords),
+      accepts: (event, parameters) => {
+        const wanted = parameters.events;
+        const type = asText(event.json.type);
+        return (
+          event.json.page_id === parameters.page_id &&
+          (wanted === undefined || wanted === 'all' || wanted === type) &&
+          (matchesKeywords(asText(event.json.text), parameters.keywords) ||
+            matchesKeywords(asText(event.json.payload), parameters.keywords))
+        );
+      },
     },
   };
+
+  const recipientProperty: NodeProperty = {
+    name: 'recipient_id',
+    displayName: 'Recipient ID',
+    type: 'string',
+    required: true,
+    expression: true,
+    default: '{{$node["Messenger Trigger"].json.sender_id}}',
+    description:
+      'Page-scoped ID of the person, e.g. sender_id of the Messenger Trigger',
+  };
+
+  // Fields that belong to one message type are hidden for the others.
+  const onlyFor = (...types: MessageType[]) => ({
+    field: 'message_type',
+    in: MESSAGE_TYPES.filter((type) => !types.includes(type)),
+  });
 
   const sendMessage: ActionNode = {
     kind: 'action',
     key: 'messenger.sendMessage',
     displayName: 'Messenger Send Message',
-    description: 'Send a text message from your Facebook Page',
+    description:
+      'Send a message from your Facebook Page: text, quick replies, buttons or an image / file',
     icon: 'send',
     color: '#0084FF',
     credentialType: MESSENGER_CREDENTIAL,
     properties: [
       pageProperty,
+      recipientProperty,
       {
-        name: 'recipient_id',
-        displayName: 'Recipient ID',
-        type: 'string',
-        required: true,
-        expression: true,
-        default: '{{$node["Messenger Trigger"].json.sender_id}}',
-        description:
-          'Page-scoped ID of the person, e.g. sender_id of the Messenger Trigger',
+        name: 'message_type',
+        displayName: 'Message type',
+        type: 'options',
+        default: 'text',
+        options: [
+          { value: 'text', label: 'Text' },
+          { value: 'quick_replies', label: 'Text with quick replies' },
+          { value: 'buttons', label: 'Text with buttons' },
+          { value: 'attachment', label: 'Image, video, audio or file' },
+        ],
       },
       {
         name: 'text',
         displayName: 'Text',
         type: 'string',
-        required: true,
         expression: true,
         multiline: true,
+        hideWhen: onlyFor('text', 'quick_replies', 'buttons'),
+      },
+      {
+        name: 'quick_replies',
+        displayName: 'Quick replies',
+        type: 'collection',
+        description: `Up to ${MAX_QUICK_REPLIES}; each one disappears once the customer taps it`,
+        hideWhen: onlyFor('quick_replies'),
+        fields: [
+          {
+            name: 'title',
+            displayName: 'Title',
+            type: 'string',
+            expression: true,
+            description: `Up to ${MAX_TITLE_LENGTH} characters`,
+          },
+          {
+            name: 'payload',
+            displayName: 'Payload',
+            type: 'string',
+            expression: true,
+            placeholder: 'e.g. PRICE',
+            description: 'Comes back in the payload of the Messenger Trigger',
+          },
+        ],
+      },
+      {
+        name: 'buttons',
+        displayName: 'Buttons',
+        type: 'collection',
+        description: `Up to ${MAX_BUTTONS}`,
+        hideWhen: onlyFor('buttons'),
+        fields: [
+          {
+            name: 'type',
+            displayName: 'Type',
+            type: 'options',
+            default: 'postback',
+            options: [
+              { value: 'postback', label: 'Send a payload back' },
+              { value: 'web_url', label: 'Open a link' },
+            ],
+          },
+          {
+            name: 'title',
+            displayName: 'Title',
+            type: 'string',
+            expression: true,
+            description: `Up to ${MAX_TITLE_LENGTH} characters`,
+          },
+          {
+            name: 'payload',
+            displayName: 'Payload',
+            type: 'string',
+            expression: true,
+            hideWhen: { field: 'type', in: ['web_url'] },
+          },
+          {
+            name: 'url',
+            displayName: 'Link',
+            type: 'string',
+            expression: true,
+            placeholder: 'https://',
+            hideWhen: { field: 'type', in: ['postback'] },
+          },
+        ],
+      },
+      {
+        name: 'attachment_type',
+        displayName: 'File type',
+        type: 'options',
+        default: 'image',
+        options: [
+          { value: 'image', label: 'Image' },
+          { value: 'video', label: 'Video' },
+          { value: 'audio', label: 'Audio' },
+          { value: 'file', label: 'File' },
+        ],
+        hideWhen: onlyFor('attachment'),
+      },
+      {
+        name: 'attachment_url',
+        displayName: 'File URL',
+        type: 'string',
+        expression: true,
+        placeholder: 'https://',
+        description: 'A public link Messenger can download from',
+        hideWhen: onlyFor('attachment'),
       },
     ],
     async execute({ parameters, credential: secret }) {
-      const pageId = asText(parameters.page_id);
-      const page = pagesOf(secret).find((candidate) => candidate.id === pageId);
-      if (!page) throw new Error(pageMissing(pageId));
-      const text = asText(parameters.text);
-      if (text.length > MAX_TEXT_LENGTH) {
-        throw new Error(
-          `Messenger messages are limited to ${MAX_TEXT_LENGTH} characters`,
-        );
-      }
+      const page = pageOf(secret, parameters);
+      const message = buildMessage(parameters);
       const recipientId = asText(parameters.recipient_id).trim();
-      const { messageId } = await graph.sendText(
+      const { messageId } = await graph.sendMessage(
         page.access_token,
         recipientId,
-        text,
+        message,
       );
       return {
         page_id: page.id,
@@ -262,12 +402,207 @@ export function createMessengerPackage(
     },
   };
 
+  const senderAction: ActionNode = {
+    kind: 'action',
+    key: 'messenger.senderAction',
+    displayName: 'Messenger Sender Action',
+    description:
+      'Show "typing…" or mark the customer’s message as seen while the bot works',
+    icon: 'ellipsis',
+    color: '#0084FF',
+    credentialType: MESSENGER_CREDENTIAL,
+    properties: [
+      pageProperty,
+      recipientProperty,
+      {
+        name: 'action',
+        displayName: 'Action',
+        type: 'options',
+        default: 'typing_on',
+        options: [
+          { value: 'typing_on', label: 'Show typing…' },
+          { value: 'typing_off', label: 'Hide typing' },
+          { value: 'mark_seen', label: 'Mark as seen' },
+        ],
+      },
+    ],
+    async execute({ parameters, credential: secret }) {
+      const page = pageOf(secret, parameters);
+      const action = asText(parameters.action) || 'typing_on';
+      if (!SENDER_ACTIONS.includes(action as SenderAction)) {
+        throw new Error(`"${action}" is not a sender action`);
+      }
+      const recipientId = asText(parameters.recipient_id).trim();
+      await graph.sendAction(
+        page.access_token,
+        recipientId,
+        action as SenderAction,
+      );
+      return {
+        page_id: page.id,
+        recipient_id: recipientId,
+        action,
+        status: 'sent',
+      };
+    },
+  };
+
   return {
     key: 'messenger',
     displayName: 'Facebook Messenger',
     credentials: [credential],
-    nodes: [trigger, sendMessage],
+    nodes: [trigger, sendMessage, senderAction],
   };
+}
+
+const MESSAGE_TYPES = [
+  'text',
+  'quick_replies',
+  'buttons',
+  'attachment',
+] as const;
+type MessageType = (typeof MESSAGE_TYPES)[number];
+const SENDER_ACTIONS: SenderAction[] = ['typing_on', 'typing_off', 'mark_seen'];
+const ATTACHMENT_TYPES = ['image', 'video', 'audio', 'file'];
+
+function hasAll(have: string[], wanted: string[]): boolean {
+  return wanted.every((field) => have.includes(field));
+}
+
+function pageOf(
+  secret: Record<string, unknown> | null,
+  parameters: Record<string, unknown>,
+): StoredPage {
+  const pageId = asText(parameters.page_id);
+  const page = pagesOf(secret).find((candidate) => candidate.id === pageId);
+  if (!page) throw new Error(pageMissing(pageId));
+  return page;
+}
+
+function rowsOf(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter(
+        (row): row is Record<string, unknown> =>
+          typeof row === 'object' && row !== null && !Array.isArray(row),
+      )
+    : [];
+}
+
+function limited(text: string, max: number, what: string): string {
+  if (text.length > max) {
+    throw new Error(`${what} is limited to ${max} characters`);
+  }
+  return text;
+}
+
+function required(text: string, what: string): string {
+  if (!text.trim()) throw new Error(`${what} is required`);
+  return text;
+}
+
+function httpUrl(raw: string, what: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    throw new Error(`${what} must be a link such as https://example.com`);
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error(`${what} must start with http:// or https://`);
+  }
+  return url.toString();
+}
+
+// The Send API message object for the node's parameters.
+export function buildMessage(
+  parameters: Record<string, unknown>,
+): Record<string, unknown> {
+  const type = (asText(parameters.message_type) || 'text') as MessageType;
+  if (!MESSAGE_TYPES.includes(type)) {
+    throw new Error(`"${type}" is not a message type`);
+  }
+
+  if (type === 'attachment') {
+    const kind = asText(parameters.attachment_type) || 'image';
+    if (!ATTACHMENT_TYPES.includes(kind)) {
+      throw new Error(`"${kind}" is not a file type`);
+    }
+    const url = httpUrl(
+      required(asText(parameters.attachment_url), 'File URL'),
+      'The file URL',
+    );
+    return { attachment: { type: kind, payload: { url, is_reusable: true } } };
+  }
+
+  const text = required(asText(parameters.text), 'Text');
+
+  if (type === 'quick_replies') {
+    limited(text, MAX_TEXT_LENGTH, 'A Messenger message');
+    const rows = rowsOf(parameters.quick_replies);
+    if (rows.length === 0) throw new Error('Add at least one quick reply');
+    if (rows.length > MAX_QUICK_REPLIES) {
+      throw new Error(`At most ${MAX_QUICK_REPLIES} quick replies are allowed`);
+    }
+    return {
+      text,
+      quick_replies: rows.map((row) => ({
+        content_type: 'text',
+        title: limited(
+          required(asText(row.title), 'A quick reply title'),
+          MAX_TITLE_LENGTH,
+          'A quick reply title',
+        ),
+        payload: limited(
+          required(asText(row.payload), 'A quick reply payload'),
+          MAX_PAYLOAD_LENGTH,
+          'A quick reply payload',
+        ),
+      })),
+    };
+  }
+
+  if (type === 'buttons') {
+    limited(text, MAX_BUTTON_TEXT_LENGTH, 'The text above buttons');
+    const rows = rowsOf(parameters.buttons);
+    if (rows.length === 0) throw new Error('Add at least one button');
+    if (rows.length > MAX_BUTTONS) {
+      throw new Error(`At most ${MAX_BUTTONS} buttons are allowed`);
+    }
+    const buttons = rows.map((row) => {
+      const title = limited(
+        required(asText(row.title), 'A button title'),
+        MAX_TITLE_LENGTH,
+        'A button title',
+      );
+      return asText(row.type) === 'web_url'
+        ? {
+            type: 'web_url',
+            title,
+            url: httpUrl(
+              required(asText(row.url), 'A button link'),
+              'A button link',
+            ),
+          }
+        : {
+            type: 'postback',
+            title,
+            payload: limited(
+              required(asText(row.payload), 'A button payload'),
+              MAX_PAYLOAD_LENGTH,
+              'A button payload',
+            ),
+          };
+    });
+    return {
+      attachment: {
+        type: 'template',
+        payload: { template_type: 'button', text, buttons },
+      },
+    };
+  }
+
+  limited(text, MAX_TEXT_LENGTH, 'A Messenger message');
+  return { text };
 }
 
 function appOf(values: Record<string, unknown> | null) {
@@ -355,9 +690,9 @@ export function isValidMetaSignature(
   );
 }
 
-// One event per message a customer sent. Echoes (messages the Page itself
-// sent, including the bot's replies), deliveries and reads are dropped, so a
-// reply never starts a workflow again.
+// One event per message a customer sent or button they tapped. Echoes
+// (messages the Page itself sent, including the bot's replies), deliveries and
+// reads are dropped, so a reply never starts a workflow again.
 export function parseMessengerEvents(body: unknown): TriggerEvent[] {
   const payload = body as { object?: unknown; entry?: unknown } | null;
   if (payload?.object !== 'page' || !Array.isArray(payload.entry)) return [];
@@ -371,23 +706,56 @@ export function parseMessengerEvents(body: unknown): TriggerEvent[] {
       continue;
     }
     for (const event of entry.messaging as MessagingEvent[]) {
-      const message = event?.message;
       const senderId = event?.sender?.id;
+      if (typeof senderId !== 'string') continue;
+      const timestamp =
+        typeof event.timestamp === 'number'
+          ? new Date(event.timestamp).toISOString()
+          : null;
+
+      const postback = event.postback;
+      if (postback && typeof postback.payload === 'string') {
+        // The same tap is delivered again with the same mid, or, without one,
+        // at the same time with the same payload.
+        const mid = typeof postback.mid === 'string' ? postback.mid : null;
+        events.push({
+          id:
+            mid ??
+            `postback:${entry.id}:${senderId}:${String(event.timestamp)}:${postback.payload}`,
+          json: {
+            type: 'postback',
+            message_id: mid,
+            sender_id: senderId,
+            page_id: entry.id,
+            text: typeof postback.title === 'string' ? postback.title : '',
+            payload: postback.payload,
+            attachments: [],
+            timestamp,
+            raw: event,
+          },
+        });
+        continue;
+      }
+
+      const message = event?.message;
       if (
         !message ||
         message.is_echo === true ||
-        typeof message.mid !== 'string' ||
-        typeof senderId !== 'string'
+        typeof message.mid !== 'string'
       ) {
         continue;
       }
+      const quickReply = message.quick_reply?.payload;
       events.push({
         id: message.mid,
         json: {
+          type: 'message',
           message_id: message.mid,
           sender_id: senderId,
           page_id: entry.id,
           text: typeof message.text === 'string' ? message.text : '',
+          // Set when the customer tapped one of the quick replies.
+          payload: typeof quickReply === 'string' ? quickReply : null,
           attachments: (message.attachments ?? []).map((attachment) => ({
             type: typeof attachment?.type === 'string' ? attachment.type : null,
             url:
@@ -395,10 +763,7 @@ export function parseMessengerEvents(body: unknown): TriggerEvent[] {
                 ? attachment.payload.url
                 : null,
           })),
-          timestamp:
-            typeof event.timestamp === 'number'
-              ? new Date(event.timestamp).toISOString()
-              : null,
+          timestamp,
           raw: event,
         },
       });

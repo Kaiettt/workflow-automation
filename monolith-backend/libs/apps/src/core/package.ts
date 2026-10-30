@@ -18,7 +18,7 @@ export interface LoadOptionsContext {
 export interface NodeProperty {
   name: string;
   displayName: string;
-  type: 'string' | 'number' | 'boolean' | 'options';
+  type: 'string' | 'number' | 'boolean' | 'options' | 'collection';
   required?: boolean;
   default?: unknown;
   description?: string;
@@ -28,6 +28,12 @@ export interface NodeProperty {
   multiline?: boolean;
   // Fixed choices of an `options` field.
   options?: FieldOption[];
+  // Fields of each row of a `collection` (a list the user adds rows to).
+  fields?: NodeProperty[];
+  // Hidden in the form while a sibling field (of the same node or row) has one
+  // of these values. Hidden fields are still sent with their default, so a
+  // default must not be an expression.
+  hideWhen?: { field: string; in: string[] };
   // Choices read at design time (e.g. the Pages of a credential).
   loadOptions?(context: LoadOptionsContext): Promise<FieldOption[]>;
 }

@@ -133,7 +133,7 @@ describe('action nodes of integration packages', () => {
       {
         pageAccessToken: 'EAApage1',
         recipientId: 'customer-7',
-        text: 'Bạn vừa nhắn: Xin chào',
+        message: { text: 'Bạn vừa nhắn: Xin chào' },
       },
     ]);
     expect(logOf(repository.logs, 'messenger.sendMessage')!.output).toEqual([

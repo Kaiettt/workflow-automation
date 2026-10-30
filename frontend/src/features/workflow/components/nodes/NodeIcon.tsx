@@ -1,5 +1,6 @@
 import {
   Brain,
+  Ellipsis,
   Filter,
   GitBranch,
   Layers,
@@ -34,6 +35,7 @@ const ICONS: Record<string, LucideIcon> = {
   filter: Filter,
   layers: Layers,
   brain: Brain,
+  ellipsis: Ellipsis,
   'git-branch': GitBranch,
   split: Split,
   pencil: Pencil,

@@ -28,11 +28,11 @@
 - [x] 🤖 Unit (bộ nhớ giả, adapter, luồng bot nhớ hội thoại); e2e với Redis thật: hai tin liên tiếp, tin thứ hai thấy tin đầu, người khác thì không
 
 ## P4. Messenger
-- [ ] 🤖 Trigger: postback, quick_reply payload, `type` / `payload`, property `events`, field `messaging_postbacks` + `checkExists` kiểm fields
-- [ ] 🤖 Hợp đồng package: `NodeProperty.type = 'collection'`; JSON Schema; frontend `CollectionField`
-- [ ] 🤖 Send Message: quick replies, buttons, attachment; `MetaGraphApi.sendMessage`; lỗi 24 giờ
-- [ ] 🤖 `messenger.senderAction`
-- [ ] 🤖 Unit + e2e với Graph giả
+- [x] 🤖 Trigger: postback, quick_reply payload, `type` / `payload`, property `events`, field `messaging_postbacks` + `checkExists` kiểm fields (đăng ký lại workflow cũ)
+- [x] 🤖 Hợp đồng package: `NodeProperty.type = 'collection'` + `hideWhen`; JSON Schema; frontend dùng `ListField` chung (không cần `CollectionField` riêng)
+- [x] 🤖 Send Message: quick replies, buttons, attachment; `MetaGraphApi.sendMessage`; lỗi 24 giờ (đã có từ trước)
+- [x] 🤖 `messenger.senderAction`
+- [x] 🤖 Unit + e2e với Graph giả (postback → typing → quick replies)
 - [ ] 👤 Thử với Page thật: bấm quick reply / nút, xem workflow chạy lại
 
 ## P5. HTTP Request

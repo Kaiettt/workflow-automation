@@ -4,16 +4,32 @@ import type {
   AppSubscription,
   FacebookPage,
   MetaGraphApi,
+  SenderAction,
 } from '@app/apps/messenger/meta-graph.api';
 
 export interface SentMessage {
   pageAccessToken: string;
   recipientId: string;
-  text: string;
+  // The Send API message object, e.g. { text } or { text, quick_replies }.
+  message: Record<string, unknown>;
 }
+
+// What the bot sent as a plain text message, for the tests that only care about words.
+export const texts = (sent: SentMessage[]) =>
+  sent.map((entry) => entry.message.text);
+
+export interface SentAction {
+  pageAccessToken: string;
+  recipientId: string;
+  action: SenderAction;
+}
+
+// The kinds of events a freshly subscribed app and Page receive.
+export const SUBSCRIBED = ['messages', 'messaging_postbacks'];
 
 export class FakeMetaGraph implements MetaGraphApi {
   sent: SentMessage[] = [];
+  actions: SentAction[] = [];
   exchanged: Array<{ appId: string; code: string; redirectUri: string }> = [];
   pages: FacebookPage[] = [
     { id: 'page-1', name: 'Shop ABC', accessToken: 'EAApage1' },
@@ -23,8 +39,8 @@ export class FakeMetaGraph implements MetaGraphApi {
     string,
     AppSubscription & { verifyToken: string; appToken: string }
   >();
-  // pageId → app ids receiving its events.
-  pageApps = new Map<string, Set<string>>();
+  // pageId → app id → event kinds the Page sends to that app.
+  pageApps = new Map<string, Map<string, string[]>>();
   // Called while subscribeApp runs, like Meta verifying the callback URL.
   onSubscribeApp?: (subscription: {
     callbackUrl: string;
@@ -58,12 +74,25 @@ export class FakeMetaGraph implements MetaGraphApi {
     return Promise.resolve(this.pages);
   }
 
-  sendText(pageAccessToken: string, recipientId: string, text: string) {
-    this.sent.push({ pageAccessToken, recipientId, text });
+  sendMessage(
+    pageAccessToken: string,
+    recipientId: string,
+    message: Record<string, unknown>,
+  ) {
+    this.sent.push({ pageAccessToken, recipientId, message });
     const failure = this.sendFailures.shift();
     return failure
       ? Promise.reject(failure)
       : Promise.resolve({ messageId: `mid.${this.sent.length}` });
+  }
+
+  sendAction(
+    pageAccessToken: string,
+    recipientId: string,
+    action: SenderAction,
+  ) {
+    this.actions.push({ pageAccessToken, recipientId, action });
+    return Promise.resolve();
   }
 
   listAppSubscriptions(appId: string) {
@@ -92,6 +121,7 @@ export class FakeMetaGraph implements MetaGraphApi {
       object: 'page',
       callbackUrl: subscription.callbackUrl,
       active: true,
+      fields: subscription.fields,
       verifyToken: subscription.verifyToken,
       appToken,
     });
@@ -103,15 +133,20 @@ export class FakeMetaGraph implements MetaGraphApi {
     return Promise.resolve();
   }
 
-  pageSubscribedAppIds(pageId: string) {
-    return Promise.resolve([...(this.pageApps.get(pageId) ?? [])]);
+  pageSubscribedApps(pageId: string) {
+    return Promise.resolve(
+      [...(this.pageApps.get(pageId) ?? [])].map(([id, fields]) => ({
+        id,
+        fields,
+      })),
+    );
   }
 
-  subscribePage(pageId: string, pageAccessToken: string) {
+  subscribePage(pageId: string, pageAccessToken: string, fields: string[]) {
     this.calls.push(`subscribePage ${pageId} ${pageAccessToken}`);
     // The app is the one whose subscription exists (a single app in tests).
     const appIds = [...this.appSubscriptions.keys()];
-    this.pageApps.set(pageId, new Set(appIds));
+    this.pageApps.set(pageId, new Map(appIds.map((id) => [id, fields])));
     return Promise.resolve();
   }
 

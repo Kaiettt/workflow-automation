@@ -229,12 +229,18 @@ describe('Messenger trigger and send (e2e)', () => {
     const nodeTypes = await prisma.nodeTypeDefinition.findMany({
       where: {
         key: {
-          in: ['messenger.trigger', 'messenger.sendMessage', 'webhook.trigger'],
+          in: [
+            'messenger.trigger',
+            'messenger.sendMessage',
+            'messenger.senderAction',
+            'webhook.trigger',
+          ],
         },
       },
     });
     expect(nodeTypes.map((n) => n.key).sort()).toEqual([
       'messenger.sendMessage',
+      'messenger.senderAction',
       'messenger.trigger',
       'webhook.trigger',
     ]);
@@ -328,17 +334,17 @@ describe('Messenger trigger and send (e2e)', () => {
         {
           pageAccessToken: `EAApage${run}`,
           recipientId: 'customer-42',
-          text: 'Bảng giá ở đây ạ',
+          message: { text: 'Bảng giá ở đây ạ' },
         },
         {
           pageAccessToken: `EAApage${run}`,
           recipientId: 'customer-42',
-          text: 'Cảm ơn bạn đã nhắn: Cho xin BẢNG GIA',
+          message: { text: 'Cảm ơn bạn đã nhắn: Cho xin BẢNG GIA' },
         },
         {
           pageAccessToken: `EAApage${run}`,
           recipientId: 'customer-42',
-          text: 'Cảm ơn bạn đã nhắn: Xin chào',
+          message: { text: 'Cảm ơn bạn đã nhắn: Xin chào' },
         },
       ]),
     );
@@ -366,6 +372,157 @@ describe('Messenger trigger and send (e2e)', () => {
       .expect(200);
     expect(graph.appSubscriptions.has(appId)).toBe(false);
     expect(graph.calls).toContain(`unsubscribePage ${pageId}`);
+  });
+
+  it('answers a tap on a button with typing and quick replies, and ignores typed messages', async () => {
+    const credentialId = await createCredential(
+      'Buttons app',
+      `${appId}-c`,
+      'secret-c',
+    );
+    await connect(credentialId);
+
+    const created = await request(server())
+      .post('/api/workflows')
+      .send({ name: 'Buttons bot e2e', ownerId })
+      .expect(201);
+    const workflowId = created.body.data.id as string;
+    const common = { credential_id: credentialId, page_id: pageId };
+    const recipient = '{{$node["Messenger Trigger"].json.sender_id}}';
+    await request(server())
+      .put(`/api/workflows/${workflowId}/draft`)
+      .send({
+        definition: {
+          nodes: [
+            {
+              id: 'chat',
+              type: 'triggerNode',
+              data: {
+                key: 'messenger.trigger',
+                name: 'Messenger Trigger',
+                config: { ...common, events: 'postback', keywords: 'price' },
+              },
+            },
+            {
+              id: 'typing',
+              type: 'actionNode',
+              data: {
+                key: 'messenger.senderAction',
+                name: 'Typing',
+                config: {
+                  ...common,
+                  recipient_id: recipient,
+                  action: 'typing_on',
+                },
+              },
+            },
+            {
+              id: 'reply',
+              type: 'actionNode',
+              data: {
+                key: 'messenger.sendMessage',
+                name: 'Reply',
+                config: {
+                  ...common,
+                  recipient_id: recipient,
+                  message_type: 'quick_replies',
+                  text: 'Bạn muốn xem gì?',
+                  quick_replies: [
+                    { title: 'Áo', payload: 'SHIRTS' },
+                    {
+                      title: 'Quần',
+                      payload: '{{$node["Messenger Trigger"].json.payload}}_2',
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+          edges: [
+            { id: 'e1', source: 'chat', target: 'typing' },
+            { id: 'e2', source: 'typing', target: 'reply' },
+          ],
+        },
+      })
+      .expect(200);
+    await request(server())
+      .post(`/api/workflows/${workflowId}/versions`)
+      .expect(201);
+    await request(server())
+      .post(`/api/workflows/${workflowId}/activate`)
+      .expect(200);
+
+    const endpoint = await prisma.webhookEndpoint.findUnique({
+      where: { scopeKey: `credential:${credentialId}` },
+    });
+    const path = `/api/webhooks/${endpoint!.id}`;
+    // The app and the Page are subscribed to button clicks as well.
+    expect(graph.appSubscriptions.get(`${appId}-c`)?.fields).toContain(
+      'messaging_postbacks',
+    );
+    expect(graph.pageApps.get(pageId)?.get(`${appId}-c`)).toContain(
+      'messaging_postbacks',
+    );
+
+    const typed = await postSigned(
+      path,
+      customerMessage(`m_${run}_typed`, 'price please'),
+      'secret-c',
+    ).expect(200);
+    expect(typed.body.data.started).toEqual([]);
+
+    const tap = await postSigned(
+      path,
+      {
+        object: 'page',
+        entry: [
+          {
+            id: pageId,
+            messaging: [
+              {
+                sender: { id: 'customer-77' },
+                timestamp: Date.now(),
+                postback: {
+                  mid: `pb_${run}`,
+                  title: 'Xem giá',
+                  payload: 'PRICE_LIST',
+                },
+              },
+            ],
+          },
+        ],
+      },
+      'secret-c',
+    ).expect(200);
+    expect(tap.body.data.started).toHaveLength(1);
+
+    const execution = await finished(tap.body.data.started[0] as string);
+    expect(execution.status).toBe('SUCCESS');
+    expect(execution.nodeLogs.map((log) => log.nodeKey)).toEqual([
+      'messenger.trigger',
+      'messenger.senderAction',
+      'messenger.sendMessage',
+    ]);
+    expect(graph.actions).toContainEqual({
+      pageAccessToken: `EAApage${run}`,
+      recipientId: 'customer-77',
+      action: 'typing_on',
+    });
+    expect(graph.sent).toContainEqual({
+      pageAccessToken: `EAApage${run}`,
+      recipientId: 'customer-77',
+      message: {
+        text: 'Bạn muốn xem gì?',
+        quick_replies: [
+          { content_type: 'text', title: 'Áo', payload: 'SHIRTS' },
+          { content_type: 'text', title: 'Quần', payload: 'PRICE_LIST_2' },
+        ],
+      },
+    });
+
+    await request(server())
+      .post(`/api/workflows/${workflowId}/deactivate`)
+      .expect(200);
   });
 
   it('stays off with the reason when Meta refuses the subscription', async () => {
