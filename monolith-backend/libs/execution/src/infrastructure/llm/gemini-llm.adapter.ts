@@ -8,6 +8,7 @@ import type { GenerateContentParameters } from '@google/genai';
 import { LlmLimits } from '../../domain/constants/execution.constants';
 import {
   buildSystemPrompt,
+  conversationHistory,
   isRetryableStatus,
   LlmGenerateRequest,
   LlmGenerateResult,
@@ -37,9 +38,20 @@ export class GeminiLlmAdapter implements LlmProvider {
   ) {}
 
   async generate(request: LlmGenerateRequest): Promise<LlmGenerateResult> {
+    const history = conversationHistory(request);
     const params: GenerateContentParameters = {
       model: request.model,
-      contents: request.prompt,
+      // Gemini calls the assistant "model".
+      contents:
+        history.length === 0
+          ? request.prompt
+          : [
+              ...history.map((message) => ({
+                role: message.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: message.content }],
+              })),
+              { role: 'user', parts: [{ text: request.prompt }] },
+            ],
       config: {
         systemInstruction: buildSystemPrompt(request),
         maxOutputTokens: request.maxTokens,

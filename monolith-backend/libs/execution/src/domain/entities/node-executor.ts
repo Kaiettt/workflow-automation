@@ -12,6 +12,12 @@ interface NodeExecutorBase<TConfig> {
   expectedConnectorKey?(rawConfig: Record<string, unknown>): string | null;
 }
 
+// Where a node runs, for nodes that keep state between runs (Chat Memory).
+export interface ExecutionContext {
+  workflowId: string;
+  executionId: string;
+}
+
 // What a per-item node returns for one input item.
 export type ItemResult = ItemJson | RoutedItem;
 
@@ -33,6 +39,7 @@ export interface IPerItemExecutor<
     config: TConfig;
     item: Item;
     credential: unknown;
+    context?: ExecutionContext;
   }): Promise<ItemResult | ItemResult[] | null>;
 }
 

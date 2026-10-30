@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { LlmLimits } from '../../domain/constants/execution.constants';
 import {
   buildSystemPrompt,
+  conversationHistory,
   isRetryableStatus,
   LlmGenerateRequest,
   LlmGenerateResult,
@@ -39,7 +40,10 @@ export class AnthropicLlmAdapter implements LlmProvider {
     const body: Anthropic.MessageCreateParamsNonStreaming = {
       model: request.model,
       max_tokens: request.maxTokens,
-      messages: [{ role: 'user', content: request.prompt }],
+      messages: [
+        ...conversationHistory(request),
+        { role: 'user', content: request.prompt },
+      ],
     };
     const system = buildSystemPrompt(request);
     if (system) body.system = system;

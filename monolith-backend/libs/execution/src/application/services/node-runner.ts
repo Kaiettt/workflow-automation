@@ -28,6 +28,8 @@ const UUID_PATTERN =
 
 export interface NodeRunParams {
   node: WorkflowNode;
+  workflowId: string;
+  executionId: string;
   items: Item[];
   // Where each input item came from; absent for the start node.
   inputSources?: readonly ItemSource[];
@@ -209,6 +211,10 @@ export class NodeRunner {
           config,
           item: items[index],
           credential: secret,
+          context: {
+            workflowId: params.workflowId,
+            executionId: params.executionId,
+          },
         });
 
         const jsons =

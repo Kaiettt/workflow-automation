@@ -22,10 +22,10 @@
 - [x] 🤖 Unit cho từng toán tử, executor và luồng chatbot; e2e: webhook → Switch → hai nhánh, nhánh kia `SKIPPED`; publish chặn cạnh từ luật đã xoá
 
 ## P3. Chat Memory
-- [ ] 🤖 Tham số `context { workflowId, executionId }` cho executor
-- [ ] 🤖 `memory.chat` (load / save / clear) trên Redis + seed node type
-- [ ] 🤖 `LlmGenerateRequest.history`; ba adapter gửi nhiều lượt; config LLM `history`
-- [ ] 🤖 Unit (Redis giả, adapter); e2e: hai tin liên tiếp, lần hai LLM nhận lịch sử
+- [x] 🤖 Tham số `context { workflowId, executionId }` cho executor
+- [x] 🤖 `memory.chat` (load / save / clear) trên Redis + seed node type (`ChatMemoryPort`, `RedisChatMemory`)
+- [x] 🤖 `LlmGenerateRequest.history`; ba adapter gửi nhiều lượt; config LLM `history`
+- [x] 🤖 Unit (bộ nhớ giả, adapter, luồng bot nhớ hội thoại); e2e với Redis thật: hai tin liên tiếp, tin thứ hai thấy tin đầu, người khác thì không
 
 ## P4. Messenger
 - [ ] 🤖 Trigger: postback, quick_reply payload, `type` / `payload`, property `events`, field `messaging_postbacks` + `checkExists` kiểm fields

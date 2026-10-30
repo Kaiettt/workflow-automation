@@ -188,6 +188,73 @@ export const SET_CONFIG_SCHEMA = {
   },
 };
 
+// Reads and writes the recent messages of one conversation. "load" adds
+// `history` (for the LLM node) and `history_text` to the item.
+export const CHAT_MEMORY_CONFIG_SCHEMA = {
+  type: 'object',
+  required: ['session_key'],
+  'x-propertyOrder': [
+    'mode',
+    'session_key',
+    'window',
+    'user_message',
+    'assistant_message',
+    'ttl_days',
+  ],
+  properties: {
+    mode: {
+      type: 'string',
+      title: 'Action',
+      enum: ['load', 'save', 'clear'],
+      default: 'load',
+      'x-enumLabels': {
+        load: 'Load the conversation',
+        save: 'Save a turn',
+        clear: 'Forget the conversation',
+      },
+    },
+    session_key: {
+      type: 'string',
+      title: 'Session key',
+      'x-allowExpression': true,
+      default: '{{$node["Messenger Trigger"].json.sender_id}}',
+      description:
+        'Who the conversation is with, e.g. the sender_id of the Messenger Trigger',
+    },
+    window: {
+      type: 'integer',
+      title: 'Turns to load',
+      minimum: 1,
+      maximum: 25,
+      default: 10,
+      'x-hideWhen': { field: 'mode', in: ['save', 'clear'] },
+    },
+    user_message: {
+      type: 'string',
+      title: 'Customer message',
+      'x-allowExpression': true,
+      // No default: a default expression would also be evaluated in "load" mode.
+      'x-placeholder': '{{$node["Messenger Trigger"].json.text}}',
+      'x-hideWhen': { field: 'mode', in: ['load', 'clear'] },
+    },
+    assistant_message: {
+      type: 'string',
+      title: 'Bot reply',
+      'x-allowExpression': true,
+      'x-placeholder': '{{$node["LLM"].json.text}}',
+      'x-hideWhen': { field: 'mode', in: ['load', 'clear'] },
+    },
+    ttl_days: {
+      type: 'integer',
+      title: 'Forget after (days)',
+      minimum: 1,
+      maximum: 90,
+      default: 7,
+      'x-hideWhen': { field: 'mode', in: ['load', 'clear'] },
+    },
+  },
+};
+
 // `to` defaults to the item's email so workflows published before the field existed keep working.
 export const GMAIL_SEND_CONFIG_SCHEMA = {
   type: 'object',
@@ -222,6 +289,7 @@ export const LLM_GENERATE_CONFIG_SCHEMA = {
     'credential_id',
     'model',
     'system_prompt',
+    'history',
     'prompt',
     'output_format',
     'max_tokens',
@@ -258,6 +326,13 @@ export const LLM_GENERATE_CONFIG_SCHEMA = {
       title: 'System prompt',
       'x-allowExpression': true,
       'x-multiline': true,
+    },
+    history: {
+      type: 'string',
+      title: 'Conversation history',
+      'x-allowExpression': true,
+      description:
+        'Optional. Earlier messages, e.g. {{$json.history}} from a Chat Memory node',
     },
     prompt: {
       type: 'string',

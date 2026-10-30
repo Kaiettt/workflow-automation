@@ -165,6 +165,8 @@ export class WorkflowEngine {
       const outputDefs = resolveOutputs(configSchema, rawConfig);
       const result = await this.runner.run({
         node,
+        workflowId: version.workflowId,
+        executionId,
         items,
         inputSources: edges.length > 0 ? inputSources : undefined,
         outputKeys: outputDefs.map((def) => def.key),

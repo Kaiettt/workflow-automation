@@ -139,9 +139,10 @@ Lý do: dữ liệu tạm, cần nhanh, tự hết hạn. Nếu về sau cần x
 - Config:
   - `mode: load | save | clear`
   - `session_key` (biểu thức, mặc định `{{$node["Messenger Trigger"].json.sender_id}}`)
-  - `window` (load, mặc định 10 lượt = 20 tin)
-  - `user_message`, `assistant_message` (save, biểu thức)
-  - `ttl_days` (mặc định 7), giới hạn cứng 50 lượt mỗi phiên.
+  - `window` (load, mặc định 10 lượt = 20 tin, tối đa 25)
+  - `user_message`, `assistant_message` (save, biểu thức; không đặt `default` mà chỉ gợi ý bằng `x-placeholder`, vì `applySchemaDefaults` chạy trước khi giải biểu thức nên một biểu thức mặc định sẽ bị giải cả ở chế độ load và báo lỗi nếu tên node không có)
+  - `ttl_days` (mặc định 7, tối đa 90), giới hạn cứng 50 tin (25 lượt) mỗi phiên.
+- Lưu trữ nằm sau `ChatMemoryPort`; khoá Redis có tiền tố `BULLMQ_PREFIX` (hoặc `flowpilot`) để e2e và server dev dùng chung Redis không lẫn nhau.
 - Output:
   - `load`: `{ ...item.json, history: [...], history_text }` (giữ dữ liệu đầu vào để node sau vẫn dùng `$json.text`).
   - `save` / `clear`: trả lại `item.json`.

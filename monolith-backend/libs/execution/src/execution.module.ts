@@ -29,6 +29,9 @@ import { FilterExecutor } from './application/executors/filter-executor';
 import { IfExecutor } from './application/executors/if-executor';
 import { SwitchExecutor } from './application/executors/switch-executor';
 import { SetFieldsExecutor } from './application/executors/set-fields-executor';
+import { ChatMemoryExecutor } from './application/executors/chat-memory-executor';
+import { ChatMemoryPort } from './application/ports/chat-memory.port';
+import { RedisChatMemory } from './infrastructure/memory/redis-chat-memory';
 import { GmailSendExecutor } from './application/executors/gmail-send-executor';
 import { AggregateExecutor } from './application/executors/aggregate-executor';
 import {
@@ -55,6 +58,12 @@ import { INodeExecutor } from './domain/entities/node-executor';
     SetFieldsExecutor,
     GmailSendExecutor,
     AggregateExecutor,
+    { provide: ChatMemoryPort, useClass: RedisChatMemory },
+    {
+      provide: ChatMemoryExecutor,
+      useFactory: (memory: ChatMemoryPort) => new ChatMemoryExecutor(memory),
+      inject: [ChatMemoryPort],
+    },
     AnthropicLlmAdapter,
     OpenAiLlmAdapter,
     GeminiLlmAdapter,
@@ -93,6 +102,7 @@ import { INodeExecutor } from './domain/entities/node-executor';
         ifExecutor: IfExecutor,
         switchExecutor: SwitchExecutor,
         setFieldsExecutor: SetFieldsExecutor,
+        chatMemoryExecutor: ChatMemoryExecutor,
         gmailSendExecutor: GmailSendExecutor,
         aggregateExecutor: AggregateExecutor,
         llmGenerateExecutor: LlmGenerateExecutor,
@@ -104,6 +114,7 @@ import { INodeExecutor } from './domain/entities/node-executor';
         ifExecutor,
         switchExecutor,
         setFieldsExecutor,
+        chatMemoryExecutor,
         gmailSendExecutor,
         aggregateExecutor,
         llmGenerateExecutor,
@@ -117,6 +128,7 @@ import { INodeExecutor } from './domain/entities/node-executor';
         IfExecutor,
         SwitchExecutor,
         SetFieldsExecutor,
+        ChatMemoryExecutor,
         GmailSendExecutor,
         AggregateExecutor,
         LlmGenerateExecutor,

@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { LlmLimits } from '../../domain/constants/execution.constants';
 import {
   buildSystemPrompt,
+  conversationHistory,
   isRetryableStatus,
   LlmGenerateRequest,
   LlmGenerateResult,
@@ -41,6 +42,7 @@ export class OpenAiLlmAdapter implements LlmProvider {
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
     const system = buildSystemPrompt(request);
     if (system) messages.push({ role: 'system', content: system });
+    messages.push(...conversationHistory(request));
     messages.push({ role: 'user', content: request.prompt });
 
     const body: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {

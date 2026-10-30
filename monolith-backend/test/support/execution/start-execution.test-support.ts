@@ -31,12 +31,18 @@ import { AggregateExecutor } from '@app/execution/application/executors/aggregat
 import { IfExecutor } from '@app/execution/application/executors/if-executor';
 import { SwitchExecutor } from '@app/execution/application/executors/switch-executor';
 import { SetFieldsExecutor } from '@app/execution/application/executors/set-fields-executor';
+import { ChatMemoryExecutor } from '@app/execution/application/executors/chat-memory-executor';
+import {
+  ChatMemoryPort,
+  ChatMessage,
+} from '@app/execution/application/ports/chat-memory.port';
 import { LlmGenerateExecutor } from '@app/execution/application/executors/llm-generate-executor';
 import {
   AGGREGATE_CONFIG_SCHEMA,
   FILTER_CONFIG_SCHEMA,
   GMAIL_SEND_CONFIG_SCHEMA,
   GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA,
+  CHAT_MEMORY_CONFIG_SCHEMA,
   IF_CONFIG_SCHEMA,
   LLM_GENERATE_CONFIG_SCHEMA,
   MANUAL_TRIGGER_CONFIG_SCHEMA,
@@ -128,6 +134,7 @@ export class FakeCatalog extends NodeCatalogPort {
         [NodeKeys.LOGIC_IF, IF_CONFIG_SCHEMA],
         [NodeKeys.LOGIC_SWITCH, SWITCH_CONFIG_SCHEMA],
         [NodeKeys.DATA_SET, SET_CONFIG_SCHEMA],
+        [NodeKeys.MEMORY_CHAT, CHAT_MEMORY_CONFIG_SCHEMA],
       ]),
     );
   }
@@ -155,6 +162,43 @@ export const llmText = (text: string): LlmGenerateResult => ({
   text,
   usage: { inputTokens: 10, outputTokens: 4 },
 });
+
+// Conversations kept in memory, keyed like the Redis version.
+export class FakeChatMemory extends ChatMemoryPort {
+  sessions = new Map<string, ChatMessage[]>();
+  lastTtlSeconds: number | null = null;
+
+  private key(workflowId: string, sessionKey: string) {
+    return `${workflowId}/${sessionKey}`;
+  }
+
+  load(workflowId: string, sessionKey: string, limit: number) {
+    const all = this.sessions.get(this.key(workflowId, sessionKey)) ?? [];
+    return Promise.resolve(all.slice(-limit));
+  }
+
+  append(
+    workflowId: string,
+    sessionKey: string,
+    messages: ChatMessage[],
+    options: { maxMessages: number; ttlSeconds: number },
+  ) {
+    const key = this.key(workflowId, sessionKey);
+    this.sessions.set(
+      key,
+      [...(this.sessions.get(key) ?? []), ...messages].slice(
+        -options.maxMessages,
+      ),
+    );
+    this.lastTtlSeconds = options.ttlSeconds;
+    return Promise.resolve();
+  }
+
+  clear(workflowId: string, sessionKey: string) {
+    this.sessions.delete(this.key(workflowId, sessionKey));
+    return Promise.resolve();
+  }
+}
 
 export type Row = string[];
 export const CUSTOMERS: Row[] = [
@@ -232,6 +276,7 @@ export interface BuildOptions {
   llmConnectorKey?: string;
   llmCeiling?: number;
   catalog?: NodeCatalogPort;
+  memory?: ChatMemoryPort;
 }
 
 export function build(definition: unknown, options: BuildOptions = {}) {
@@ -266,6 +311,7 @@ export function build(definition: unknown, options: BuildOptions = {}) {
       new IfExecutor(),
       new SwitchExecutor(),
       new SetFieldsExecutor(),
+      new ChatMemoryExecutor(options.memory ?? new FakeChatMemory()),
       new GmailSendExecutor(() => ({ users: { messages: { send } } })),
       new AggregateExecutor(),
       new LlmGenerateExecutor(

@@ -27,6 +27,15 @@ const asText = (value: unknown): unknown => {
 const blankToUndefined = (value: unknown): unknown =>
   value === '' || value === null ? undefined : value;
 
+const HistorySchema = z
+  .array(
+    z.object({
+      role: z.enum(['user', 'assistant']),
+      content: z.string(),
+    }),
+  )
+  .optional();
+
 const ConfigSchema = z.object({
   provider: z.enum(PROVIDERS),
   credential_id: z.string().min(1),
@@ -36,6 +45,8 @@ const ConfigSchema = z.object({
     const given = blankToUndefined(value);
     return given === undefined ? undefined : asText(given);
   }, z.string().optional()),
+  // An expression such as {{$json.history}} (from a Chat Memory node); blank means none.
+  history: z.preprocess(blankToUndefined, HistorySchema),
   prompt: z.preprocess(
     asText,
     z.string().min(1, 'LLM config.prompt must not be empty'),
@@ -127,6 +138,7 @@ export class LlmGenerateExecutor implements IPerItemExecutor<LlmGenerateConfig> 
       provider.generate({
         model: config.model,
         systemPrompt: config.system_prompt,
+        history: config.history,
         prompt: config.prompt,
         maxTokens: config.max_tokens,
         temperature: config.temperature,

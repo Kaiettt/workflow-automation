@@ -17,6 +17,7 @@ export const NodeKeys = {
   LOGIC_IF: 'logic.if',
   LOGIC_SWITCH: 'logic.switch',
   DATA_SET: 'data.set',
+  MEMORY_CHAT: 'memory.chat',
   DATA_AGGREGATE: 'data.aggregate',
   AI_LLM_GENERATE: 'ai.llm.generate',
 } as const;

@@ -72,6 +72,25 @@ describe('AnthropicLlmAdapter', () => {
     });
   });
 
+  it('sends the earlier messages before the prompt and drops a start by the assistant', async () => {
+    const { adapter, stream } = adapterReturning(message());
+    await adapter.generate({
+      ...request,
+      history: [
+        { role: 'assistant', content: 'cut off start' },
+        { role: 'user', content: 'Price?' },
+        { role: 'assistant', content: '100k' },
+      ],
+    });
+
+    const [body] = stream.mock.calls[0] as [{ messages: unknown }];
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'Price?' },
+      { role: 'assistant', content: '100k' },
+      { role: 'user', content: 'Hello' },
+    ]);
+  });
+
   it('omits system and temperature when not given, and asks for JSON in the system prompt', async () => {
     const { adapter, stream } = adapterReturning(message());
     await adapter.generate({ ...request, systemPrompt: undefined });
@@ -213,6 +232,25 @@ describe('OpenAiLlmAdapter', () => {
     });
   });
 
+  it('puts the earlier messages between the system message and the prompt', async () => {
+    const { adapter, create } = adapterReturning(completion());
+    await adapter.generate({
+      ...request,
+      history: [
+        { role: 'user', content: 'Price?' },
+        { role: 'assistant', content: '100k' },
+      ],
+    });
+
+    const [body] = create.mock.calls[0] as [{ messages: unknown }];
+    expect(body.messages).toEqual([
+      { role: 'system', content: 'Be brief' },
+      { role: 'user', content: 'Price?' },
+      { role: 'assistant', content: '100k' },
+      { role: 'user', content: 'Hello' },
+    ]);
+  });
+
   it('uses JSON mode and mentions JSON in the system message', async () => {
     const { adapter, create } = adapterReturning(completion());
     await adapter.generate({
@@ -339,6 +377,24 @@ describe('GeminiLlmAdapter', () => {
       text: 'Hi there',
       usage: { inputTokens: 5, outputTokens: 2 },
     });
+  });
+
+  it('sends the earlier messages as a conversation, calling the assistant "model"', async () => {
+    const { adapter, generateContent } = adapterReturning(response());
+    await adapter.generate({
+      ...request,
+      history: [
+        { role: 'user', content: 'Price?' },
+        { role: 'assistant', content: '100k' },
+      ],
+    });
+
+    const [params] = generateContent.mock.calls[0] as [{ contents: unknown }];
+    expect(params.contents).toEqual([
+      { role: 'user', parts: [{ text: 'Price?' }] },
+      { role: 'model', parts: [{ text: '100k' }] },
+      { role: 'user', parts: [{ text: 'Hello' }] },
+    ]);
   });
 
   it('asks for JSON output', async () => {
