@@ -101,6 +101,13 @@ describe('createExpressionContext', () => {
     expect(() => contextFor(0).getNodeAll('Nope')).toThrow(/renamed/);
   });
 
+  it('suggests the node name when only case or spacing differs', () => {
+    expect(() => contextFor(0).getNodeAll('read  customers')).toThrow(
+      'Did you mean "Read Customers"?',
+    );
+    expect(() => contextFor(0).getNodeAll('Nope')).not.toThrow(/Did you mean/);
+  });
+
   it('fails for a node that exists but has not run yet', () => {
     expect(() => contextFor(0).getPairedJson('Later')).toThrow(/has not run/);
   });

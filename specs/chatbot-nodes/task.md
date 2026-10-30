@@ -41,7 +41,7 @@
 - [x] 🤖 Unit (server thật cục bộ, các dải IP bị chặn, dựng request, xác thực, lỗi) + e2e (webhook → HTTP Request với credential bearer; bị chặn khi tắt cho phép địa chỉ nội bộ)
 
 ## P6. Sửa nhỏ
-- [ ] 🤖 Gợi ý tên node gần đúng trong lỗi biểu thức
+- [x] 🤖 Gợi ý tên node gần đúng trong lỗi biểu thức (khác nhau chỉ ở hoa thường hoặc khoảng trắng → "Did you mean ...?")
 
 ## Cuối
 - [ ] 🤖 Lint backend + frontend, frontend test + build, unit, e2e

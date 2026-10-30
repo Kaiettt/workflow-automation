@@ -33,6 +33,18 @@ export function buildNodeNameIndex(
   return index;
 }
 
+const normalizeName = (name: string) =>
+  name.replace(/\s+/g, ' ').trim().toLowerCase();
+
+// A node name that differs only in case or spacing from the one typed.
+function nearestName(names: NodeNameIndex, typed: string): string | undefined {
+  const wanted = normalizeName(typed);
+  for (const name of names.keys()) {
+    if (normalizeName(name) === wanted) return name;
+  }
+  return undefined;
+}
+
 function findRunIndex(
   runs: readonly NodeRun[],
   names: NodeNameIndex,
@@ -40,8 +52,10 @@ function findRunIndex(
 ): number {
   const ids = names.get(nodeName);
   if (!ids || ids.length === 0) {
+    const suggestion = nearestName(names, nodeName);
     throw new NodeReferenceError(
-      `Node "${nodeName}" was not found - it may have been renamed`,
+      `Node "${nodeName}" was not found - it may have been renamed` +
+        (suggestion ? `. Did you mean "${suggestion}"?` : ''),
     );
   }
   if (ids.length > 1) {
