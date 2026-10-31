@@ -1,4 +1,5 @@
-import { Handle, Position } from '@xyflow/react';
+import { useEffect } from 'react';
+import { Handle, Position, useUpdateNodeInternals } from '@xyflow/react';
 import { AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDesignerStore } from '../../store/designer.store';
@@ -32,6 +33,9 @@ const SIDES = [
   [Position.Right, 'right'],
 ] as const;
 
+// Vertical room for each named output so the handles never overlap.
+const OUTPUT_ROW_PX = 28;
+
 const HANDLE_CLASS =
   '!size-2.5 !border-2 !border-white !bg-slate-400 opacity-0 transition-opacity group-hover:opacity-100 group-data-[selected=true]:opacity-100';
 
@@ -49,6 +53,14 @@ export function BaseNode({ id, selected, data, trigger = false }: BaseNodeProps)
   const errorCount = id ? validationIssues.filter((i) => i.nodeId === id).length : 0;
   const outputs = resolveOutputs(nodeType?.configSchema, data.config);
   const named = hasNamedOutputs(outputs);
+
+  // The outputs follow the node's config (a Switch gains one per rule). React Flow
+  // only learns about a handle when told, so without this a new output cannot be dragged from.
+  const updateNodeInternals = useUpdateNodeInternals();
+  const outputKeys = outputs.map((output) => output.key).join('|');
+  useEffect(() => {
+    if (id) updateNodeInternals(id);
+  }, [id, named, outputKeys, updateNodeInternals]);
 
   // Nodes get renamed freely: keep the original type visible underneath.
   const kind =
@@ -75,7 +87,10 @@ export function BaseNode({ id, selected, data, trigger = false }: BaseNodeProps)
           selected && 'ring-2 ring-offset-1',
           errorCount > 0 ? 'border-rose-400 ring-rose-400/70' : 'border-gray-200',
         )}
-        style={selected && errorCount === 0 ? ({ '--tw-ring-color': color } as React.CSSProperties) : undefined}
+        style={{
+          ...(selected && errorCount === 0 ? ({ '--tw-ring-color': color } as React.CSSProperties) : {}),
+          ...(named ? { minHeight: outputs.length * OUTPUT_ROW_PX } : {}),
+        }}
       >
         <span
           className="absolute inset-y-0 left-0 w-1"

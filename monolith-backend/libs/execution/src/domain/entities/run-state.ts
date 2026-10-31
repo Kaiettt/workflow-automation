@@ -109,6 +109,10 @@ export function createExpressionContext(params: {
         if (item === undefined) throw noItem();
         if (pos === targetPos) return item.json;
         if (item.pairedItem === undefined) {
+          // A node that ran once has nothing to pair: its only item is the one meant.
+          if (runs[targetPos].output.length === 1) {
+            return runs[targetPos].output[0].json;
+          }
           throw new PairedItemError(
             `Cannot tell which item of node "${nodeName}" matches the current item. Use $node["${nodeName}"].all to read all of its items`,
           );

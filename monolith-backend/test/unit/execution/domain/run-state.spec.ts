@@ -82,6 +82,28 @@ describe('createExpressionContext', () => {
     ]);
   });
 
+  it('uses the only item of an earlier node when the chain cannot be followed', () => {
+    const aggOut = [item({ items: [] })];
+    const withAggregate: NodeRun[] = [
+      {
+        nodeId: 'trigger',
+        nodeName: 'Start',
+        input: [],
+        output: [item({ text: 'hi' })],
+      },
+      {
+        nodeId: 'sheet',
+        nodeName: 'Read Customers',
+        input: [item({})],
+        output: sheetOut,
+      },
+      { nodeId: 'agg', nodeName: 'Gather', input: sheetOut, output: aggOut },
+    ];
+    expect(contextFor(0, withAggregate).getPairedJson('Start')).toEqual({
+      text: 'hi',
+    });
+  });
+
   it('fails when the pairing chain is broken by a node that does not pair items', () => {
     const aggOut = [item({ items: [] })];
     const withAggregate: NodeRun[] = [
