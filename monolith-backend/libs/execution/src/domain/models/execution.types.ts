@@ -14,6 +14,8 @@ export interface ExecutionRecord {
   triggerType: TriggerType;
   // null when nobody pressed Run (webhook).
   triggeredById: string | null;
+  // QUEUED for a background run until the queue picks it up, else RUNNING.
+  status: ExecutionStatus.QUEUED | ExecutionStatus.RUNNING;
   startedAt: Date;
   // Normalized trigger payload, kept for debugging.
   context?: unknown;
@@ -23,7 +25,7 @@ export interface NodeLogRecord {
   nodeId: string;
   nodeKey: string;
   // SKIPPED: no incoming edge was activated, so the node did not run.
-  status: ExecutionStatus | 'SKIPPED';
+  status: Exclude<ExecutionStatus, ExecutionStatus.QUEUED> | 'SKIPPED';
   input: unknown;
   output: unknown;
   errorMessage?: string;

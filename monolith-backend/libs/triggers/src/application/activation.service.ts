@@ -18,6 +18,15 @@ export interface ActivationState {
   versionId: string | null;
 }
 
+// `versionId`: the version that listens after the switch. With `error` the
+// new version could not listen: the previous one still does (active) or, if
+// none did, the workflow was turned off.
+export type SwitchVersionResult = {
+  active: boolean;
+  versionId: string | null;
+  error?: string;
+} | null;
+
 export interface NodeWebhook {
   nodeId: string;
   nodeKey: string;
@@ -40,7 +49,12 @@ export class ActivationService {
 
   async state(workflowId: string, userId: string): Promise<ActivationState> {
     const workflow = await this.ownedWorkflow(workflowId, userId);
-    return stateOf(workflow);
+    if (!workflow.active) return { active: false, versionId: null };
+    return {
+      active: true,
+      versionId:
+        (await this.listeningVersion(workflow.id)) ?? workflow.currentVersionId,
+    };
   }
 
   async activate(workflowId: string, userId: string): Promise<ActivationState> {
@@ -65,22 +79,29 @@ export class ActivationService {
   }
 
   // After a publish / restore: an active workflow listens with the new
-  // version. If that fails the workflow is turned off. Null when inactive.
-  async switchVersion(
-    workflowId: string,
-  ): Promise<{ active: boolean; error?: string } | null> {
+  // version. If that fails, the version that listened before keeps answering
+  // (a bad publish must not take a live bot down); only when nothing listened
+  // is the workflow turned off. Null when inactive.
+  async switchVersion(workflowId: string): Promise<SwitchVersionResult> {
     const workflow = await this.repository.findWorkflow(workflowId);
     if (!workflow?.active || !workflow.currentVersionId) return null;
     try {
       await this.listen(workflow, workflow.currentVersionId);
-      return { active: true };
+      return { active: true, versionId: workflow.currentVersionId };
     } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      // listen() replaces the listeners only once everything is registered,
+      // so on failure the previous version's listeners are untouched.
+      const previous = await this.listeningVersion(workflow.id);
+      if (previous) return { active: true, versionId: previous, error: reason };
       await this.stop(workflow);
-      return {
-        active: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
+      return { active: false, versionId: null, error: reason };
     }
+  }
+
+  private async listeningVersion(workflowId: string): Promise<string | null> {
+    const listeners = await this.repository.listenersOfWorkflow(workflowId);
+    return listeners[0]?.workflowVersionId ?? null;
   }
 
   // Webhook URLs of the draft's trigger nodes, so they can be copied before
@@ -206,11 +227,4 @@ export class ActivationService {
       await this.registrar.cleanup(endpointId);
     }
   }
-}
-
-function stateOf(workflow: WorkflowRef): ActivationState {
-  return {
-    active: workflow.active,
-    versionId: workflow.active ? workflow.currentVersionId : null,
-  };
 }

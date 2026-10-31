@@ -22,8 +22,10 @@ for (const [network, prefix] of [
   blocked.addSubnet(network, prefix, 'ipv4');
 }
 for (const [network, prefix] of [
-  ['::', 128],
-  ['::1', 128],
+  // IPv4-compatible (::a.b.c.d, deprecated) also covers :: and ::1.
+  ['::', 96],
+  // 6to4 embeds an IPv4 address too (deprecated, no legitimate use here).
+  ['2002::', 16],
   ['fc00::', 7],
   ['fe80::', 10],
   ['ff00::', 8],
@@ -76,6 +78,9 @@ export interface SafeRequest {
   maxRedirects: number;
   // Lets the request reach private addresses (development only).
   allowPrivate: boolean;
+  // Headers that carry a credential (e.g. an API key header): like
+  // Authorization, they are sent to the first host only.
+  secretHeaders?: string[];
 }
 
 export interface SafeResponse {
@@ -319,10 +324,14 @@ export async function safeRequest(request: SafeRequest): Promise<SafeResponse> {
       );
     }
     if (url.host !== firstHost) {
+      const secret = new Set(
+        (request.secretHeaders ?? []).map((name) => name.toLowerCase()),
+      );
       headers = Object.fromEntries(
-        Object.entries(headers).filter(
-          ([name]) => !SENSITIVE_HEADERS.has(name.toLowerCase()),
-        ),
+        Object.entries(headers).filter(([name]) => {
+          const lower = name.toLowerCase();
+          return !SENSITIVE_HEADERS.has(lower) && !secret.has(lower);
+        }),
       );
     }
   }

@@ -52,9 +52,11 @@ describe('OAuth2 credentials', () => {
   });
 
   it('signs in with the user’s own app and stores the tokens in the credential', async () => {
-    const url = new URL(
-      await service.authorizationUrl(MESSENGER_CREDENTIAL_ID, OWNER),
+    const started = await service.authorizationUrl(
+      MESSENGER_CREDENTIAL_ID,
+      OWNER,
     );
+    const url = new URL(started.url);
     expect(url.origin + url.pathname).toBe(
       'https://www.facebook.com/v23.0/dialog/oauth',
     );
@@ -67,7 +69,8 @@ describe('OAuth2 credentials', () => {
     );
 
     const state = url.searchParams.get('state')!;
-    expect(await service.handleCallback('code-1', state)).toBe(
+    expect(started.state).toBe(state);
+    expect(await service.complete('code-1', state, OWNER)).toBe(
       MESSENGER_CREDENTIAL_ID,
     );
     expect(
@@ -80,7 +83,25 @@ describe('OAuth2 credentials', () => {
     });
 
     // The state works once.
-    await expect(service.handleCallback('code-1', state)).rejects.toThrow(
+    await expect(service.complete('code-1', state, OWNER)).rejects.toThrow(
+      'expired',
+    );
+  });
+
+  it('refuses a sign-in started by another user (a forged sign-in link)', async () => {
+    const { state } = await service.authorizationUrl(
+      MESSENGER_CREDENTIAL_ID,
+      OWNER,
+    );
+
+    await expect(service.complete('code-1', state, 'victim')).rejects.toThrow(
+      'started by another user',
+    );
+    expect(
+      vault.credentials.get(MESSENGER_CREDENTIAL_ID)!.secret.access_token,
+    ).toBeUndefined();
+    // The state is used up, so the link cannot be tried again.
+    await expect(service.complete('code-1', state, OWNER)).rejects.toThrow(
       'expired',
     );
   });

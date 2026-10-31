@@ -20,6 +20,8 @@ export abstract class TriggerRepository {
   abstract createEndpoint(
     endpoint: NewWebhookEndpoint,
   ): Promise<WebhookEndpoint>;
+  // Endpoints currently registered with their outside app.
+  abstract registeredEndpointIds(): Promise<string[]>;
   abstract updateEndpoint(
     endpointId: string,
     changes: { data: Record<string, unknown>; registered: boolean },

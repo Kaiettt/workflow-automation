@@ -57,6 +57,11 @@ export class WorkflowEngine {
       workflowVersionId: input.version.id,
       triggerType: input.triggerType,
       triggeredById: input.triggeredById,
+      // A manual run starts at once; a background one waits for the queue.
+      status:
+        input.triggerType === TriggerType.MANUAL
+          ? ExecutionStatus.RUNNING
+          : ExecutionStatus.QUEUED,
       startedAt,
       context:
         input.triggerType === TriggerType.MANUAL

@@ -8,7 +8,7 @@ const mockCredentialApi = vi.hoisted(() => ({
   listConnectors: vi.fn(),
 }));
 vi.mock('../api/credential.api', () => ({ credentialApi: mockCredentialApi }));
-const mockTriggerApi = vi.hoisted(() => ({ oauth2Url: vi.fn() }));
+const mockTriggerApi = vi.hoisted(() => ({ oauth2Start: vi.fn(), oauth2Complete: vi.fn() }));
 vi.mock('../api/trigger.api', () => ({ triggerApi: mockTriggerApi }));
 
 import { AddCredentialDialog } from './AddCredentialDialog';
@@ -112,7 +112,12 @@ describe('AddCredentialDialog', () => {
       name: 'Shop app',
       createdAt: '',
     });
-    mockTriggerApi.oauth2Url.mockResolvedValue('https://www.facebook.com/dialog/oauth?x=1');
+    mockTriggerApi.oauth2Start.mockResolvedValue({
+      url: 'https://www.facebook.com/dialog/oauth?x=1',
+      state: 'state-1',
+      callbackOrigin: 'https://flow.example.com',
+    });
+    mockTriggerApi.oauth2Complete.mockResolvedValue('cred-fb');
     const popup = { location: { href: '' }, closed: false, close: vi.fn() };
     const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
     const onSaved = renderDialog('facebookMessengerOAuth2');
@@ -123,7 +128,7 @@ describe('AddCredentialDialog', () => {
     fireEvent.change(screen.getByLabelText('App Secret'), { target: { value: 's3cret' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save & connect' }));
 
-    await waitFor(() => expect(mockTriggerApi.oauth2Url).toHaveBeenCalledWith('cred-fb'));
+    await waitFor(() => expect(mockTriggerApi.oauth2Start).toHaveBeenCalledWith('cred-fb'));
     expect(mockCredentialApi.create).toHaveBeenCalledWith('facebookMessengerOAuth2', {
       name: 'Shop app',
       secret: { client_id: '123', client_secret: 's3cret' },
@@ -131,13 +136,21 @@ describe('AddCredentialDialog', () => {
     await waitFor(() => expect(popup.location.href).toBe('https://www.facebook.com/dialog/oauth?x=1'));
     expect(onSaved).not.toHaveBeenCalled();
 
-    // The callback page reports back: the new credential is chosen.
-    window.dispatchEvent(
+    const callback = (origin: string, state: string) =>
       new MessageEvent('message', {
-        data: { type: 'oauth2-callback', status: 'success', credentialId: 'cred-fb' },
-      }),
-    );
+        origin,
+        data: { type: 'oauth2-callback', status: 'success', state, code: 'code-1' },
+      });
+    // Messages from another origin or for another sign-in are ignored.
+    window.dispatchEvent(callback('https://evil.example.com', 'state-1'));
+    window.dispatchEvent(callback('https://flow.example.com', 'other-state'));
+    expect(mockTriggerApi.oauth2Complete).not.toHaveBeenCalled();
+
+    // The callback page reports back: the sign-in is completed with this
+    // window's login and the new credential is chosen.
+    window.dispatchEvent(callback('https://flow.example.com', 'state-1'));
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith('cred-fb'));
+    expect(mockTriggerApi.oauth2Complete).toHaveBeenCalledWith('state-1', 'code-1');
     open.mockRestore();
   });
 });

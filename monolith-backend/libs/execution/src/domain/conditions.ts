@@ -1,3 +1,4 @@
+import { createContext, Script } from 'node:vm';
 import { z } from 'zod';
 
 export const CONDITION_OPERATORS = [
@@ -17,6 +18,20 @@ export const CONDITION_OPERATORS = [
 export type ConditionOperator = (typeof CONDITION_OPERATORS)[number];
 
 const MAX_REGEX_LENGTH = 500;
+// A pattern such as (a+)+$ can backtrack for minutes on a short text (the
+// customer's message), which would freeze the whole server. The match runs in
+// a vm context whose timeout interrupts it.
+export const REGEX_TIMEOUT_MS = 50;
+const regexContext = createContext(Object.create(null) as object);
+const regexTest = new Script('pattern.test(subject)');
+
+function isTimeout(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 'ERR_SCRIPT_EXECUTION_TIMEOUT'
+  );
+}
 
 export const ConditionSchema = z.object({
   // Usually an expression such as {{$json.text}}, so any JSON value can arrive.
@@ -100,7 +115,19 @@ function regexMatches(
   } catch {
     throw new Error(`"${pattern}" is not a valid regular expression`);
   }
-  return expression.test(subject);
+  try {
+    Object.assign(regexContext, { pattern: expression, subject });
+    return regexTest.runInContext(regexContext, {
+      timeout: REGEX_TIMEOUT_MS,
+    }) as boolean;
+  } catch (error) {
+    if (!isTimeout(error)) throw error;
+    throw new Error(
+      `The regular expression "${pattern}" took too long on this value; make it simpler`,
+    );
+  } finally {
+    Object.assign(regexContext, { pattern: undefined, subject: undefined });
+  }
 }
 
 export function evaluateCondition(

@@ -33,6 +33,9 @@ describe('isBlockedAddress', () => {
     '::ffff:7f00:1',
     '::ffff:a9fe:a9fe',
     '64:ff9b::7f00:1',
+    '::7f00:1',
+    '::127.0.0.1',
+    '2002:7f00:1::1',
     'not-an-address',
   ])('blocks %s', (address) => {
     expect(isBlockedAddress(address)).toBe(true);
@@ -193,6 +196,27 @@ describe('safeRequest', () => {
     expect(seen[1].headers.authorization).toBeUndefined();
     expect(seen[1].headers.cookie).toBeUndefined();
     expect(seen[1].headers['x-keep']).toBe('1');
+  });
+
+  it('does not pass a credential header (API key) on to another host', async () => {
+    const other = await serve((_req, res) => res.end('other'));
+    const base = await serve((req, res) => {
+      if (req.url === '/same') {
+        res.writeHead(302, { location: `${other}/` });
+      } else {
+        res.writeHead(302, { location: '/same' });
+      }
+      res.end();
+    });
+    await request(`${base}/`, {
+      headers: { 'x-api-key': 'secret', 'x-keep': '1' },
+      secretHeaders: ['X-API-Key'],
+    });
+
+    // Same host keeps it, another host does not.
+    expect(seen[1].headers['x-api-key']).toBe('secret');
+    expect(seen[2].headers['x-api-key']).toBeUndefined();
+    expect(seen[2].headers['x-keep']).toBe('1');
   });
 
   it('stops after too many redirects', async () => {

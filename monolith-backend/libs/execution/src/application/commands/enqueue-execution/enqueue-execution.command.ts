@@ -41,12 +41,18 @@ export class EnqueueExecutionHandler implements ICommandHandler<EnqueueExecution
       },
       startedAt,
     );
-    await this.queue.enqueue({
-      executionId,
-      workflowVersionId: version.id,
-      triggerItems: command.triggerItems,
-      startedAt: startedAt.toISOString(),
-    });
+    try {
+      await this.queue.enqueue({
+        executionId,
+        workflowVersionId: version.id,
+        triggerItems: command.triggerItems,
+        queuedAt: startedAt.toISOString(),
+      });
+    } catch (error) {
+      // Never picked up: the row must not stay QUEUED.
+      await this.repository.failUnfinishedExecution(executionId, new Date());
+      throw error;
+    }
     return executionId;
   }
 }

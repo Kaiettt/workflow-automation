@@ -223,10 +223,14 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
       useDesignerStore.getState().setValidationIssues([]);
       setNodes((currentNodes) => updateValidationHighlights(currentNodes, []));
       void queryClient.invalidateQueries({ queryKey: triggerKeys.activation(workflowId) });
-      if (published.activation && !published.activation.active) {
-        // The new version could not listen: the server turned the workflow off.
+      const activation = published.activation;
+      if (activation && (activation.error || !activation.active)) {
+        // The new version could not listen.
+        const reason = activation.error ?? 'its triggers could not listen';
         setPublishValidation({
-          message: `Published version ${published.versionNumber}, but the workflow was turned off: ${published.activation.error ?? 'its triggers could not listen'}. Fix it, publish, then activate again.`,
+          message: activation.active
+            ? `Published version ${published.versionNumber}, but it could not start listening: ${reason}. The previous version keeps answering events. Fix it and publish again.`
+            : `Published version ${published.versionNumber}, but the workflow was turned off: ${reason}. Fix it, publish, then activate again.`,
           issues: [],
         });
         setValidationDialogOpen(true);

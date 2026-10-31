@@ -71,9 +71,30 @@ export class MemoryExecutionRepository extends ExecutionRepository {
 
   created: Array<Omit<ExecutionRecord, 'id'>> = [];
 
+  // Status of the (single) execution, as the database would hold it.
+  status: ExecutionStatus | null = null;
+
   createExecution(input: Omit<ExecutionRecord, 'id'>): Promise<string> {
     this.created.push(input);
+    this.status = input.status;
     return Promise.resolve('execution-1');
+  }
+
+  claimQueuedExecution(): Promise<boolean> {
+    if (this.status !== ExecutionStatus.QUEUED) return Promise.resolve(false);
+    this.status = ExecutionStatus.RUNNING;
+    return Promise.resolve(true);
+  }
+
+  failUnfinishedExecution(): Promise<void> {
+    if (
+      this.status === ExecutionStatus.QUEUED ||
+      this.status === ExecutionStatus.RUNNING
+    ) {
+      this.status = ExecutionStatus.FAILED;
+      this.finishedStatus = ExecutionStatus.FAILED;
+    }
+    return Promise.resolve();
   }
 
   resolveCredential(
@@ -105,6 +126,7 @@ export class MemoryExecutionRepository extends ExecutionRepository {
 
   finishExecution(_id: string, status: ExecutionStatus): Promise<void> {
     this.finishedStatus = status;
+    this.status = status;
     return Promise.resolve();
   }
 

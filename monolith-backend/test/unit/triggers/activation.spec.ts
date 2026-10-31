@@ -240,24 +240,48 @@ describe('workflow activation and webhooks', () => {
       await activation.activate('wf', OWNER);
       repository.publish('wf', definition(webhookTrigger('new')));
 
-      expect(await activation.switchVersion('wf')).toEqual({ active: true });
+      expect(await activation.switchVersion('wf')).toEqual({
+        active: true,
+        versionId: 'wf-v2',
+      });
       expect(
         repository.listeners.map((l) => [l.nodeId, l.workflowVersionId]),
       ).toEqual([['new', 'wf-v2']]);
     });
 
-    it('turns the workflow off when the new version cannot listen', async () => {
-      repository.addWorkflow('wf', definition(webhookTrigger()));
+    it('keeps the previous version listening when the new version cannot listen', async () => {
+      repository.addWorkflow('wf', definition(webhookTrigger('old')));
       await activation.activate('wf', OWNER);
       repository.publish('wf', definition(node('m', 'trigger.manual')));
 
       const result = await activation.switchVersion('wf');
       expect(result).toEqual({
+        active: true,
+        versionId: 'wf-v1',
+        error: expect.stringContaining('no trigger'),
+      });
+      expect(repository.workflows.get('wf')!.active).toBe(true);
+      expect(
+        repository.listeners.map((l) => [l.nodeId, l.workflowVersionId]),
+      ).toEqual([['old', 'wf-v1']]);
+      expect(await activation.state('wf', OWNER)).toEqual({
+        active: true,
+        versionId: 'wf-v1',
+      });
+    });
+
+    it('turns the workflow off when the new version cannot listen and nothing listened before', async () => {
+      repository.addWorkflow('wf', definition(node('m', 'trigger.manual')), {
+        active: true,
+      });
+
+      const result = await activation.switchVersion('wf');
+      expect(result).toEqual({
         active: false,
+        versionId: null,
         error: expect.stringContaining('no trigger'),
       });
       expect(repository.workflows.get('wf')!.active).toBe(false);
-      expect(repository.listeners).toHaveLength(0);
     });
 
     it('does nothing for an inactive workflow', async () => {
@@ -440,6 +464,36 @@ describe('workflow activation and webhooks', () => {
       await expect(testListen.get(started.listenId, OWNER)).rejects.toThrow(
         'not found',
       );
+    });
+
+    it('unregisters an endpoint once the only test on it expired, also after a restart', async () => {
+      repository.addWorkflow('wf', definition(messengerTrigger('chat')), {
+        published: false,
+      });
+      const started = await testListen.start('wf', 'chat', OWNER);
+      expect(graph.appSubscriptions.size).toBe(1);
+
+      // Still waiting: the sweep leaves it alone.
+      await testListen.sweep();
+      expect(graph.appSubscriptions.size).toBe(1);
+
+      // Expired (no timer in this process knows about it any more).
+      const listen = tests.listens.get(started.listenId)!;
+      listen.expiresAt = new Date(Date.now() - 1000).toISOString();
+      await testListen.sweep();
+      expect(graph.appSubscriptions.size).toBe(0);
+      expect(
+        repository.endpointOf(`credential:${MESSENGER_CREDENTIAL_ID}`)!
+          .registered,
+      ).toBe(false);
+    });
+
+    it('keeps endpoints an active workflow listens on', async () => {
+      repository.addWorkflow('wf', definition(webhookTrigger()));
+      await activation.activate('wf', OWNER);
+
+      await testListen.sweep();
+      expect(repository.endpointOf('node:wf:hook')!.registered).toBe(true);
     });
 
     it('refuses nodes that do not receive events', async () => {

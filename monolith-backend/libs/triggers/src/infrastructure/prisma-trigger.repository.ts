@@ -91,6 +91,14 @@ export class PrismaTriggerRepository implements TriggerRepository {
     return row ? toEndpoint(row) : null;
   }
 
+  async registeredEndpointIds(): Promise<string[]> {
+    const rows = await this.prisma.webhookEndpoint.findMany({
+      where: { registered: true },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   async findEndpointByScope(scopeKey: string): Promise<WebhookEndpoint | null> {
     const row = await this.prisma.webhookEndpoint.findUnique({
       where: { scopeKey },

@@ -90,7 +90,7 @@ function setup(definition: unknown) {
   const processor = new ExecutionProcessor(repository, engine);
   const process = (job: QueuedExecutionJob) =>
     processor.process({ data: job } as Job<QueuedExecutionJob>);
-  return { repository, queue, enqueue, process, send };
+  return { repository, queue, enqueue, processor, process, send };
 }
 
 const emailFlow = chain([
@@ -117,6 +117,7 @@ describe('Webhook executions', () => {
         workflowVersionId: 'version-1',
         triggerType: TriggerType.WEBHOOK,
         triggeredById: null,
+        status: ExecutionStatus.QUEUED,
         context: { triggerItems: [order('urgent')] },
       }),
     ]);
@@ -170,18 +171,52 @@ describe('Webhook executions', () => {
   });
 
   it('marks the execution FAILED when the version was deleted before the job ran', async () => {
-    const { repository, process } = setup(emailFlow);
+    const { repository, queue, enqueue, process } = setup(emailFlow);
+    await enqueue.execute(new EnqueueExecutionCommand('version-1', []));
     jest.spyOn(repository, 'findVersion').mockResolvedValue(null);
 
-    const status = await process({
-      executionId: 'execution-1',
-      workflowVersionId: 'gone',
-      triggerItems: [],
-      startedAt: new Date().toISOString(),
-    });
+    const status = await process(queue.jobs[0]);
 
     expect(status).toBe(ExecutionStatus.FAILED);
     expect(repository.finishedStatus).toBe(ExecutionStatus.FAILED);
+  });
+
+  it('never runs a job twice: a run that is no longer QUEUED is skipped', async () => {
+    const { repository, queue, enqueue, process, send } = setup(emailFlow);
+    await enqueue.execute(
+      new EnqueueExecutionCommand('version-1', [order('urgent')]),
+    );
+    await process(queue.jobs[0]);
+    expect(send).toHaveBeenCalledTimes(1);
+
+    // The same job delivered again (e.g. after its worker stalled).
+    expect(await process(queue.jobs[0])).toBe(ExecutionStatus.FAILED);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(repository.finishedStatus).toBe(ExecutionStatus.SUCCESS);
+  });
+
+  it('marks the execution FAILED when its job fails in the queue (worker died)', async () => {
+    const { repository, queue, enqueue, processor, send } = setup(emailFlow);
+    await enqueue.execute(
+      new EnqueueExecutionCommand('version-1', [order('urgent')]),
+    );
+
+    await processor.onFailed({
+      data: queue.jobs[0],
+    } as Job<QueuedExecutionJob>);
+
+    expect(repository.status).toBe(ExecutionStatus.FAILED);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('marks the execution FAILED when it cannot be queued', async () => {
+    const { repository, queue, enqueue } = setup(emailFlow);
+    jest.spyOn(queue, 'enqueue').mockRejectedValue(new Error('Redis down'));
+
+    await expect(
+      enqueue.execute(new EnqueueExecutionCommand('version-1', [])),
+    ).rejects.toThrow('Redis down');
+    expect(repository.status).toBe(ExecutionStatus.FAILED);
   });
 
   it('starts the flow with an empty item when a webhook workflow gets no payload', async () => {

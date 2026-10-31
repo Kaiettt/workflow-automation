@@ -92,6 +92,16 @@ describe('evaluateCondition', () => {
       evaluateCondition(cond('regex', 'x', 'a'.repeat(501)), both),
     ).toThrow(/limited to 500/);
   });
+
+  it('stops a regular expression that backtracks too long instead of freezing the server', () => {
+    const started = Date.now();
+    expect(() =>
+      evaluateCondition(cond('regex', `${'a'.repeat(40)}!`, '^(a+)+$'), both),
+    ).toThrow(/took too long/);
+    expect(Date.now() - started).toBeLessThan(2000);
+    // The next condition still works.
+    expect(evaluateCondition(cond('regex', 'abc', 'b'), both)).toBe(true);
+  });
 });
 
 describe('evaluateConditions', () => {

@@ -141,6 +141,8 @@ export class HttpMetaGraphApi implements MetaGraphApi {
         messaging_type: 'RESPONSE',
         message,
       },
+      // A timeout or 5xx may come after the message went out: no retry.
+      { idempotent: false },
     );
     return { messageId: data.message_id ?? '' };
   }
@@ -233,6 +235,7 @@ export class HttpMetaGraphApi implements MetaGraphApi {
     path: string,
     params: Record<string, unknown>,
     data?: unknown,
+    options: { idempotent?: boolean } = {},
   ): Promise<T> {
     try {
       const response = await axios.request<T>({
@@ -244,7 +247,7 @@ export class HttpMetaGraphApi implements MetaGraphApi {
       });
       return response.data;
     } catch (error) {
-      throw toAppApiError(error);
+      throw toAppApiError(error, options.idempotent ?? true);
     }
   }
 }
@@ -256,7 +259,10 @@ interface GraphError {
 }
 
 // Rate limits, timeouts and 5xx are retryable; Graph explains everything else.
-export function toAppApiError(error: unknown): AppApiError {
+// A call that is not idempotent (sending a message) is retried only when Graph
+// refused it outright (rate limit): after a timeout or a 5xx it may already
+// have been delivered, and a retry would send it twice.
+export function toAppApiError(error: unknown, idempotent = true): AppApiError {
   if (!(error instanceof AxiosError)) {
     return new AppApiError(
       error instanceof Error ? error.message : 'Facebook request failed',
@@ -266,7 +272,7 @@ export function toAppApiError(error: unknown): AppApiError {
   if (!error.response) {
     return new AppApiError(
       `Facebook did not answer (${error.code ?? 'network error'})`,
-      true,
+      idempotent,
     );
   }
 
@@ -292,9 +298,10 @@ export function toAppApiError(error: unknown): AppApiError {
       false,
     );
   }
-  const rateLimited = code === 4 || code === 32 || code === 613;
+  const rateLimited =
+    status === 429 || code === 4 || code === 32 || code === 613;
   return new AppApiError(
     `Facebook API error (${status}): ${graph?.message ?? error.message}`,
-    status === 429 || status >= 500 || rateLimited,
+    rateLimited || (idempotent && status >= 500),
   );
 }

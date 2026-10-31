@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { DesignerModule } from '@app/designer';
+import { NoTriggersTestModule } from '@test/support/designer/no-triggers.module';
 import { PrismaModule } from '@app/database';
 import { PrismaService } from '@app/database/prisma/prisma.service';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
@@ -16,7 +17,8 @@ describe('Feature 4.4 - Workflow Versions & Execution Run API (e2e)', () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [PrismaModule, DesignerModule],
+      // The designer alone: the triggers module's answers are stubbed.
+      imports: [PrismaModule, DesignerModule, NoTriggersTestModule],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({

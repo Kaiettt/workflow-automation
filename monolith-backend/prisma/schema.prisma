@@ -235,6 +235,7 @@ enum TriggerType {
 }
 
 enum ExecutionStatus {
+  QUEUED // chờ trong queue (webhook), chưa node nào chạy
   RUNNING
   SUCCESS
   FAILED

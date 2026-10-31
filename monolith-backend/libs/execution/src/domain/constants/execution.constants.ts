@@ -1,4 +1,6 @@
 export enum ExecutionStatus {
+  // Waiting in the queue (webhook); no node has run yet.
+  QUEUED = 'QUEUED',
   RUNNING = 'RUNNING',
   SUCCESS = 'SUCCESS',
   FAILED = 'FAILED',

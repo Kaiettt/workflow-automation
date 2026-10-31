@@ -34,3 +34,11 @@ export interface NodeOption {
 export interface WebhookHint {
   scope: 'node' | 'credential';
 }
+
+// An OAuth2 sign-in started for a credential. The pop-up's callback page is
+// trusted only from `callbackOrigin` and with this `state`.
+export interface OAuth2Start {
+  url: string;
+  state: string;
+  callbackOrigin: string;
+}

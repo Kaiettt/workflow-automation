@@ -144,6 +144,12 @@ export class MemoryTriggerRepository extends TriggerRepository {
     return Promise.resolve(endpoint ? clone(endpoint) : null);
   }
 
+  registeredEndpointIds() {
+    return Promise.resolve(
+      this.endpoints.filter((e) => e.registered).map((e) => e.id),
+    );
+  }
+
   findEndpointByScope(scopeKey: string) {
     const endpoint = this.endpoints.find((e) => e.scopeKey === scopeKey);
     return Promise.resolve(endpoint ? clone(endpoint) : null);

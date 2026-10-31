@@ -2,11 +2,9 @@
 import {
   CommandBus,
   CommandHandler,
-  CommandHandlerNotFoundException,
   EventBus,
   ICommandHandler,
   QueryBus,
-  QueryHandlerNotFoundException,
 } from '@nestjs/cqrs';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { WorkflowDraftRepository } from '../../domain/repositories/workflow-draft.repository';
@@ -49,9 +47,9 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
   async execute(command: PublishWorkflowCommand): Promise<{
     versionId: string;
     versionNumber: number;
-    // Set when the workflow is active: its listeners moved to the new version,
-    // or (active: false) that failed and the workflow was turned off.
-    activation?: { active: boolean; error?: string };
+    // Set when the workflow is active: the version that listens now, and the
+    // reason when the new version could not listen (see SwitchActiveVersionResult).
+    activation?: NonNullable<SwitchActiveVersionResult>;
   }> {
     const { workflowId, publishedById } = command;
 
@@ -135,20 +133,16 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     };
   }
 
-  // Without the triggers module loaded (e.g. a test app) there is nothing to check.
+  // Answered by the triggers module (credentials and channels of trigger
+  // nodes). A missing handler is a wiring bug and fails the publish.
   private async checkTriggers(
     query: CheckPublishTriggersQuery,
   ): Promise<PublishValidationIssue[]> {
-    try {
-      const issues = await this.queryBus.execute<
-        CheckPublishTriggersQuery,
-        PublishValidationIssue[] | undefined
-      >(query);
-      return Array.isArray(issues) ? issues : [];
-    } catch (error) {
-      if (error instanceof QueryHandlerNotFoundException) return [];
-      throw error;
-    }
+    const issues = await this.queryBus.execute<
+      CheckPublishTriggersQuery,
+      PublishValidationIssue[] | undefined
+    >(query);
+    return Array.isArray(issues) ? issues : [];
   }
 
   private async saveValidationErrors(
@@ -160,18 +154,14 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
   }
 }
 
-// Without the triggers module loaded (e.g. a test app) nothing listens.
-export async function switchActiveVersion(
+// Handled by the triggers module. A missing handler is a wiring bug: it
+// throws instead of silently leaving an active workflow on the old version.
+export function switchActiveVersion(
   commandBus: CommandBus,
   workflowId: string,
 ): Promise<SwitchActiveVersionResult> {
-  try {
-    return await commandBus.execute<
-      SwitchActiveVersionCommand,
-      SwitchActiveVersionResult
-    >(new SwitchActiveVersionCommand(workflowId));
-  } catch (error) {
-    if (error instanceof CommandHandlerNotFoundException) return null;
-    throw error;
-  }
+  return commandBus.execute<
+    SwitchActiveVersionCommand,
+    SwitchActiveVersionResult
+  >(new SwitchActiveVersionCommand(workflowId));
 }

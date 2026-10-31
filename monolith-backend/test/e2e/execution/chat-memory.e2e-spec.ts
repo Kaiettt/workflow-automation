@@ -57,7 +57,8 @@ describe('Chat memory (e2e)', () => {
         where: { id: executionId },
         include: { nodeLogs: true },
       });
-      if (execution && execution.status !== 'RUNNING') return execution;
+      if (execution && !['QUEUED', 'RUNNING'].includes(execution.status))
+        return execution;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     throw new Error(`execution ${executionId} did not finish`);

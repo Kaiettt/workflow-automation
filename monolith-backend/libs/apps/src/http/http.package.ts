@@ -338,9 +338,11 @@ export function createHttpPackage(
         headers['content-type'] = contentType;
       }
       // The credential comes last, so a header typed by hand cannot replace it.
-      for (const [name, value] of Object.entries(
-        authHeader(text(parameters.authentication), credential),
-      )) {
+      const credentialHeaders = authHeader(
+        text(parameters.authentication),
+        credential,
+      );
+      for (const [name, value] of Object.entries(credentialHeaders)) {
         headers[name.toLowerCase()] = value;
       }
 
@@ -362,6 +364,8 @@ export function createHttpPackage(
           maxBytes: MAX_RESPONSE_BYTES,
           maxRedirects: MAX_REDIRECTS,
           allowPrivate: allowPrivate(),
+          // Never forwarded to the host of a redirect.
+          secretHeaders: Object.keys(credentialHeaders),
         });
       } catch (error) {
         if (error instanceof BlockedAddressError) {

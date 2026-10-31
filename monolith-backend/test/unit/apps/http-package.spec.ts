@@ -278,6 +278,8 @@ describe('HTTP package', () => {
         { name: 'X-API-Key', value: 'k' },
       );
       expect(calls[0].headers).toEqual({ 'x-api-key': 'k' });
+      // Marked so a redirect to another host does not receive it.
+      expect(calls[0].secretHeaders).toEqual(['X-API-Key']);
     });
 
     it('lets the credential win over a header typed by hand', async () => {

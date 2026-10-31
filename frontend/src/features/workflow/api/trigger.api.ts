@@ -3,6 +3,7 @@ import type {
   ActivationState,
   NodeOption,
   NodeWebhook,
+  OAuth2Start,
   TestListen,
 } from '../types/trigger.types';
 
@@ -57,10 +58,18 @@ export const triggerApi = {
   },
 
   // Sign-in URL of an OAuth2 credential, opened in a pop-up.
-  oauth2Url: async (credentialId: string): Promise<string> => {
-    const res = await apiClient.get<{ url: string }>('/api/oauth2/auth', {
+  oauth2Start: async (credentialId: string): Promise<OAuth2Start> => {
+    const res = await apiClient.get<OAuth2Start>('/api/oauth2/auth', {
       params: { credentialId },
     });
-    return res.data.url;
+    return res.data;
+  },
+
+  oauth2Complete: async (state: string, code: string): Promise<string> => {
+    const res = await apiClient.post<{ data: { credentialId: string } }>(
+      '/api/oauth2/complete',
+      { state, code },
+    );
+    return res.data.data.credentialId;
   },
 };

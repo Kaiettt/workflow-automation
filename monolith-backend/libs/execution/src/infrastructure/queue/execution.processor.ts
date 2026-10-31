@@ -1,5 +1,5 @@
 import { Inject, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { ExecutionRepository } from '../../domain/repositories/execution.repository';
 import { ExecutionStatus } from '../../domain/constants/execution.constants';
@@ -10,7 +10,10 @@ import { EXECUTION_QUEUE } from './execution-queue.module';
 const DEFAULT_CONCURRENCY = 5;
 const DEFAULT_STALE_MINUTES = 15;
 
-@Processor(EXECUTION_QUEUE)
+// A run is never replayed: nodes may already have sent emails or messages.
+// maxStalledCount 0 makes BullMQ fail a job whose worker died (instead of
+// running it again); the `failed` event then marks its execution FAILED.
+@Processor(EXECUTION_QUEUE, { maxStalledCount: 0 })
 export class ExecutionProcessor
   extends WorkerHost
   implements OnApplicationBootstrap
@@ -30,7 +33,7 @@ export class ExecutionProcessor
       DEFAULT_CONCURRENCY,
     );
 
-    // Executions left RUNNING by a process that died will never finish.
+    // Manual runs left RUNNING by a process that died will never finish.
     const staleMinutes = positiveInt(
       process.env['EXECUTION_STALE_MINUTES'],
       DEFAULT_STALE_MINUTES,
@@ -45,7 +48,13 @@ export class ExecutionProcessor
 
   async process(job: Job<QueuedExecutionJob>): Promise<ExecutionStatus> {
     const { executionId, workflowVersionId, triggerItems } = job.data;
-    const startedAt = new Date(job.data.startedAt);
+    const startedAt = new Date();
+
+    // Only a QUEUED run starts; anything else already failed or is taken.
+    if (!(await this.repository.claimQueuedExecution(executionId, startedAt))) {
+      this.logger.warn(`Execution ${executionId} is not queued any more`);
+      return ExecutionStatus.FAILED;
+    }
 
     const version = await this.repository.findVersion(workflowVersionId);
     if (!version) {
@@ -73,6 +82,23 @@ export class ExecutionProcessor
         }`,
       );
       return ExecutionStatus.FAILED;
+    }
+  }
+
+  // Also fires for a job whose worker died (stalled), which never reached
+  // process() again.
+  @OnWorkerEvent('failed')
+  async onFailed(job: Job<QueuedExecutionJob> | undefined): Promise<void> {
+    const executionId = job?.data?.executionId;
+    if (!executionId) return;
+    try {
+      await this.repository.failUnfinishedExecution(executionId, new Date());
+    } catch (error) {
+      this.logger.error(
+        `Could not mark execution ${executionId} FAILED: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 }

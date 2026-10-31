@@ -4,7 +4,7 @@ export interface QueuedExecutionJob {
   executionId: string;
   workflowVersionId: string;
   triggerItems: Item[];
-  startedAt: string; // ISO time the execution row was created
+  queuedAt: string; // ISO time the execution row was created
 }
 
 export abstract class ExecutionQueuePort {

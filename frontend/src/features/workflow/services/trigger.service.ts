@@ -9,7 +9,8 @@ export const triggerService = {
   testListen: triggerApi.testListen,
   stopTestListen: triggerApi.stopTestListen,
   loadOptions: triggerApi.loadOptions,
-  oauth2Url: triggerApi.oauth2Url,
+  oauth2Start: triggerApi.oauth2Start,
+  oauth2Complete: triggerApi.oauth2Complete,
 
   // Turning the switch on fails with the server's reason (e.g. Meta refused
   // the webhook); that reason is what the user needs to read.

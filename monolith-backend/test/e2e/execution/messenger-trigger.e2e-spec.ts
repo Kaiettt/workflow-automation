@@ -86,15 +86,23 @@ describe('Messenger trigger and send (e2e)', () => {
       'http://localhost/api/oauth2/callback',
     );
     const state = url.searchParams.get('state');
+    expect(auth.body.state).toBe(state);
+    // The callback stores nothing: it hands the code to the designer window.
     const callback = await request(server())
       .get('/api/oauth2/callback')
       .query({ code: 'fb-code', state })
       .expect(200);
     expect(callback.text).toContain('"status":"success"');
+    expect(callback.text).toContain('"code":"fb-code"');
+    const completed = await request(server())
+      .post('/api/oauth2/complete')
+      .send({ code: 'fb-code', state })
+      .expect(200);
+    expect(completed.body.data).toEqual({ credentialId });
     // The state works once.
     await request(server())
-      .get('/api/oauth2/callback')
-      .query({ code: 'fb-code', state })
+      .post('/api/oauth2/complete')
+      .send({ code: 'fb-code', state })
       .expect(400);
   }
 
@@ -159,7 +167,8 @@ describe('Messenger trigger and send (e2e)', () => {
         where: { id: executionId },
         include: { nodeLogs: { orderBy: { startedAt: 'asc' } } },
       });
-      if (execution && execution.status !== 'RUNNING') return execution;
+      if (execution && !['QUEUED', 'RUNNING'].includes(execution.status))
+        return execution;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     throw new Error(`execution ${executionId} did not finish`);

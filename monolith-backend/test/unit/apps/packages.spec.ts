@@ -432,5 +432,18 @@ describe('integration packages', () => {
         'reconnect',
       );
     });
+
+    it('retries a message send only when Graph refused it (rate limit), never after a timeout or 5xx', () => {
+      const timeout = new AxiosError('timeout', 'ECONNABORTED');
+      expect(toAppApiError(timeout).retryable).toBe(true);
+      expect(toAppApiError(timeout, false).retryable).toBe(false);
+      expect(
+        toAppApiError(graphError(500, { message: 'x' }), false).retryable,
+      ).toBe(false);
+      expect(toAppApiError(graphError(400, { code: 4 }), false).retryable).toBe(
+        true,
+      );
+      expect(toAppApiError(graphError(429, {}), false).retryable).toBe(true);
+    });
   });
 });

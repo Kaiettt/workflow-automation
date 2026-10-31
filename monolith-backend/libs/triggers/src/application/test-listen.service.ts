@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
 import { PackageRegistry } from '@app/apps';
@@ -23,11 +24,16 @@ export interface TestListenView {
   expiresAt: string;
 }
 
+// How often endpoints left registered by an expired test are unregistered.
+const SWEEP_INTERVAL_MS = 60_000;
+
 // "Listen for test event": one real event for a trigger node of the draft,
 // shown in the designer and never executed.
 @Injectable()
-export class TestListenService implements OnModuleDestroy {
-  private readonly timers = new Set<NodeJS.Timeout>();
+export class TestListenService
+  implements OnApplicationBootstrap, OnModuleDestroy
+{
+  private sweeper: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly registry: PackageRegistry,
@@ -88,17 +94,7 @@ export class TestListenService implements OnModuleDestroy {
       throw error;
     }
 
-    // Unregister an endpoint that only existed for this test.
-    const timer = setTimeout(
-      () => {
-        this.timers.delete(timer);
-        void this.registrar.cleanup(listen.endpointId);
-      },
-      TEST_LISTEN_SECONDS * 1000 + 1000,
-    );
-    timer.unref?.();
-    this.timers.add(timer);
-
+    // Once the test expires, sweep() unregisters an endpoint only it used.
     return viewOf(listen);
   }
 
@@ -120,8 +116,26 @@ export class TestListenService implements OnModuleDestroy {
     return listen;
   }
 
+  // Unregisters every endpoint nobody listens on any more (cleanup() keeps
+  // the ones with a listener or a waiting test). Runs at startup and every
+  // minute, so a test that expired, even across a restart, never leaves its
+  // webhook registered with the app.
+  async sweep(): Promise<void> {
+    for (const endpointId of await this.repository.registeredEndpointIds()) {
+      await this.registrar.cleanup(endpointId);
+    }
+  }
+
+  onApplicationBootstrap() {
+    const run = () => void this.sweep().catch(() => undefined);
+    run();
+    this.sweeper = setInterval(run, SWEEP_INTERVAL_MS);
+    this.sweeper.unref?.();
+  }
+
   onModuleDestroy() {
-    for (const timer of this.timers) clearTimeout(timer);
+    if (this.sweeper) clearInterval(this.sweeper);
+    this.sweeper = null;
   }
 }
 

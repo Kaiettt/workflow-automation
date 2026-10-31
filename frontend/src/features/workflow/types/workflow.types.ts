@@ -11,7 +11,8 @@ export interface WorkflowSummary {
 export interface PublishResult {
   versionId: string;
   versionNumber: number;
-  // Present when the workflow is active: its listeners moved to the new
-  // version, or (active: false) that failed and the workflow was turned off.
-  activation?: { active: boolean; error?: string };
+  // Present when the workflow is active: the version that listens now. With
+  // `error` the new version could not listen: the previous version keeps
+  // listening (active) or, when none did, the workflow was turned off.
+  activation?: { active: boolean; versionId: string | null; error?: string };
 }
