@@ -1,5 +1,6 @@
 import { Sidebar } from './Sidebar';
 import { PropertiesPanel } from './PropertiesPanel';
+import { ActiveToggle } from './ActiveToggle';
 import { Canvas } from './Canvas';
 import { useDesignerStore } from '../store/designer.store';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { History, ArrowLeft, GitBranch, AlertCircle } from 'lucide-react';
 import type { Node, Edge, OnNodesChange, OnEdgesChange } from '@xyflow/react';
 
 interface DesignerLayoutProps {
+  workflowId: string;
   nodes: Node[];
   edges: Edge[];
   onNodesChange: OnNodesChange;
@@ -25,6 +27,7 @@ interface DesignerLayoutProps {
 }
 
 export function DesignerLayout({
+  workflowId,
   nodes,
   edges,
   onNodesChange,
@@ -82,6 +85,8 @@ export function DesignerLayout({
             </Button>
           )}
 
+          <ActiveToggle workflowId={workflowId} />
+          <div className="h-4 w-px bg-border" />
           {isSaving ? (
             <span className="text-xs text-muted-foreground italic">Saving...</span>
           ) : (
@@ -132,6 +137,7 @@ export function DesignerLayout({
           setEdges={setEdges} 
         />
         <PropertiesPanel
+          workflowId={workflowId}
           nodes={nodes}
           onNodeDataChange={onNodeDataChange}
           onDeleteNode={handleDeleteNode}

@@ -1,5 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
+import {
+  CommandBus,
+  CommandHandler,
+  EventBus,
+  ICommandHandler,
+  QueryBus,
+} from '@nestjs/cqrs';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { WorkflowDraftRepository } from '../../domain/repositories/workflow-draft.repository';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
@@ -7,6 +13,12 @@ import { WorkflowVersionRepository } from '../../domain/repositories/workflow-ve
 import { WorkflowVersion } from '../../domain/entities/workflow-version.entity';
 import { WorkflowDraft } from '../../domain/entities/workflow-draft.entity';
 import { GetNodeConfigSchemasQuery } from '@app/node-library/application/queries/get-node-config-schemas.query';
+import { WorkflowPublishedEvent } from '../events/workflow-published.event';
+import { CheckPublishTriggersQuery } from '../queries/check-publish-triggers.query';
+import {
+  SwitchActiveVersionCommand,
+  SwitchActiveVersionResult,
+} from './switch-active-version.command';
 import {
   extractNodeCatalogKeys,
   validateWorkflowDraft,
@@ -28,11 +40,17 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     private readonly workflowDraftRepo: WorkflowDraftRepository,
     private readonly workflowVersionRepo: WorkflowVersionRepository,
     private readonly queryBus: QueryBus,
+    private readonly eventBus: EventBus,
+    private readonly commandBus: CommandBus,
   ) {}
 
-  async execute(
-    command: PublishWorkflowCommand,
-  ): Promise<{ versionId: string; versionNumber: number }> {
+  async execute(command: PublishWorkflowCommand): Promise<{
+    versionId: string;
+    versionNumber: number;
+    // Set when the workflow is active: the version that listens now, and the
+    // reason when the new version could not listen (see SwitchActiveVersionResult).
+    activation?: NonNullable<SwitchActiveVersionResult>;
+  }> {
     const { workflowId, publishedById } = command;
 
     const existingWorkflow = await this.workflowRepo.findById(workflowId);
@@ -59,12 +77,20 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
       draft.definition,
       nodeTypesByKey,
     );
+    const triggerIssues = await this.checkTriggers(
+      new CheckPublishTriggersQuery(
+        workflowId,
+        existingWorkflow.ownerId,
+        draft.definition,
+      ),
+    );
+    const issues = [...validationReport.issues, ...triggerIssues];
 
-    if (!validationReport.isValid) {
-      await this.saveValidationErrors(draft, validationReport.issues);
+    if (issues.length > 0) {
+      await this.saveValidationErrors(draft, issues);
       throw new BadRequestException({
         message: 'Workflow validation failed.',
-        issues: validationReport.issues,
+        issues,
       });
     }
 
@@ -94,10 +120,29 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     existingWorkflow.currentVersionId = newVersion.id;
     await this.workflowRepo.update(existingWorkflow);
 
+    this.eventBus.publish(
+      new WorkflowPublishedEvent(workflowId, newVersion.id, draft.definition),
+    );
+
+    const activation = await switchActiveVersion(this.commandBus, workflowId);
+
     return {
       versionId: newVersion.id,
       versionNumber: newVersion.versionNumber,
+      ...(activation ? { activation } : {}),
     };
+  }
+
+  // Answered by the triggers module (credentials and channels of trigger
+  // nodes). A missing handler is a wiring bug and fails the publish.
+  private async checkTriggers(
+    query: CheckPublishTriggersQuery,
+  ): Promise<PublishValidationIssue[]> {
+    const issues = await this.queryBus.execute<
+      CheckPublishTriggersQuery,
+      PublishValidationIssue[] | undefined
+    >(query);
+    return Array.isArray(issues) ? issues : [];
   }
 
   private async saveValidationErrors(
@@ -107,4 +152,16 @@ export class PublishWorkflowHandler implements ICommandHandler<PublishWorkflowCo
     draft.validationErrors = { issues };
     await this.workflowDraftRepo.upsert(draft);
   }
+}
+
+// Handled by the triggers module. A missing handler is a wiring bug: it
+// throws instead of silently leaving an active workflow on the old version.
+export function switchActiveVersion(
+  commandBus: CommandBus,
+  workflowId: string,
+): Promise<SwitchActiveVersionResult> {
+  return commandBus.execute<
+    SwitchActiveVersionCommand,
+    SwitchActiveVersionResult
+  >(new SwitchActiveVersionCommand(workflowId));
 }

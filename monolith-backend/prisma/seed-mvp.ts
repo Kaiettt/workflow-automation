@@ -3,6 +3,10 @@ import {
   AGGREGATE_CONFIG_SCHEMA,
   API_KEY_CONNECTOR_CONFIG_SCHEMA,
   FILTER_CONFIG_SCHEMA,
+  CHAT_MEMORY_CONFIG_SCHEMA,
+  IF_CONFIG_SCHEMA,
+  SWITCH_CONFIG_SCHEMA,
+  SET_CONFIG_SCHEMA,
   GMAIL_SEND_CONFIG_SCHEMA,
   GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA,
   LLM_GENERATE_CONFIG_SCHEMA,
@@ -108,6 +112,50 @@ export async function seedMvp(prisma: PrismaClient) {
       connectorId: null,
     },
     {
+      id: '44444444-4444-4444-4444-44444444444c',
+      key: 'logic.if',
+      displayName: 'IF',
+      icon: 'git-branch',
+      color: '#8B5CF6',
+      category: NodeCategory.LOGIC,
+      description: 'Send items down the true or false branch',
+      configSchema: IF_CONFIG_SCHEMA,
+      connectorId: null,
+    },
+    {
+      id: '44444444-4444-4444-4444-44444444444d',
+      key: 'logic.switch',
+      displayName: 'Switch',
+      icon: 'split',
+      color: '#8B5CF6',
+      category: NodeCategory.LOGIC,
+      description: 'Send items down a different branch for each rule',
+      configSchema: SWITCH_CONFIG_SCHEMA,
+      connectorId: null,
+    },
+    {
+      id: '44444444-4444-4444-4444-44444444444e',
+      key: 'data.set',
+      displayName: 'Edit Fields',
+      icon: 'pencil',
+      color: '#F59E0B',
+      category: NodeCategory.DATA_PROCESSING,
+      description: 'Add or change fields on every item',
+      configSchema: SET_CONFIG_SCHEMA,
+      connectorId: null,
+    },
+    {
+      id: '44444444-4444-4444-4444-44444444444f',
+      key: 'memory.chat',
+      displayName: 'Chat Memory',
+      icon: 'brain',
+      color: '#14B8A6',
+      category: NodeCategory.DATA_PROCESSING,
+      description: 'Load, save or forget the recent messages of a conversation',
+      configSchema: CHAT_MEMORY_CONFIG_SCHEMA,
+      connectorId: null,
+    },
+    {
       id: '44444444-4444-4444-4444-444444444444',
       key: 'integration.gmail.send',
       displayName: 'Send Gmail',
@@ -142,6 +190,29 @@ export async function seedMvp(prisma: PrismaClient) {
       connectorId: null,
     },
   ];
+
+  // Node types of integration packages (webhook, messenger…) are written by
+  // PackageCatalogSync when the server starts. Superseded designs are kept for
+  // old drafts but hidden from the palette.
+  await prisma.nodeTypeDefinition.updateMany({
+    where: {
+      key: {
+        in: [
+          'trigger.webhook',
+          'trigger.messenger.message',
+          'integration.messenger.send',
+          'trigger.app',
+          'chat.reply',
+        ],
+      },
+    },
+    data: { isActive: false },
+  });
+  // Replaced by the facebookMessengerOAuth2 credential type.
+  await prisma.connector.updateMany({
+    where: { key: 'messenger' },
+    data: { isActive: false },
+  });
 
   for (const { id, ...nodeType } of nodeTypes) {
     const data = {

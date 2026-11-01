@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkflowPublishValidationError } from '../models/workflow-validation.model';
 import { useDesignerStore } from '../store/designer.store';
 
@@ -48,6 +49,9 @@ interface RenderedNode {
 }
 
 describe('DesignerPage publish validation', () => {
+    // No vitest globals here, so Testing Library does not unmount by itself.
+    afterEach(cleanup);
+
     beforeEach(() => {
         vi.clearAllMocks();
         useDesignerStore.getState().setSelectedNodeId(null);
@@ -79,12 +83,17 @@ describe('DesignerPage publish validation', () => {
         );
     });
 
-    it('shows the publish issue, highlights its node, and focuses its properties', async () => {
+    const renderPage = () =>
         render(
-            <MemoryRouter>
-                <DesignerPage workflowId="workflow-1" />
-            </MemoryRouter>,
+            <QueryClientProvider client={new QueryClient()}>
+                <MemoryRouter>
+                    <DesignerPage workflowId="workflow-1" />
+                </MemoryRouter>
+            </QueryClientProvider>,
         );
+
+    it('shows the publish issue, highlights its node, and focuses its properties', async () => {
+        renderPage();
 
         fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
 
@@ -101,5 +110,43 @@ describe('DesignerPage publish validation', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Focus node action-1' }));
         expect(useDesignerStore.getState().selectedNodeId).toBe('action-1');
+    });
+
+    it('says when publishing turned an active workflow off', async () => {
+        mockWorkflowService.publishWorkflow.mockResolvedValue({
+            versionId: 'v2',
+            versionNumber: 2,
+            activation: {
+                active: false,
+                versionId: null,
+                error: '"Messenger Trigger": the selected credential no longer exists.',
+            },
+        });
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
+
+        const alert = await screen.findByRole('alert');
+        expect(alert.textContent).toContain('Published version 2, but the workflow was turned off');
+        expect(alert.textContent).toContain('the selected credential no longer exists');
+    });
+
+    it('says when the new version could not listen and the previous one keeps answering', async () => {
+        mockWorkflowService.publishWorkflow.mockResolvedValue({
+            versionId: 'v2',
+            versionNumber: 2,
+            activation: {
+                active: true,
+                versionId: 'v1',
+                error: '"Messenger Trigger": the selected credential no longer exists.',
+            },
+        });
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
+
+        const alert = await screen.findByRole('alert');
+        expect(alert.textContent).toContain('Published version 2, but it could not start listening');
+        expect(alert.textContent).toContain('The previous version keeps answering events');
     });
 });

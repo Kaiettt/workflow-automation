@@ -1,6 +1,13 @@
+export interface LlmMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface LlmGenerateRequest {
   model: string;
   systemPrompt?: string;
+  // What was said before `prompt` in the same conversation, oldest first.
+  history?: LlmMessage[];
   prompt: string;
   maxTokens: number;
   temperature?: number;
@@ -40,6 +47,15 @@ export function buildSystemPrompt(
   return request.systemPrompt
     ? `${request.systemPrompt}\n\n${JSON_ONLY_INSTRUCTION}`
     : JSON_ONLY_INSTRUCTION;
+}
+
+// The earlier messages to send before the prompt. Providers reject a
+// conversation that starts with the assistant, so anything before the first
+// user message is dropped.
+export function conversationHistory(request: LlmGenerateRequest): LlmMessage[] {
+  const history = request.history ?? [];
+  const first = history.findIndex((message) => message.role === 'user');
+  return first === -1 ? [] : history.slice(first);
 }
 
 export function isRetryableStatus(status: number | undefined): boolean {

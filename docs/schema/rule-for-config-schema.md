@@ -84,6 +84,17 @@ Ngoài JSON Schema gốc, cố định 1 bộ `x-*` key dùng xuyên suốt:
 | `x-propertyOrder: ["a", "b", ...]` | `config_schema` (ở gốc schema, cạnh `properties`) | Thứ tự hiển thị các field trong form. Bắt buộc phải khai báo vì **JSONB của Postgres không giữ thứ tự key** (sắp lại theo độ dài), nên thứ tự viết trong `properties` bị mất. Field không được liệt kê hiện sau cùng |
 | `x-multiline: true` | `config_schema` | UI render textarea thay vì ô một dòng (prompt dài) |
 | `x-placeholderByField: { field, values }` | `config_schema` | UI hiện gợi ý (placeholder) lấy từ `values[<giá trị hiện tại của field>]` — vd. gợi ý tên model theo provider |
+| `x-credentialInput: "form"` | `config_schema`, field có `x-connectorKey` | Credential được tạo bằng **form** sinh từ `connectors.config_schema` (API key, hoặc App ID / App Secret của credential OAuth2 rồi bấm Connect) và chọn trong picker. Không có hint này, `x-connectorKey` render nút OAuth Google cũ |
+| `x-webhook: { scope }` | `config_schema` (ở gốc schema) | Node trigger của integration package: nhận sự kiện qua `/api/webhooks/<id>`. `scope: "node"` → Properties Panel hiện Webhook URL riêng của node; mọi node có hint này có nút **Listen for test event** |
+| `x-outputs` | `config_schema` (ở gốc schema) | Node có nhiều đầu ra. `{ static: [{ key, label }] }` (IF: `true` / `false`) hoặc `{ fromConfig: "rules", labelField: "label", fallback: true }` (một đầu ra `rule_<i>` cho mỗi phần tử của list trong config, thêm `fallback`). Không khai báo = một đầu ra `main`. Cạnh nối từ đầu ra có tên lưu `sourceHandle: "out:<key>"` |
+| `x-placeholder` trên field có `x-allowExpression` | `config_schema` | Dùng thay `default` khi giá trị mặc định là một biểu thức mà không phải lúc nào cũng giải được (field ẩn theo `x-hideWhen`): `default` được điền và giải biểu thức trước khi node chạy |
+| `x-rowId: true` | `config_schema`, `items` của field `array` | Frontend gán mỗi dòng mới một `id` ngẫu nhiên. Switch dùng nó đặt tên đầu ra (`rule_<id>`) |
+| `x-hideWhen: { field, in: [...] }` | `config_schema`, field | Ẩn field khi field anh em `field` có một trong các giá trị `in` (vd. điều kiện "is empty" không cần giá trị so sánh) |
+| `x-loadOptions: true` | `config_schema`, field | Lựa chọn tải từ server với credential đang chọn: `POST /api/node-types/:key/options/:field` `{ credentialId }` (vd. danh sách Page) |
+| `x-enumLabels: { value: label }` | `config_schema`, field có `enum` | Nhãn hiển thị cho từng giá trị enum |
+| `x-placeholder` | `config_schema`, field chuỗi | Gợi ý trong ô nhập |
+| `x-oauth2: true` | `connectors.config_schema` (ở gốc schema) | Credential type OAuth2 của package: form có App ID / App Secret, hiện OAuth Redirect URL, sau khi lưu mở pop-up đăng nhập; token được callback chung `GET /api/oauth2/callback` ghi vào credential |
+| `description` | `config_schema`, field kiểu chuỗi | Gợi ý riêng hiện dưới ô nhập, thay cho gợi ý biểu thức chung |
 | `default` | `config_schema` (JSON Schema chuẩn) | Engine điền giá trị này khi config **thiếu** key (`applySchemaDefaults`); UI điền sẵn khi thêm node lên canvas. Default có thể là biểu thức, vd. Gmail `to` = `{{$json.email}}` |
 | `x-secret: true` | `config_schema` (hiếm khi cần, vì secret thường đã nằm ở `credential_id`) | Field này bị **mask khi ghi vào `execution_node_logs.input`** — bổ sung lớp bảo vệ nếu 1 node nào đó lỡ cần nhập secret trực tiếp (không qua credential) |
 | `x-dynamicSource: { operation }` | `config_schema` | Field cần load option runtime (list channel, list sheet) — UI gọi `GET /connectors/:credentialId/dynamic-options?operation=...`, executor implement thêm 1 method `listOptions()` ngoài `execute()` |
@@ -109,6 +120,8 @@ Dữ liệu giữa các node luôn là `Item[]`, `Item = { json, pairedItem? }`.
 |---|---|---|
 | `per_item` | Gọi `executeItem` một lần cho **mỗi** item; resolve config theo item đó; gán `pairedItem`. Trả `null`/`[]` → bỏ item | Filter, Gmail |
 | `once` | Resolve config một lần, gọi `execute` với toàn bộ `Item[]` | Manual Trigger, Google Sheet, Aggregate |
+
+**Đồ thị và nhánh.** Workflow là đồ thị có hướng không chu trình, một node bắt đầu. Một node có thể rẽ ra nhiều node và nhiều node có thể gộp lại một node. Engine chạy theo thứ tự topo; một cạnh **được kích hoạt** khi node nguồn đã chạy và đầu ra mà cạnh xuất phát có item (đầu ra `main` luôn được kích hoạt, kể cả rỗng, để Filter lọc hết vẫn cho node sau chạy). Node không có cạnh vào nào được kích hoạt thì ghi log `SKIPPED` và không chạy; node phía sau nó cũng vậy. Node gộp chạy một lần với item của các cạnh đã kích hoạt. Executor gửi item vào đầu ra có tên bằng `new RoutedItem(output, json)`; item thường đi vào `main`. Item trả vào đầu ra node không có làm node `FAILED`.
 
 Output của một node **chỉ chứa kết quả của chính node đó** (trừ Filter trả nguyên item); dữ liệu node trước lấy bằng `$node[...]`.
 
@@ -138,3 +151,11 @@ Biểu thức (không phải JavaScript, chỉ truy cập dữ liệu):
 → Đây chính là ranh giới rõ ràng giữa "phần mở rộng bằng data" (bước 1) và "phần bắt buộc phải code" (bước 2) mà câu hỏi trước bạn đặt ra — schema thiết kế đúng sẽ giữ engine ổn định vĩnh viễn, chỉ có catalog và executor tăng theo số connector.
 
 Bạn muốn mình cập nhật `execute-node.ts` để áp dụng `x-refType`/`x-secret`/`x-allowExpression` thật sự (thay vì chỉ mô tả), hay viết phần Ajv validate trước publish?
+
+---
+
+## F. Integration packages (node của app bên ngoài)
+
+Node Webhook, Messenger… **không** khai báo trong seed. Mỗi app là một package trong `libs/apps/src/<app>` khai báo credential type, trigger node (field + vòng đời webhook `checkExists` / `create` / `delete` / `handle`) và action node (field + `execute`). Khi server khởi động, `PackageCatalogSync` sinh `config_schema` (các hint ở mục B) và upsert vào `node_type_definitions` / `connectors`. Thêm app = thêm package + một dòng trong `libs/apps/src/packages.ts`; không sửa engine, ingress, activation hay Designer. Chi tiết: `specs/chat-trigger/design.md`.
+
+Field của node package (`NodeProperty`) có thêm: `type: 'collection'` + `fields` (danh sách dòng, sinh `type: array` với `items`, mỗi dòng là một object theo `fields`) và `hideWhen: { field, in }` (sinh `x-hideWhen`). Node có thể khai báo `credentialTypeFrom: { field, types }` (credential tuỳ chọn, kiểu do field khác chọn; sinh `credential_id` với `x-connectorKeyFrom` và `x-hideWhen` khi field là `none`). Field có thể bị ẩn vẫn được gửi kèm `default`, nên `default` của nó không được là biểu thức.

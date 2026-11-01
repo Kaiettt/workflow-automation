@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { triggerKeys } from '../hooks/useWorkflowTriggers';
 import { useNodesState, useEdgesState, useReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import { workflowService } from '../services/workflow.service';
@@ -11,6 +13,7 @@ import {
   WorkflowPublishValidationError,
   type WorkflowValidationIssue,
 } from '../models/workflow-validation.model';
+import { resolveOutputs, outputOfHandle } from '../utils/node-outputs';
 
 interface DesignerPageProps {
   workflowId?: string;
@@ -73,6 +76,7 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
   const onBack = propOnBack || (() => navigate('/workflows'));
 
   const { setCenter, getNode } = useReactFlow();
+  const queryClient = useQueryClient();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -191,7 +195,17 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
         return n;
       })
     );
-  }, [setNodes]);
+    // A deleted Switch rule takes its connections with it.
+    const schema = useDesignerStore.getState().nodeTypes.find((t) => t.key === data.key)?.configSchema;
+    const kept = new Set(resolveOutputs(schema, data.config).map((output) => output.key));
+    setEdges((eds) => {
+      const next = eds.filter((edge) => {
+        const output = edge.source === nodeId ? outputOfHandle(edge.sourceHandle) : null;
+        return output === null || kept.has(output);
+      });
+      return next.length === eds.length ? eds : next;
+    });
+  }, [setNodes, setEdges]);
 
   const handlePublish = async () => {
     setIsPublishing(true);
@@ -203,14 +217,31 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
     await saveDraft(nodes, edges);
 
     try {
-      await workflowService.publishWorkflow(workflowId);
+      const published = await workflowService.publishWorkflow(workflowId);
       setPublishValidation(null);
       setValidationDialogOpen(false);
       useDesignerStore.getState().setValidationIssues([]);
       setNodes((currentNodes) => updateValidationHighlights(currentNodes, []));
+      void queryClient.invalidateQueries({ queryKey: triggerKeys.activation(workflowId) });
+      const activation = published.activation;
+      if (activation && (activation.error || !activation.active)) {
+        // The new version could not listen.
+        const reason = activation.error ?? 'its triggers could not listen';
+        setPublishValidation({
+          message: activation.active
+            ? `Published version ${published.versionNumber}, but it could not start listening: ${reason}. The previous version keeps answering events. Fix it and publish again.`
+            : `Published version ${published.versionNumber}, but the workflow was turned off: ${reason}. Fix it, publish, then activate again.`,
+          issues: [],
+        });
+        setValidationDialogOpen(true);
+        return;
+      }
+      const followUp = published.activation?.active
+        ? `Workflow published! Version ${published.versionNumber} is now listening.`
+        : 'Workflow published successfully!';
       if (
         window.confirm(
-          'Workflow published successfully! Would you like to view the version history and run it?',
+          `${followUp} Would you like to view the version history and run it?`,
         )
       ) {
         navigate(`/workflows/${workflowId}/versions`);
@@ -289,6 +320,7 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
         onSelectNode={handleFocusNode}
       />
       <DesignerLayout
+        workflowId={workflowId}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

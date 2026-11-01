@@ -1,0 +1,307 @@
+import axios, { AxiosError } from 'axios';
+import { AppApiError } from '../core/package';
+
+export const GRAPH_VERSION = 'v23.0';
+const REQUEST_TIMEOUT_MS = 15_000;
+
+export interface FacebookPage {
+  id: string;
+  name: string;
+  accessToken: string;
+}
+
+export interface AppSubscription {
+  object: string;
+  callbackUrl: string;
+  active: boolean;
+  // Event kinds the app receives, e.g. messages, messaging_postbacks.
+  fields: string[];
+}
+
+export type SenderAction = 'typing_on' | 'typing_off' | 'mark_seen';
+
+// The Facebook Graph API calls the Messenger package makes; replaced by a fake
+// in tests. The Meta App (id + secret) is the user's own, from the credential.
+export interface MetaGraphApi {
+  // OAuth: code → short-lived user token → long-lived user token.
+  exchangeCode(
+    appId: string,
+    appSecret: string,
+    code: string,
+    redirectUri: string,
+  ): Promise<string>;
+  exchangeLongLived(
+    appId: string,
+    appSecret: string,
+    userToken: string,
+  ): Promise<{ token: string; expiresIn: number | null }>;
+  // Pages the user granted, each with a Page token (never expires when it
+  // comes from a long-lived user token).
+  listPages(userToken: string): Promise<FacebookPage[]>;
+  // `message` is the Send API message object: text (with quick_replies) or an attachment.
+  sendMessage(
+    pageAccessToken: string,
+    recipientId: string,
+    message: Record<string, unknown>,
+  ): Promise<{ messageId: string }>;
+  sendAction(
+    pageAccessToken: string,
+    recipientId: string,
+    action: SenderAction,
+  ): Promise<void>;
+  // App webhook subscription (app token = "{app-id}|{app-secret}").
+  listAppSubscriptions(
+    appId: string,
+    appToken: string,
+  ): Promise<AppSubscription[]>;
+  subscribeApp(
+    appId: string,
+    appToken: string,
+    subscription: {
+      callbackUrl: string;
+      verifyToken: string;
+      fields: string[];
+    },
+  ): Promise<void>;
+  unsubscribeApp(appId: string, appToken: string): Promise<void>;
+  // Which apps receive a Page's events, and which kinds.
+  pageSubscribedApps(
+    pageId: string,
+    pageAccessToken: string,
+  ): Promise<Array<{ id: string; fields: string[] }>>;
+  subscribePage(
+    pageId: string,
+    pageAccessToken: string,
+    fields: string[],
+  ): Promise<void>;
+  unsubscribePage(pageId: string, pageAccessToken: string): Promise<void>;
+}
+
+export class HttpMetaGraphApi implements MetaGraphApi {
+  async exchangeCode(
+    appId: string,
+    appSecret: string,
+    code: string,
+    redirectUri: string,
+  ) {
+    const data = await this.call<{ access_token: string }>(
+      'get',
+      'oauth/access_token',
+      {
+        client_id: appId,
+        client_secret: appSecret,
+        redirect_uri: redirectUri,
+        code,
+      },
+    );
+    return data.access_token;
+  }
+
+  async exchangeLongLived(appId: string, appSecret: string, userToken: string) {
+    const data = await this.call<{ access_token: string; expires_in?: number }>(
+      'get',
+      'oauth/access_token',
+      {
+        client_id: appId,
+        client_secret: appSecret,
+        grant_type: 'fb_exchange_token',
+        fb_exchange_token: userToken,
+      },
+    );
+    return { token: data.access_token, expiresIn: data.expires_in ?? null };
+  }
+
+  async listPages(userToken: string) {
+    const data = await this.call<{
+      data?: Array<{ id: string; name: string; access_token: string }>;
+    }>('get', 'me/accounts', {
+      access_token: userToken,
+      fields: 'id,name,access_token',
+      limit: 100,
+    });
+    return (data.data ?? []).map((page) => ({
+      id: page.id,
+      name: page.name,
+      accessToken: page.access_token,
+    }));
+  }
+
+  async sendMessage(
+    pageAccessToken: string,
+    recipientId: string,
+    message: Record<string, unknown>,
+  ) {
+    const data = await this.call<{ message_id?: string }>(
+      'post',
+      'me/messages',
+      { access_token: pageAccessToken },
+      {
+        recipient: { id: recipientId },
+        // A reply to a message the customer sent (allowed for 24 hours).
+        messaging_type: 'RESPONSE',
+        message,
+      },
+      // A timeout or 5xx may come after the message went out: no retry.
+      { idempotent: false },
+    );
+    return { messageId: data.message_id ?? '' };
+  }
+
+  async sendAction(
+    pageAccessToken: string,
+    recipientId: string,
+    action: SenderAction,
+  ) {
+    await this.call(
+      'post',
+      'me/messages',
+      { access_token: pageAccessToken },
+      { recipient: { id: recipientId }, sender_action: action },
+    );
+  }
+
+  async listAppSubscriptions(appId: string, appToken: string) {
+    const data = await this.call<{
+      data?: Array<{
+        object: string;
+        callback_url: string;
+        active: boolean;
+        fields?: Array<{ name: string }>;
+      }>;
+    }>('get', `${appId}/subscriptions`, { access_token: appToken });
+    return (data.data ?? []).map((subscription) => ({
+      object: subscription.object,
+      callbackUrl: subscription.callback_url,
+      active: subscription.active,
+      fields: (subscription.fields ?? []).map((field) => field.name),
+    }));
+  }
+
+  async subscribeApp(
+    appId: string,
+    appToken: string,
+    subscription: {
+      callbackUrl: string;
+      verifyToken: string;
+      fields: string[];
+    },
+  ) {
+    // Meta calls the callback URL (GET hub.challenge) before answering.
+    await this.call('post', `${appId}/subscriptions`, {
+      access_token: appToken,
+      object: 'page',
+      callback_url: subscription.callbackUrl,
+      verify_token: subscription.verifyToken,
+      fields: subscription.fields.join(','),
+    });
+  }
+
+  async unsubscribeApp(appId: string, appToken: string) {
+    await this.call('delete', `${appId}/subscriptions`, {
+      access_token: appToken,
+      object: 'page',
+    });
+  }
+
+  async pageSubscribedApps(pageId: string, pageAccessToken: string) {
+    const data = await this.call<{
+      data?: Array<{ id: string; subscribed_fields?: string[] }>;
+    }>('get', `${pageId}/subscribed_apps`, { access_token: pageAccessToken });
+    return (data.data ?? []).map((app) => ({
+      id: app.id,
+      fields: app.subscribed_fields ?? [],
+    }));
+  }
+
+  async subscribePage(
+    pageId: string,
+    pageAccessToken: string,
+    fields: string[],
+  ) {
+    await this.call('post', `${pageId}/subscribed_apps`, {
+      access_token: pageAccessToken,
+      subscribed_fields: fields.join(','),
+    });
+  }
+
+  async unsubscribePage(pageId: string, pageAccessToken: string) {
+    await this.call('delete', `${pageId}/subscribed_apps`, {
+      access_token: pageAccessToken,
+    });
+  }
+
+  private async call<T>(
+    method: 'get' | 'post' | 'delete',
+    path: string,
+    params: Record<string, unknown>,
+    data?: unknown,
+    options: { idempotent?: boolean } = {},
+  ): Promise<T> {
+    try {
+      const response = await axios.request<T>({
+        method,
+        url: `https://graph.facebook.com/${GRAPH_VERSION}/${path}`,
+        params,
+        data,
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+      return response.data;
+    } catch (error) {
+      throw toAppApiError(error, options.idempotent ?? true);
+    }
+  }
+}
+
+interface GraphError {
+  message?: string;
+  code?: number;
+  error_subcode?: number;
+}
+
+// Rate limits, timeouts and 5xx are retryable; Graph explains everything else.
+// A call that is not idempotent (sending a message) is retried only when Graph
+// refused it outright (rate limit): after a timeout or a 5xx it may already
+// have been delivered, and a retry would send it twice.
+export function toAppApiError(error: unknown, idempotent = true): AppApiError {
+  if (!(error instanceof AxiosError)) {
+    return new AppApiError(
+      error instanceof Error ? error.message : 'Facebook request failed',
+      false,
+    );
+  }
+  if (!error.response) {
+    return new AppApiError(
+      `Facebook did not answer (${error.code ?? 'network error'})`,
+      idempotent,
+    );
+  }
+
+  const status = error.response.status;
+  const graph = (error.response.data as { error?: GraphError } | undefined)
+    ?.error;
+  const code = graph?.code;
+  if (code === 10 && graph?.error_subcode === 2018278) {
+    return new AppApiError(
+      'Messenger only allows replies within 24 hours of the customer’s last message',
+      false,
+    );
+  }
+  if (code === 551) {
+    return new AppApiError(
+      'This person is not available on Messenger right now',
+      false,
+    );
+  }
+  if (code === 190) {
+    return new AppApiError(
+      'The Facebook connection has expired; reconnect the credential',
+      false,
+    );
+  }
+  const rateLimited =
+    status === 429 || code === 4 || code === 32 || code === 613;
+  return new AppApiError(
+    `Facebook API error (${status}): ${graph?.message ?? error.message}`,
+    rateLimited || (idempotent && status >= 500),
+  );
+}

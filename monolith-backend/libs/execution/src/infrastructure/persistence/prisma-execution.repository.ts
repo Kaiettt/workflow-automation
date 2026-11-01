@@ -3,7 +3,10 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { EncryptionUtil } from '@app/shared/utils/encryption.util';
 import { ExecutionRepository } from '../../domain/repositories/execution.repository';
-import { ExecutionStatus } from '../../domain/constants/execution.constants';
+import {
+  ExecutionStatus,
+  TriggerType,
+} from '../../domain/constants/execution.constants';
 import {
   ExecutionRecord,
   NodeLogRecord,
@@ -39,10 +42,12 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       data: {
         workflowId: input.workflowId,
         workflowVersionId: input.workflowVersionId,
-        triggerType: 'MANUAL',
+        triggerType: input.triggerType,
         triggeredById: input.triggeredById,
-        status: ExecutionStatus.RUNNING,
+        status: input.status,
         startedAt: input.startedAt,
+        context:
+          input.context === undefined ? undefined : jsonValue(input.context),
       },
       select: { id: true },
     });
@@ -106,6 +111,36 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       where: { id },
       data: { status: status, finishedAt, durationMs },
     });
+  }
+
+  async claimQueuedExecution(id: string, startedAt: Date): Promise<boolean> {
+    const { count } = await this.prisma.execution.updateMany({
+      where: { id, status: ExecutionStatus.QUEUED },
+      data: { status: ExecutionStatus.RUNNING, startedAt },
+    });
+    return count === 1;
+  }
+
+  async failUnfinishedExecution(id: string, finishedAt: Date): Promise<void> {
+    await this.prisma.execution.updateMany({
+      where: {
+        id,
+        status: { in: [ExecutionStatus.QUEUED, ExecutionStatus.RUNNING] },
+      },
+      data: { status: ExecutionStatus.FAILED, finishedAt },
+    });
+  }
+
+  async failStaleExecutions(startedBefore: Date): Promise<number> {
+    const { count } = await this.prisma.execution.updateMany({
+      where: {
+        status: ExecutionStatus.RUNNING,
+        triggerType: TriggerType.MANUAL,
+        startedAt: { lt: startedBefore },
+      },
+      data: { status: ExecutionStatus.FAILED, finishedAt: new Date() },
+    });
+    return count;
   }
 
   async findExecutionResult(id: string): Promise<unknown> {

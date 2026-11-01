@@ -36,6 +36,11 @@ erDiagram
     Workflow o|--o| WorkflowVersion : current_version
     Workflow ||--o{ Execution : executions
     WorkflowVersion ||--o{ Execution : executed_as
+    Workflow ||--o{ WorkflowTrigger : triggers
+    WorkflowVersion ||--o{ WorkflowTrigger : listens_as
+    WebhookEndpoint ||--o{ WorkflowTrigger : receives_for
+    Workflow ||--o{ WebhookEndpoint : node_endpoints
+    ConnectorCredential ||--o{ WebhookEndpoint : credential_endpoints
 
     Connector ||--o{ NodeTypeDefinition : backs
     Connector ||--o{ ConnectorCredential : credentials
@@ -74,6 +79,7 @@ Relations: owns workflows and credentials; may publish versions, lock drafts, an
 | `status` | `WorkflowStatus`, default `DRAFT` | |
 | `ownerId` | `owner_id`, UUID, required relation to `User` | |
 | `currentVersionId` | `current_version_id`, nullable UUID, unique | Optional relation to the current `WorkflowVersion` |
+| `active` | default `false` | Active switch: only active workflows receive events, with their current version |
 | `createdAt`, `updatedAt` | timestamps | |
 
 Indexes: `ownerId`, `status`. A workflow has an optional draft, many versions, and many executions.
@@ -168,26 +174,43 @@ Index: `(connectorId, ownerId)`. Encryption and preventing secrets from entering
 | `triggeredById` | `triggered_by_id`, nullable UUID relation to `User` | Null for non-user triggers |
 | `startedAt`, `finishedAt` | `started_at`, `finished_at`, timestamps | `finishedAt` nullable |
 | `durationMs` | `duration_ms`, nullable integer | |
-| `context` | nullable JSON | Run input/context |
+| `context` | nullable JSON | Run input/context; webhook runs store `{ triggerItems }` |
 
 Indexes: `(workflowId, startedAt DESC)` and `status`.
 
-**`ExecutionNodeLog` → `execution_node_logs`**
+**`WebhookEndpoint` → `webhook_endpoints`**
+
+A public URL `/api/webhooks/<id>` of a trigger node of an integration package (`libs/apps`). The package decides the scope: one endpoint per trigger node (Webhook) or one per credential (Messenger: a Meta App has a single callback URL). Rows are kept when nobody listens, so the URL stays the same across publishes and deactivate / activate.
+
+| Field | Database mapping / constraint | Notes |
+| --- | --- | --- |
+| `id` | UUID, primary key | Last segment of the URL |
+| `scopeKey` | `scope_key`, `VarChar(255)`, unique | `node:<workflowId>:<nodeId>` or `credential:<credentialId>` |
+| `nodeKey` | `node_key`, `VarChar(150)` | Trigger node type of the package (e.g. `messenger.trigger`) |
+| `workflowId` | `workflow_id`, nullable UUID relation to `Workflow` | Node scope; cascades on delete |
+| `credentialId` | `credential_id`, nullable UUID relation to `ConnectorCredential` | Credential scope; cascades on delete |
+| `ownerId` | `owner_id`, UUID | Owner of the workflow / credential |
+| `data` | JSON, default `{}` | Package state, e.g. the verify token Meta checks, the Pages subscribed |
+| `registered` | default `false` | Registered with the outside app (package `create` ran) |
+| `createdAt`, `updatedAt` | timestamps | |
+
+**`WorkflowTrigger` → `workflow_triggers`**
+
+A trigger node of an **active** workflow listening on an endpoint. Rows exist only while the workflow is active (`workflows.active`); activating writes the published version's trigger nodes, publishing while active replaces them with the new version's, deactivating deletes them. Every listener of an endpoint that accepts an event runs (one execution each).
 
 | Field | Database mapping / constraint | Notes |
 | --- | --- | --- |
 | `id` | UUID, primary key | |
-| `executionId` | `execution_id`, UUID, required relation to `Execution` | Deleting the execution cascades to its logs |
-| `nodeId` | `node_id`, `VarChar(100)` | Node instance ID from the definition JSON; not a foreign key |
-| `nodeKey` | `node_key`, `VarChar(150)` | Catalog key recorded for the run; not a foreign key |
-| `status` | `NodeExecutionStatus`, default `RUNNING` | |
-| `input`, `output` | nullable JSON | Node input and output data |
-| `errorMessage`, `errorStack` | `error_message`, `error_stack`, nullable strings | |
-| `retryCount` | `retry_count`, integer, default `0` | |
-| `startedAt`, `finishedAt` | `started_at`, `finished_at`, timestamps | `finishedAt` nullable |
-| `durationMs` | `duration_ms`, nullable integer | |
+| `workflowId` | `workflow_id`, UUID, required relation to `Workflow` | Cascades on delete |
+| `workflowVersionId` | `workflow_version_id`, UUID, required relation to `WorkflowVersion` | Version that runs for the events |
+| `nodeId` | `node_id`, `VarChar(100)` | Trigger node ID in the definition JSON; not a foreign key |
+| `nodeKey` | `node_key`, `VarChar(150)` | e.g. `webhook.trigger`, `messenger.trigger` |
+| `endpointId` | `endpoint_id`, UUID, required relation to `WebhookEndpoint` | Cascades on delete |
+| `credentialId` | `credential_id`, nullable UUID | Credential of the node |
+| `parameters` | JSON, default `{}` | Node config without `credential_id` (e.g. Page, keywords) |
+| `createdAt` | `created_at`, timestamp, default now | |
 
-Indexes: `executionId` and `(executionId, status)`. The schema does not define partitioning or log-retention behavior.
+Indexes: unique `(workflowId, nodeId)`, `endpointId`.
 
 ## Enums
 

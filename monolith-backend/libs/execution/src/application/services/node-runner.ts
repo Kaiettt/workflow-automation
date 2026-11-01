@@ -2,7 +2,10 @@ import { BadRequestException } from '@nestjs/common';
 import { ExecutionRepository } from '../../domain/repositories/execution.repository';
 import { NodeLogRecord } from '../../domain/models/execution.types';
 import { ExecutionStatus } from '../../domain/constants/execution.constants';
-import { WorkflowNode } from '../../domain/entities/workflow-execution.entity';
+import {
+  MAIN_OUTPUT,
+  WorkflowNode,
+} from '../../domain/entities/workflow-execution.entity';
 import {
   INodeExecutor,
   IOnceExecutor,
@@ -10,6 +13,7 @@ import {
 } from '../../domain/entities/node-executor';
 import {
   createExpressionContext,
+  ItemSource,
   NodeNameIndex,
   NodeRun,
 } from '../../domain/entities/run-state';
@@ -17,23 +21,33 @@ import {
   applySchemaDefaults,
   resolveConfig,
 } from '../../domain/expression/resolve-config';
-import { isPlainObject, Item } from '../../domain/models/item';
+import { isPlainObject, Item, RoutedItem } from '../../domain/models/item';
 
 const UUID_PATTERN =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 export interface NodeRunParams {
   node: WorkflowNode;
+  workflowId: string;
+  executionId: string;
   items: Item[];
+  // Where each input item came from; absent for the start node.
+  inputSources?: readonly ItemSource[];
+  // Keys of the node's outputs; absent means the single main output.
+  outputKeys?: readonly string[];
   runs: readonly NodeRun[];
   names: NodeNameIndex;
   configSchema: unknown;
-  actorId: string;
+  // Credentials are looked up for the workflow owner, also when no one
+  // pressed Run (webhook).
+  credentialOwnerId: string;
 }
 
 export interface NodeRunResult {
   log: NodeLogRecord;
+  // Every output item (all outputs, in declaration order) and the items per output.
   output: Item[];
+  outputs: Map<string, Item[]>;
   status: ExecutionStatus;
 }
 
@@ -73,10 +87,11 @@ export class NodeRunner {
         toRecord(node.data.config),
         params.configSchema,
       );
-      const output =
+      const outputs =
         executor.runMode === 'once'
           ? await this.runOnce(executor, rawConfig, params)
           : await this.runPerItem(executor, rawConfig, params);
+      const output = [...outputs.values()].flat();
 
       return {
         log: {
@@ -89,6 +104,7 @@ export class NodeRunner {
           finishedAt: new Date(),
         },
         output,
+        outputs,
         status: ExecutionStatus.SUCCESS,
       };
     } catch (error) {
@@ -106,6 +122,7 @@ export class NodeRunner {
           finishedAt: new Date(),
         },
         output: [],
+        outputs: new Map(),
         status: ExecutionStatus.FAILED,
       };
     }
@@ -115,11 +132,11 @@ export class NodeRunner {
     executor: IOnceExecutor,
     rawConfig: Record<string, unknown>,
     params: NodeRunParams,
-  ): Promise<Item[]> {
+  ): Promise<Map<string, Item[]>> {
     const secret = await this.resolveCredential(
       executor,
       rawConfig,
-      params.actorId,
+      params.credentialOwnerId,
     );
     const currentItem = params.items[0] ?? { json: {} };
     const config = executor.parseConfig(
@@ -131,6 +148,7 @@ export class NodeRunner {
           names: params.names,
           currentItem,
           currentIndex: 0,
+          currentSources: params.inputSources,
         }),
       ),
     );
@@ -146,17 +164,20 @@ export class NodeRunner {
     ) {
       throw new Error('Node returned an invalid list of items');
     }
-    return output;
+    return new Map([[MAIN_OUTPUT, output]]);
   }
 
   private async runPerItem(
     executor: IPerItemExecutor,
     rawConfig: Record<string, unknown>,
     params: NodeRunParams,
-  ): Promise<Item[]> {
+  ): Promise<Map<string, Item[]>> {
     const { items } = params;
+    const outputs = new Map<string, Item[]>(
+      (params.outputKeys ?? [MAIN_OUTPUT]).map((key) => [key, []]),
+    );
     // Nothing to process: no credential lookup, no config validation.
-    if (items.length === 0) return [];
+    if (items.length === 0) return outputs;
 
     const cap = executor.maxItems?.(rawConfig);
     if (cap && items.length > cap.limit) {
@@ -168,9 +189,8 @@ export class NodeRunner {
     const secret = await this.resolveCredential(
       executor,
       rawConfig,
-      params.actorId,
+      params.credentialOwnerId,
     );
-    const output: Item[] = [];
 
     for (let index = 0; index < items.length; index += 1) {
       try {
@@ -183,6 +203,7 @@ export class NodeRunner {
               names: params.names,
               currentItem: items[index],
               currentIndex: index,
+              currentSources: params.inputSources,
             }),
           ),
         );
@@ -190,6 +211,10 @@ export class NodeRunner {
           config,
           item: items[index],
           credential: secret,
+          context: {
+            workflowId: params.workflowId,
+            executionId: params.executionId,
+          },
         });
 
         const jsons =
@@ -198,11 +223,20 @@ export class NodeRunner {
             : Array.isArray(result)
               ? result
               : [result];
-        for (const json of jsons) {
+        for (const entry of jsons) {
+          const routed = entry instanceof RoutedItem;
+          const json = routed ? entry.json : entry;
           if (!isPlainObject(json)) {
             throw new Error('Node returned an invalid item');
           }
-          output.push({ json, pairedItem: index });
+          const key = routed ? entry.output : MAIN_OUTPUT;
+          const target = outputs.get(key);
+          if (!target) {
+            throw new Error(
+              `Node returned an item for an unknown output "${key}"`,
+            );
+          }
+          target.push({ json, pairedItem: index });
         }
       } catch (error) {
         throw new ItemRunError(
@@ -215,14 +249,14 @@ export class NodeRunner {
         );
       }
     }
-    return output;
+    return outputs;
   }
 
   // Runs once per node (not per item); credential_id is never an expression.
   private async resolveCredential(
     executor: INodeExecutor,
     rawConfig: Record<string, unknown>,
-    actorId: string,
+    ownerId: string,
   ): Promise<unknown> {
     const candidate = rawConfig.credential_id;
     if (candidate === undefined) return null;
@@ -232,7 +266,7 @@ export class NodeRunner {
 
     const resolved = await this.repository.resolveCredential(
       candidate,
-      actorId,
+      ownerId,
     );
     if (!resolved) throw new Error('credential was not found');
 
@@ -251,12 +285,16 @@ function toRecord(value: unknown): Record<string, unknown> {
 }
 
 export function sanitizeErrorText(message: string): string {
-  return message
-    .replace(/\b(?:sk-ant-|sk-)[A-Za-z0-9_-]{16,}/g, '[REDACTED]')
-    .replace(/\bAIza[0-9A-Za-z_-]{20,}/g, '[REDACTED]')
-    .replace(
-      /(access_token|refresh_token|token|encrypted_secret|ENCRYPTION_KEY|client_secret|Bearer [A-Za-z0-9._~+/=-]+)/gi,
-      '[REDACTED]',
-    )
-    .replace(/\b[a-fA-F0-9]{32,}\b/g, '[REDACTED]');
+  return (
+    message
+      .replace(/\b(?:sk-ant-|sk-)[A-Za-z0-9_-]{16,}/g, '[REDACTED]')
+      .replace(/\bAIza[0-9A-Za-z_-]{20,}/g, '[REDACTED]')
+      // Meta Page / user access tokens.
+      .replace(/\bEAA[A-Za-z0-9]{20,}/g, '[REDACTED]')
+      .replace(
+        /(access_token|refresh_token|token|encrypted_secret|ENCRYPTION_KEY|client_secret|Bearer [A-Za-z0-9._~+/=-]+)/gi,
+        '[REDACTED]',
+      )
+      .replace(/\b[a-fA-F0-9]{32,}\b/g, '[REDACTED]')
+  );
 }

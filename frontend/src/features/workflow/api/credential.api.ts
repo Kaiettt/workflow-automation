@@ -1,6 +1,7 @@
 import { apiClient } from '../../../shared/api/http-client';
 import type {
-  CreateApiKeyCredentialRequest,
+  ConnectorSummary,
+  CreateCredentialRequest,
   CredentialSummary,
 } from '../types/credential.types';
 
@@ -12,14 +13,19 @@ export const credentialApi = {
     return res.data.data;
   },
 
-  createApiKey: async (
+  create: async (
     connectorKey: string,
-    body: CreateApiKeyCredentialRequest,
+    body: CreateCredentialRequest,
   ): Promise<CredentialSummary> => {
     const res = await apiClient.post<{ data: CredentialSummary }>(
       `/api/connectors/${connectorKey}/credentials`,
       body,
     );
+    return res.data.data;
+  },
+
+  listConnectors: async (): Promise<ConnectorSummary[]> => {
+    const res = await apiClient.get<{ data: ConnectorSummary[] }>('/api/connectors');
     return res.data.data;
   },
 };

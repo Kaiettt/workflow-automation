@@ -12,7 +12,9 @@ export class CreateApiKeyCredentialCommand {
     readonly connectorKey: string,
     readonly ownerId: string,
     readonly name: string,
-    readonly apiKey: string,
+    // The fields of the connector's config_schema (e.g. page_id +
+    // page_access_token); a plain string is the api_key of single-key connectors.
+    readonly secret: string | Record<string, unknown>,
   ) {}
 }
 
@@ -32,17 +34,27 @@ export class CreateApiKeyCredentialHandler implements ICommandHandler<CreateApiK
         `Connector "${command.connectorKey}" was not found`,
       );
     }
-    if (connector.authType !== ConnectorAuthType.API_KEY) {
+    // OAuth2 credential types of integration packages start from a form too
+    // (App ID / App Secret); their tokens are added by the OAuth2 callback.
+    const isPackageOAuth2 =
+      connector.authType === ConnectorAuthType.OAUTH2 &&
+      (connector.configSchema as { 'x-oauth2'?: unknown } | null)?.[
+        'x-oauth2'
+      ] === true;
+    if (connector.authType !== ConnectorAuthType.API_KEY && !isPackageOAuth2) {
       throw new BadRequestException(
-        `Connector "${connector.key}" does not use an API key`,
+        `Connector "${connector.key}" is not created from a form`,
       );
     }
 
     const name = command.name.trim();
-    const apiKey = command.apiKey.trim();
-    if (!name || !apiKey) {
-      throw new BadRequestException('name and api_key must not be blank');
-    }
+    if (!name) throw new BadRequestException('name must not be blank');
+    const secret = secretFields(
+      connector.configSchema,
+      typeof command.secret === 'string'
+        ? { api_key: command.secret }
+        : command.secret,
+    );
 
     const encryptionKey = process.env['ENCRYPTION_KEY'];
     if (!encryptionKey) {
@@ -55,10 +67,7 @@ export class CreateApiKeyCredentialHandler implements ICommandHandler<CreateApiK
         connector.id,
         command.ownerId,
         name,
-        EncryptionUtil.encrypt(
-          JSON.stringify({ api_key: apiKey }),
-          encryptionKey,
-        ),
+        EncryptionUtil.encrypt(JSON.stringify(secret), encryptionKey),
       ),
     );
 
@@ -69,4 +78,39 @@ export class CreateApiKeyCredentialHandler implements ICommandHandler<CreateApiK
       createdAt: saved.createdAt!,
     };
   }
+}
+
+// Keeps the fields the connector declares, trimmed; every required one must be
+// a non-blank string. A connector declaring nothing takes a single api_key.
+function secretFields(
+  configSchema: unknown,
+  values: Record<string, unknown>,
+): Record<string, string> {
+  const schema = (configSchema ?? {}) as {
+    required?: unknown;
+    properties?: Record<string, unknown>;
+  };
+  const declared = Array.isArray(schema.required)
+    ? schema.required.filter(
+        (field): field is string => typeof field === 'string',
+      )
+    : [];
+  const required =
+    declared.length === 0 && Object.keys(schema.properties ?? {}).length === 0
+      ? ['api_key']
+      : declared;
+  const known = new Set([...Object.keys(schema.properties ?? {}), ...required]);
+
+  const secret: Record<string, string> = {};
+  for (const field of known) {
+    const value = values[field];
+    if (typeof value === 'string' && value.trim() !== '') {
+      secret[field] = value.trim();
+    }
+  }
+  const missing = required.filter((field) => !(field in secret));
+  if (missing.length > 0) {
+    throw new BadRequestException(`${missing.join(', ')} must not be blank`);
+  }
+  return secret;
 }

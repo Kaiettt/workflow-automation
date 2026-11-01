@@ -1,6 +1,7 @@
 import { apiClient } from '../../../shared/api/http-client';
 import { useAuthStore } from '../../auth';
 import type { NodeTypeDefinition } from '../models/workflow.model';
+import type { PublishResult } from '../types/workflow.types';
 
 
 export const workflowApi = {
@@ -38,8 +39,9 @@ export const workflowApi = {
     await apiClient.put(`/api/workflows/${id}/draft`, { definition });
   },
 
-  publishWorkflow: async (id: string): Promise<void> => {
-    await apiClient.post(`/api/workflows/${id}/versions`);
+  publishWorkflow: async (id: string): Promise<PublishResult> => {
+    const res = await apiClient.post<{ data: PublishResult }>(`/api/workflows/${id}/versions`);
+    return res.data.data;
   },
 
   getNodeTypes: async (): Promise<NodeTypeDefinition[]> => {

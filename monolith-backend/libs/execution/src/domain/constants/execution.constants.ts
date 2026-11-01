@@ -1,7 +1,14 @@
 export enum ExecutionStatus {
+  // Waiting in the queue (webhook); no node has run yet.
+  QUEUED = 'QUEUED',
   RUNNING = 'RUNNING',
   SUCCESS = 'SUCCESS',
   FAILED = 'FAILED',
+}
+
+export enum TriggerType {
+  MANUAL = 'MANUAL',
+  WEBHOOK = 'WEBHOOK',
 }
 
 export const NodeKeys = {
@@ -9,6 +16,10 @@ export const NodeKeys = {
   GOOGLE_SHEET_READ_ROWS: 'integration.google_sheet.readRows',
   TRIGGER_MANUAL: 'trigger.manual',
   LOGIC_FILTER: 'logic.filter',
+  LOGIC_IF: 'logic.if',
+  LOGIC_SWITCH: 'logic.switch',
+  DATA_SET: 'data.set',
+  MEMORY_CHAT: 'memory.chat',
   DATA_AGGREGATE: 'data.aggregate',
   AI_LLM_GENERATE: 'ai.llm.generate',
 } as const;
@@ -18,6 +29,11 @@ export const ConnectorKeys = {
   ANTHROPIC: 'anthropic',
   OPENAI: 'openai',
   GEMINI: 'gemini',
+} as const;
+
+// Action nodes of integration packages: retries of temporary app errors.
+export const PackageActionLimits = {
+  MAX_RETRIES: 2,
 } as const;
 
 export const LlmLimits = {

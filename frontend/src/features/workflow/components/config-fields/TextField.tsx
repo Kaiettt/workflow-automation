@@ -10,6 +10,8 @@ interface TextFieldProps {
   multiline?: boolean;
   expression?: boolean;
   placeholder?: string;
+  // Field-specific guidance (schema `description`); replaces the generic one.
+  hint?: string;
 }
 
 export function TextField({
@@ -20,10 +22,11 @@ export function TextField({
   multiline,
   expression,
   placeholder,
+  hint: fieldHint,
 }: TextFieldProps) {
-  const hint = expression
-    ? 'Use {{$json.column}} or {{$node["Node name"].json.column}}'
-    : undefined;
+  const hint =
+    fieldHint ??
+    (expression ? 'Use {{$json.column}} or {{$node["Node name"].json.column}}' : undefined);
 
   return (
     <FieldShell id={id} label={label} expression={expression} hint={hint}>

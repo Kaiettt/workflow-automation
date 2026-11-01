@@ -7,20 +7,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCredentials } from '../../hooks/useCredentials';
-import { AddApiKeyDialog } from '../AddApiKeyDialog';
+import { useConnector, useCredentials } from '../../hooks/useCredentials';
+import { useOAuth2Popup } from '../../hooks/useOAuth2Popup';
+import { AddCredentialDialog } from '../AddCredentialDialog';
 import { FieldShell } from './FieldShell';
 
 interface CredentialPickerProps {
   id: string;
   label: string;
-  // Provider chosen in another field of the node; undefined until it is picked.
+  // Fixed by the schema (x-connectorKey) or chosen in another field of the node
+  // (x-connectorKeyFrom); undefined until that provider is picked.
   connectorKey: string | undefined;
   value: string;
   onChange: (credentialId: string) => void;
 }
 
-// Lists only the credentials of the chosen connector and lets the user save a new API key.
+// Lists only the credentials of the connector and lets the user save a new one.
 export function CredentialPicker({
   id,
   label,
@@ -30,6 +32,9 @@ export function CredentialPicker({
 }: CredentialPickerProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: credentials = [], isLoading, isError } = useCredentials(connectorKey);
+  const { data: connector } = useConnector(connectorKey);
+  // OAuth2 credentials can be signed in again (more Pages, fresh token).
+  const reconnect = useOAuth2Popup();
 
   // A selection that no longer exists (e.g. another provider's) shows as empty.
   const selected = credentials.some((c) => c.id === value) ? value : null;
@@ -37,10 +42,10 @@ export function CredentialPicker({
   const placeholder = isLoading
     ? 'Loading...'
     : isError
-      ? 'Could not load saved keys'
+      ? 'Could not load saved connections'
       : credentials.length === 0
-        ? 'No saved keys yet'
-        : 'Select a key';
+        ? 'Nothing saved yet'
+        : 'Select a connection';
 
   return (
     <FieldShell
@@ -50,7 +55,7 @@ export function CredentialPicker({
         !connectorKey
           ? 'Choose a provider first'
           : isError
-            ? 'Saved keys could not be loaded. Check your connection and reopen the node.'
+            ? 'Saved connections could not be loaded. Check your network and reopen the node.'
             : undefined
       }
     >
@@ -83,9 +88,24 @@ export function CredentialPicker({
             className="w-full"
             onClick={() => setDialogOpen(true)}
           >
-            + Add API key
+            + Add connection
           </Button>
-          <AddApiKeyDialog
+          {connector?.oauth2 && selected && (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                disabled={reconnect.pending}
+                onClick={() => void reconnect.connect(selected)}
+              >
+                {reconnect.pending ? 'Waiting for sign-in...' : 'Reconnect'}
+              </Button>
+              {reconnect.error && <p className="text-xs text-destructive">{reconnect.error}</p>}
+            </>
+          )}
+          <AddCredentialDialog
             connectorKey={connectorKey}
             open={dialogOpen}
             onOpenChange={setDialogOpen}

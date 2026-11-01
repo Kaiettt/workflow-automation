@@ -1,5 +1,5 @@
 export type NodeExecutionStatus = 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED' | 'TIMEOUT';
-export type ExecutionStatus = 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+export type ExecutionStatus = 'QUEUED' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
 
 export interface NodeLogRecord {
   id?: string;

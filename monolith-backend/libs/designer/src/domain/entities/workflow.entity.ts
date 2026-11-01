@@ -11,6 +11,8 @@ export class Workflow {
     public currentVersionId?: string | null,
     public readonly createdAt?: Date,
     public readonly updatedAt?: Date,
+    // The Active switch; changed only by the triggers module.
+    public readonly active: boolean = false,
   ) {}
 
   static create(props: {

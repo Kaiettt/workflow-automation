@@ -55,6 +55,7 @@ export class WorkflowsController {
         id: w.id,
         name: w.name,
         status: w.status,
+        active: w.active,
         createdAt: w.createdAt,
         updatedAt: w.updatedAt,
       })),

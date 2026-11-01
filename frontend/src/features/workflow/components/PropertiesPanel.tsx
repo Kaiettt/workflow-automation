@@ -12,8 +12,12 @@ import {
   orderedProperties,
 } from '../utils/node-config';
 import { ConfigField } from './config-fields/ConfigField';
+import { WebhookUrlField } from './config-fields/WebhookUrlField';
+import { TestEventPanel } from './TestEventPanel';
+import { triggerService } from '../services/trigger.service';
 
 interface PropertiesPanelProps {
+  workflowId: string;
   nodes: Node[];
   onNodeDataChange: (nodeId: string, data: Record<string, unknown>) => void;
   onDeleteNode: (nodeId: string) => void;
@@ -22,9 +26,15 @@ interface PropertiesPanelProps {
 const PANEL_CLASS =
   'w-80 bg-white border-l border-gray-200 h-full shadow-sm z-10 flex flex-col';
 
-export function PropertiesPanel({ nodes, onNodeDataChange, onDeleteNode }: PropertiesPanelProps) {
+export function PropertiesPanel({
+  workflowId,
+  nodes,
+  onNodeDataChange,
+  onDeleteNode,
+}: PropertiesPanelProps) {
   const selectedNodeId = useDesignerStore((state) => state.selectedNodeId);
   const nodeTypes = useDesignerStore((state) => state.nodeTypes);
+  const isSaving = useDesignerStore((state) => state.isSaving);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
   const nodeType = selectedNode ? nodeTypes.find((t) => t.key === selectedNode.data?.key) : null;
@@ -63,7 +73,9 @@ export function PropertiesPanel({ nodes, onNodeDataChange, onDeleteNode }: Prope
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'oauth-success') {
-        const currentKey = Object.keys(properties).find((k) => properties[k]['x-connectorKey']);
+        const currentKey = Object.keys(properties).find(
+          (k) => properties[k]['x-connectorKey'] && properties[k]['x-credentialInput'] !== 'form',
+        );
         if (currentKey && event.data.credentialId) {
           handleConfigChange(currentKey, event.data.credentialId);
         }
@@ -101,6 +113,10 @@ export function PropertiesPanel({ nodes, onNodeDataChange, onDeleteNode }: Prope
   const fields = orderedProperties(nodeType.configSchema).filter(
     ([key]) => key !== 'input_schema' && key !== 'output_schema',
   );
+  // Trigger nodes of integration packages receive events from outside.
+  const webhook = triggerService.webhookHint(nodeType.configSchema);
+  const required = nodeType.configSchema?.required;
+  const needsCredential = Array.isArray(required) && required.includes('credential_id');
 
   return (
     <aside className={PANEL_CLASS}>
@@ -126,19 +142,32 @@ export function PropertiesPanel({ nodes, onNodeDataChange, onDeleteNode }: Prope
       </div>
 
       <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">
-        {fields.length === 0 ? (
+        {webhook?.scope === 'node' && (
+          <WebhookUrlField workflowId={workflowId} nodeId={selectedNode.id} />
+        )}
+        {fields.length === 0 && !webhook ? (
           <div className="text-sm text-gray-500 italic">No configuration required.</div>
         ) : (
           fields.map(([key, schema]) => (
             <ConfigField
               key={key}
+              nodeKey={nodeType.key}
               fieldKey={key}
               schema={schema}
               config={localConfig}
+              needsCredential={needsCredential}
               onChange={handleConfigChange}
               onConnectOAuth={() => void handleConnect()}
             />
           ))
+        )}
+        {webhook && (
+          <TestEventPanel
+            key={selectedNode.id}
+            workflowId={workflowId}
+            nodeId={selectedNode.id}
+            draftSaving={isSaving}
+          />
         )}
       </div>
 

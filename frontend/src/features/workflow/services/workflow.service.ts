@@ -1,6 +1,7 @@
 import { AxiosError } from 'axios';
 import { workflowApi } from '../api/workflow.api';
 import type { NodeTypeDefinition } from '../models/workflow.model';
+import type { PublishResult } from '../types/workflow.types';
 import {
   WorkflowPublishValidationError,
   type WorkflowValidationIssue,
@@ -60,9 +61,9 @@ export const workflowService = {
     }
   },
 
-  async publishWorkflow(id: string): Promise<void> {
+  async publishWorkflow(id: string): Promise<PublishResult> {
     try {
-      await workflowApi.publishWorkflow(id);
+      return await workflowApi.publishWorkflow(id);
     } catch (error: unknown) {
       if (
         error instanceof AxiosError &&

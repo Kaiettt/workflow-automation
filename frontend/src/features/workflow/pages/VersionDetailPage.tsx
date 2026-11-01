@@ -60,6 +60,10 @@ import { useWorkflowVersion } from '../hooks/useWorkflowVersions';
 import { useStartExecution } from '../hooks/useStartExecution';
 import type { ExecutionResult } from '../types/execution.types';
 import { countItems } from '../utils/node-config';
+import { EventTriggerInfo } from '../components/EventTriggerInfo';
+import { triggerService } from '../services/trigger.service';
+import { workflowService } from '../services/workflow.service';
+import { useQuery } from '@tanstack/react-query';
 
 // --- Custom Interactive Canvas Node ---
 interface RunnerNodeData extends Record<string, unknown> {
@@ -67,7 +71,7 @@ interface RunnerNodeData extends Record<string, unknown> {
   category: string;
   iconType: 'webhook' | 'filter' | 'database' | 'mail' | 'action';
   detail: string;
-  status: 'idle' | 'running' | 'success' | 'failed';
+  status: 'idle' | 'running' | 'success' | 'failed' | 'skipped';
   hasTarget: boolean;
   hasSource: boolean;
   outputSummary?: string;
@@ -98,6 +102,7 @@ const RunnerNodeComponent: React.FC<NodeProps<Node<RunnerNodeData>>> = ({ data }
       return 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-emerald-500/10';
     if (data.status === 'failed')
       return 'border-rose-500 ring-2 ring-rose-500/20 shadow-rose-500/10';
+    if (data.status === 'skipped') return 'border-dashed border-border opacity-60';
     return 'border-border hover:border-border/80';
   };
 
@@ -140,6 +145,9 @@ const RunnerNodeComponent: React.FC<NodeProps<Node<RunnerNodeData>>> = ({ data }
           )}
           {data.status === 'failed' && (
             <XCircle className="size-3.5 text-rose-500 ml-1 shrink-0" />
+          )}
+          {data.status === 'skipped' && (
+            <span className="ml-1 shrink-0 text-[10px] text-muted-foreground">Skipped</span>
           )}
         </div>
 
@@ -193,12 +201,15 @@ function mapDefinitionNodeToRunner(
   let iconType: RunnerNodeData['iconType'] = 'action';
   let detail = key;
 
-  if (key.startsWith('trigger.') || key.includes('webhook') || key.includes('manual')) {
+  if (
+    key.startsWith('trigger.') ||
+    key.endsWith('.trigger') ||
+    key.includes('webhook') ||
+    key.includes('manual')
+  ) {
     category = 'Trigger';
     iconType = 'webhook';
-    detail = rawNode.data?.config?.path
-      ? `POST ${String(rawNode.data.config.path)}`
-      : 'trigger.manual';
+    detail = key;
   } else if (key.startsWith('logic.') || key.includes('filter')) {
     category = 'Logic';
     iconType = 'filter';
@@ -266,6 +277,16 @@ export const VersionDetailPage: React.FC = () => {
   }, [version]);
 
   const rawNodes = useMemo(() => definition.nodes || [], [definition]);
+  // A version with an event trigger (a node type with x-webhook) is started
+  // by its events while the workflow is Active, not by the Run button.
+  const { data: catalog = [] } = useQuery({
+    queryKey: ['node-types'],
+    queryFn: () => workflowService.getNodeTypes(),
+    staleTime: Infinity,
+  });
+  const eventTriggerNode = rawNodes.find((n) =>
+    triggerService.webhookHint(catalog.find((t) => t.key === n.data?.key)?.configSchema),
+  );
   const rawEdges = useMemo(() => definition.edges || [], [definition]);
 
   const initialNodes = useMemo(() => {
@@ -310,6 +331,17 @@ export const VersionDetailPage: React.FC = () => {
                   outputSummary: `✓ Thành công (${log.durationMs ?? 0}ms)`,
                   errorMessage: undefined,
                   durationMs: log.durationMs ?? undefined,
+                },
+              };
+            } else if (log.status === 'SKIPPED') {
+              return {
+                ...n,
+                data: {
+                  ...n.data,
+                  status: 'skipped',
+                  outputSummary: undefined,
+                  errorMessage: undefined,
+                  durationMs: undefined,
                 },
               };
             } else {
@@ -483,27 +515,35 @@ export const VersionDetailPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
-                <Button
-                  size="lg"
-                  onClick={handleRun}
-                  disabled={isPending}
-                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 font-semibold px-6 shadow-md transition-all"
-                >
-                  {isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : executionResult ? (
-                    <RotateCcw className="size-4" />
-                  ) : (
-                    <Play className="size-4 fill-current" />
-                  )}
-                  <span>
-                    {isPending
-                      ? 'Đang thực thi Engine...'
-                      : executionResult
-                        ? 'Chạy lại phiên bản (Rerun)'
-                        : 'Kích hoạt chạy ngay (Run)'}
-                  </span>
-                </Button>
+                {eventTriggerNode ? (
+                  <EventTriggerInfo
+                    workflowId={workflowId}
+                    versionId={versionId}
+                    triggerName={String(eventTriggerNode.data?.name ?? eventTriggerNode.id)}
+                  />
+                ) : (
+                  <Button
+                    size="lg"
+                    onClick={handleRun}
+                    disabled={isPending}
+                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 font-semibold px-6 shadow-md transition-all"
+                  >
+                    {isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : executionResult ? (
+                      <RotateCcw className="size-4" />
+                    ) : (
+                      <Play className="size-4 fill-current" />
+                    )}
+                    <span>
+                      {isPending
+                        ? 'Đang thực thi Engine...'
+                        : executionResult
+                          ? 'Chạy lại phiên bản (Rerun)'
+                          : 'Kích hoạt chạy ngay (Run)'}
+                    </span>
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -668,6 +708,7 @@ export const VersionDetailPage: React.FC = () => {
                         executionResult.nodeLogs.map((log, index) => {
                           const isExpanded = !!expandedNodes[log.nodeId];
                           const isNodeSuccess = log.status === 'SUCCESS';
+                          const isNodeSkipped = log.status === 'SKIPPED';
 
                           return (
                             <React.Fragment key={log.id || log.nodeId}>
@@ -711,6 +752,13 @@ export const VersionDetailPage: React.FC = () => {
                                     >
                                       <CheckCircle2 className="size-3" />
                                       <span>SUCCESS ({log.durationMs ?? 0}ms)</span>
+                                    </Badge>
+                                  ) : isNodeSkipped ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="gap-1 text-[11px] text-muted-foreground"
+                                    >
+                                      <span>SKIPPED</span>
                                     </Badge>
                                   ) : (
                                     <Badge

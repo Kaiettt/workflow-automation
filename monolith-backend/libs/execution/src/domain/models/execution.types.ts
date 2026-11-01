@@ -1,4 +1,4 @@
-import { ExecutionStatus } from '../constants/execution.constants';
+import { ExecutionStatus, TriggerType } from '../constants/execution.constants';
 
 export interface WorkflowVersionForExecution {
   id: string;
@@ -11,14 +11,21 @@ export interface ExecutionRecord {
   id: string;
   workflowId: string;
   workflowVersionId: string;
-  triggeredById: string;
+  triggerType: TriggerType;
+  // null when nobody pressed Run (webhook).
+  triggeredById: string | null;
+  // QUEUED for a background run until the queue picks it up, else RUNNING.
+  status: ExecutionStatus.QUEUED | ExecutionStatus.RUNNING;
   startedAt: Date;
+  // Normalized trigger payload, kept for debugging.
+  context?: unknown;
 }
 
 export interface NodeLogRecord {
   nodeId: string;
   nodeKey: string;
-  status: ExecutionStatus;
+  // SKIPPED: no incoming edge was activated, so the node did not run.
+  status: Exclude<ExecutionStatus, ExecutionStatus.QUEUED> | 'SKIPPED';
   input: unknown;
   output: unknown;
   errorMessage?: string;

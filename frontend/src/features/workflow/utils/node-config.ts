@@ -68,11 +68,13 @@ export function dependentKeys(configSchema: unknown, changedKey: string): string
     .map(([key]) => key);
 }
 
-// x-placeholderByField: { field, values } -> the hint for the current value of `field`.
+// x-placeholder, or x-placeholderByField: { field, values } -> the hint for the
+// current value of `field`.
 export function placeholderFor(
   property: PropertySchema,
   config: Record<string, unknown>,
 ): string | undefined {
+  if (typeof property['x-placeholder'] === 'string') return property['x-placeholder'];
   const rule = property['x-placeholderByField'];
   if (typeof rule !== 'object' || rule === null) return undefined;
   const { field, values } = rule as { field?: unknown; values?: unknown };

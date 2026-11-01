@@ -1,4 +1,9 @@
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import {
+  CommandBus,
+  CommandHandler,
+  EventBus,
+  ICommandHandler,
+} from '@nestjs/cqrs';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@app/database/prisma/prisma.service';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
@@ -6,6 +11,8 @@ import { WorkflowDraftRepository } from '../../domain/repositories/workflow-draf
 import { WorkflowVersionRepository } from '../../domain/repositories/workflow-version.repository';
 import { RestoreStrategy } from '../../presentation/http/dtos/restore-version.dto';
 import { Prisma } from '@prisma/client';
+import { WorkflowPublishedEvent } from '../events/workflow-published.event';
+import { switchActiveVersion } from './publish-workflow.command';
 
 export class RestoreVersionCommand {
   constructor(
@@ -36,6 +43,8 @@ export class RestoreVersionHandler implements ICommandHandler<RestoreVersionComm
     private readonly workflowDraftRepo: WorkflowDraftRepository,
     private readonly workflowVersionRepo: WorkflowVersionRepository,
     private readonly prisma: PrismaService,
+    private readonly eventBus: EventBus,
+    private readonly commandBus: CommandBus,
   ) {}
 
   async execute(command: RestoreVersionCommand): Promise<RestoreVersionResult> {
@@ -63,6 +72,7 @@ export class RestoreVersionHandler implements ICommandHandler<RestoreVersionComm
     const currentDraft = await this.workflowDraftRepo.findById(workflowId);
 
     let newPublishedVersionNumber: number | undefined;
+    let newPublishedVersionId: string | undefined;
     let backupWorkflowId: string | undefined;
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -84,6 +94,7 @@ export class RestoreVersionHandler implements ICommandHandler<RestoreVersionComm
             },
           });
           newPublishedVersionNumber = newVer.versionNumber;
+          newPublishedVersionId = newVer.id;
 
           // Update workflow's currentVersionId to the newly published version
           await tx.workflow.update({
@@ -131,6 +142,18 @@ export class RestoreVersionHandler implements ICommandHandler<RestoreVersionComm
 
       return updatedDraft;
     });
+
+    if (newPublishedVersionId && currentDraft) {
+      this.eventBus.publish(
+        new WorkflowPublishedEvent(
+          workflowId,
+          newPublishedVersionId,
+          currentDraft.definition,
+        ),
+      );
+      // An active workflow now listens with the version just published.
+      await switchActiveVersion(this.commandBus, workflowId);
+    }
 
     return {
       workflowId,
