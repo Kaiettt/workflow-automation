@@ -70,7 +70,7 @@ model Workflow {
   // Công tắc Active: chỉ workflow đang bật mới nhận sự kiện (bằng currentVersion).
   active Boolean @default(false)
 
-  draft            WorkflowDraft?    // 1:1 — mỗi workflow có đúng 1 draft
+  draft            WorkflowDraft? // 1:1 — mỗi workflow có đúng 1 draft
   versions         WorkflowVersion[] @relation("WorkflowVersions")
   executions       Execution[]
   triggers         WorkflowTrigger[]
@@ -152,7 +152,7 @@ model NodeTypeDefinition {
   icon         String?      @db.VarChar(255)
   color        String?      @db.VarChar(50)
   category     NodeCategory // FR-NL-01
-  description  String?      // hiển thị khi tìm kiếm (FR-NL-06)
+  description  String? // hiển thị khi tìm kiếm (FR-NL-06)
   configSchema Json         @map("config_schema") // JSON Schema validate config node (FR-WD-05, FR-WD-06)
   inputSchema  Json?        @map("input_schema")
   outputSchema Json?        @map("output_schema")
@@ -263,7 +263,7 @@ model Execution {
   startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz
   finishedAt DateTime? @map("finished_at") @db.Timestamptz
   durationMs Int?      @map("duration_ms") // FR-EM-02, tính sẵn khi finish
-  context    Json?     // Biến môi trường hoặc context đầu vào của execution
+  context    Json? // Biến môi trường hoặc context đầu vào của execution
 
   nodeLogs ExecutionNodeLog[]
 
@@ -351,8 +351,8 @@ model ExecutionNodeLog {
 
   status NodeExecutionStatus @default(RUNNING)
 
-  input        Json?   // FR-LG-01
-  output       Json?   // FR-LG-01
+  input        Json? // FR-LG-01
+  output       Json? // FR-LG-01
   errorMessage String? @map("error_message") // FR-LG-04
   errorStack   String? @map("error_stack") // FR-LG-04
   retryCount   Int     @default(0) @map("retry_count") // FR-EM-03, FR-EX-04
