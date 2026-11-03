@@ -1,0 +1,54 @@
+@startuml FlowPilot_C4_Container
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Container Diagram for FlowPilot Workflow Automation Platform (C4 Level 2)
+
+' ============================================================================
+' Actors & External Systems
+' ============================================================================
+Person(creator, "Workflow Creator / Developer", "Builds, debugs, and monitors automated workflows; configures integration credentials.")
+Person(admin, "System Administrator", "Manages user permissions, audit telemetry, and system-level configurations.")
+System_Ext(webhook_sender, "External Event Producer", "External systems (e.g., Stripe, GitHub, Facebook Messenger, IoT) triggering workflows via HTTP webhooks.")
+
+' ============================================================================
+' FlowPilot System Boundary
+' ============================================================================
+System_Boundary(flowpilot_system, "FlowPilot Platform") {
+
+    Container(spa, "Single-Page Application (Frontend)", "React 19, TypeScript, Vite, Tailwind CSS v4, React Flow 12, Zustand, TanStack Query", "Provides the responsive UI, interactive node graph canvas, configuration panels, real-time validation feedback, execution logs viewer, and auth screens.")
+
+    Container(api_gateway, "Monolith Backend API & Engine", "NestJS, TypeScript, Modular Monolith + CQRS", "Handles REST endpoints, authentication (JWT), workflow designer state (drafts with advisory locks), catalog schemas, execution pipeline, and connector dispatch.")
+
+    ContainerDb(db_postgres, "Primary Database", "PostgreSQL 17 (Prisma ORM)", "Stores relational data: users, workflows, drafts, immutable version snapshots, node catalogs, encrypted credentials (AES-256-GCM), and execution step telemetry.")
+
+    ContainerDb(redis_cache, "Queue Broker & In-Memory Store", "Redis 7 (Alpine), BullMQ", "Provides job buffering for async node execution, concurrency queue management, rate limits, OTP caching, and real-time execution event pub/sub.")
+}
+
+' ============================================================================
+' External Supporting Services & APIs
+' ============================================================================
+System_Ext(smtp_mail, "Email Server / MailHog", "SMTP (Port 1025 / 587) for sending verification OTPs, password reset links, and failure alerts.")
+System_Ext(llm_providers, "AI & LLM Services", "OpenAI, Google Gemini, Anthropic Claude APIs invoked by generative AI workflow steps.")
+System_Ext(target_systems, "Target External Services & Databases", "Third-party APIs (REST/Webhook), remote PostgreSQL databases, remote Redis clusters, Gmail, and Google Sheets.")
+System_Ext(oauth_idp, "OAuth2 Identity Providers", "Google OAuth, Meta/Facebook OAuth for credential delegation and token refreshes.")
+
+' ============================================================================
+' Relationships
+' ============================================================================
+Rel(creator, spa, "Designs workflows, inspects execution runs, configures nodes", "HTTPS / Browser")
+Rel(admin, spa, "Manages system settings, users, and audit logs", "HTTPS / Browser")
+Rel(webhook_sender, api_gateway, "Sends trigger event payloads to webhook endpoints", "HTTPS / JSON (POST /api/webhooks/{id})")
+
+Rel(spa, api_gateway, "Invokes REST APIs, persists drafts, triggers runs", "HTTPS / JSON")
+Rel(api_gateway, db_postgres, "Reads & writes domain models, versions, logs, and encrypted secrets", "Prisma TCP (Port 5432)")
+Rel(api_gateway, redis_cache, "Pushes & consumes execution jobs, caches OTPs and session tokens", "BullMQ / RESP TCP (Port 6379)")
+
+Rel(api_gateway, smtp_mail, "Sends OTP emails and notifications", "SMTP (Port 1025 / 587)")
+Rel(api_gateway, llm_providers, "Executes LLM prompts and embeddings", "HTTPS / REST")
+Rel(api_gateway, target_systems, "Executes connector operations, queries, and HTTP requests", "HTTPS / TCP")
+Rel(api_gateway, oauth_idp, "Exchanges authorization codes and refreshes OAuth tokens", "HTTPS")
+
+@enduml
+
