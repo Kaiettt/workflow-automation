@@ -1,6 +1,6 @@
 ---
 name: Frontend Guidelines
-description: Guidelines for React 19 frontend development, following Feature-Based Architecture, Tailwind CSS v4, and state management rules. Trigger this when writing frontend React code.
+description: Guidelines for React 19 frontend development, following Feature-Based Architecture, Tailwind CSS v4, state management, and Vitest testing rules. Trigger this when writing or testing frontend React code.
 ---
 
 # FlowPilot Frontend Coding Standard (React)
@@ -32,3 +32,17 @@ You must follow these rules when developing the frontend:
 - **Install missing components**: Run `npx shadcn@latest add <component-name>` inside `frontend/` whenever a UI component is needed and not yet present in `src/components/ui`.
 - **Customization**: Extend shadcn components using Tailwind utility classes (`className="..."`) and `cn()` from `@/lib/utils`.
 - Follow the color system and theme tokens defined in `src/App.css` and `components.json`.
+
+## 6. Testing (Vitest & React Testing Library)
+- **Collocation**: Tests live strictly inside `src/features/<feature>/...` alongside source files (e.g. `LoginForm.test.tsx`, `auth.store.test.ts`, `workflow-validation.util.test.ts`).
+- **Scope**:
+  - Pure logic & utils (`*.test.ts`): Test edge cases, validation, formatting, calculations.
+  - Zustand stores (`*.store.test.ts`): Test actions, local storage persistence, state transitions.
+  - Services (`*.service.test.ts`): Mock API layer (`vi.mock`), verify error handling & transformations.
+  - Components (`*.test.tsx`): Test user actions, conditional alerts, accessibility roles.
+- **Conventions**:
+  - Query by accessibility: `screen.getByRole()`, `screen.getByText()`, `screen.getByPlaceholderText()`. Avoid testing CSS classes or internal implementation details.
+  - Wrap components requiring context with necessary providers (`QueryClientProvider`, `MemoryRouter`).
+  - Mock external boundaries with `vi.mock()` / `vi.fn()`, and always reset mocks / `cleanup()` between tests.
+  - Avoid snapshot testing; verify behaviors and state invariants instead.
+- **Execution**: Run `npm test` inside `frontend/`.

@@ -601,14 +601,68 @@ Split files when responsibilities grow.
 
 ---
 
-# 26. Testing (Future)
+# 26. Testing
 
-Write tests for:
+### 26.1. Stack & Tooling
 
-- Business logic
-- Custom hooks
-- Utility functions
+- **Test Runner & Framework**: **Vitest** (`vitest run --environment jsdom`)
+- **Testing Library**: **@testing-library/react** + **@testing-library/jest-dom**
+- **Environment**: **jsdom**
 
-Avoid snapshot-heavy testing.
+---
+
+### 26.2. Location & Naming Conventions
+
+All frontend tests live directly inside `@features` (`src/features/<feature>/...`), collocated with the source code:
+
+| Type | Suffix | Location | Example |
+|---|---|---|---|
+| **Components** | `*.test.tsx` | Next to component | `features/auth/components/LoginForm.test.tsx` |
+| **Stores (Zustand)** | `*.test.ts` | Next to store | `features/auth/store/auth.store.test.ts` |
+| **Services** | `*.test.ts` | Next to service | `features/workflow/services/workflow.service.test.ts` |
+| **Utilities** | `*.test.ts` | Next to util | `features/auth/utils/password.utils.test.ts` |
+| **Hooks** | `*.test.ts` | Next to hook | `features/workflow/hooks/useWorkflow.test.ts` |
+
+---
+
+### 26.3. What to Test
+
+1. **Pure Business Logic & Utilities**:
+   - Validation rules, data transformers, formatting logic, output builders.
+   - Test edge cases, empty values, invalid types, and complex computations.
+
+2. **Zustand State Stores**:
+   - Initial state initialization (e.g. from `localStorage`).
+   - State updates, action dispatches, and store resets.
+
+3. **Services**:
+   - Verify proper parameters are forwarded to the API layer (`apiClient` or feature API).
+   - Test error propagation and structured API error handling.
+
+4. **React Components**:
+   - Critical user flows: input entry, button clicks, validation errors, loading indicators, and success callbacks.
+   - Accessibility & role queries: find elements using semantic queries (`getByRole`, `getByText`, `getByPlaceholderText`).
+   - Mock child components or heavy sub-panels (e.g. React Flow canvas) when testing parent page orchestration.
+
+---
+
+### 26.4. Testing Best Practices
+
+- **Query by Accessibility First**:
+  - Prefer `screen.getByRole('button', { name: 'Sign In' })`, `screen.getByPlaceholderText(...)`, or `screen.getByText(...)`.
+  - Avoid querying internal classes or DOM hierarchy (`container.querySelector(...)`).
+
+- **Provide Context Providers**:
+  - Wrap components with required providers: `QueryClientProvider` for React Query, `MemoryRouter` for routing links (`<Link>`).
+
+- **Mock External Boundaries**:
+  - Mock API endpoints and external side-effects using `vi.mock()` and `vi.fn()`.
+  - Clear and reset mocks in `beforeEach` or `afterEach` (`vi.clearAllMocks()`, `cleanup()`).
+
+- **Avoid Fragile Snapshot Testing**:
+  - Do not use snapshot tests for UI layouts. Focus tests on behavior, invariant state transitions, and accessible feedback to the user.
+
+- **Run in CI**:
+  - Both CI pipeline (`.github/workflows/ci-pipeline.yml`) and pre-commit checks run `npm test` inside `frontend/`.
 
 ---
