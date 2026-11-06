@@ -1,0 +1,187 @@
+{
+    "edges": [
+        {
+            "id": "xy-edge__triggerNode-1792224328950right-source-actionNode-1792224333910left-target",
+            "source": "triggerNode-1792224328950",
+            "target": "actionNode-1792224333910",
+            "sourceHandle": "right-source",
+            "targetHandle": "left-target"
+        },
+        {
+            "id": "xy-edge__actionNode-1792224342073bottom-source-actionNode-1792224340416top-target",
+            "source": "actionNode-1792224342073",
+            "target": "actionNode-1792224340416",
+            "selected": false,
+            "sourceHandle": "bottom-source",
+            "targetHandle": "top-target"
+        },
+        {
+            "id": "xy-edge__actionNode-1792224333910bottom-source-actionNode-1792224342073top-target",
+            "source": "actionNode-1792224333910",
+            "target": "actionNode-1792224342073",
+            "sourceHandle": "bottom-source",
+            "targetHandle": "top-target"
+        },
+        {
+            "id": "xy-edge__actionNode-1792224340416right-source-actionNode-1792220527195left-target",
+            "source": "actionNode-1792224340416",
+            "target": "actionNode-1792220527195",
+            "sourceHandle": "right-source",
+            "targetHandle": "left-target"
+        },
+        {
+            "id": "xy-edge__actionNode-1792220527195right-source-actionNode-1792224337378left-target",
+            "source": "actionNode-1792220527195",
+            "target": "actionNode-1792224337378",
+            "selected": false,
+            "sourceHandle": "right-source",
+            "targetHandle": "left-target"
+        }
+    ],
+    "nodes": [
+        {
+            "id": "actionNode-1792220527195",
+            "data": {
+                "key": "ai.llm.generate",
+                "name": "LLM",
+                "config": {
+                    "model": "gemini-3.5-flash-lite",
+                    "prompt": "Đây là các phản hồi mới của khách hàng (dạng JSON): {{$json.items}}.\nHãy viết báo cáo gồm: (1) điểm khách khen, (2) vấn đề khách phàn nàn, (3) một việc nên làm ngay.",
+                    "provider": "gemini",
+                    "max_items": 50,
+                    "max_tokens": 1024,
+                    "temperature": 1,
+                    "credential_id": "9318a77f-2cb0-431f-966c-f06d7e36dcaa",
+                    "output_format": "text",
+                    "system_prompt": "Bạn là chuyên viên chăm sóc khách hàng. Luôn viết bằng tiếng Việt, ngắn gọn, đi thẳng vào vấn đề. Không dùng ngoặc vuông hay chỗ trống để điền, không thêm lời chào mở đầu hay lời giải thích ngoài báo cáo."
+                }
+            },
+            "type": "actionNode",
+            "dragging": false,
+            "measured": {
+                "width": 192,
+                "height": 75
+            },
+            "position": {
+                "x": 321.3376534677876,
+                "y": 118.0298920684046
+            },
+            "selected": false
+        },
+        {
+            "id": "triggerNode-1792224328950",
+            "data": {
+                "key": "trigger.manual",
+                "name": "Manual Trigger",
+                "config": {}
+            },
+            "type": "triggerNode",
+            "dragging": false,
+            "measured": {
+                "width": 192,
+                "height": 75
+            },
+            "position": {
+                "x": -176.716670032508,
+                "y": 120.4956394575925
+            },
+            "selected": false
+        },
+        {
+            "id": "actionNode-1792224333910",
+            "data": {
+                "key": "integration.google_sheet.readRows",
+                "name": "Read Google Sheet Rows",
+                "config": {
+                    "sheet_name": "helo",
+                    "credential_id": "a2c90569-9eae-4a43-b150-3959a53527d9",
+                    "spreadsheet_id": "19nZNvZobCKH4th-vKy00Po-3SknXD8v-VEDDm_qwmPk"
+                }
+            },
+            "type": "actionNode",
+            "dragging": false,
+            "measured": {
+                "width": 192,
+                "height": 75
+            },
+            "position": {
+                "x": -2.222872059855575,
+                "y": -11.34411901063375
+            },
+            "selected": true
+        },
+        {
+            "id": "actionNode-1792224337378",
+            "data": {
+                "key": "integration.gmail.send",
+                "name": "Send Gmail",
+                "config": {
+                    "to": "bacdoan52@gmail.com",
+                    "body": "{{$node[\"LLM\"].json.text}}",
+                    "subject": "Báo cáo phản hồi khách hàng",
+                    "credential_id": "6d84f3ae-b7db-429d-9067-062e713a0e41"
+                }
+            },
+            "type": "actionNode",
+            "dragging": false,
+            "measured": {
+                "width": 192,
+                "height": 75
+            },
+            "position": {
+                "x": 553.2490514864214,
+                "y": 176.7214188043361
+            },
+            "selected": false
+        },
+        {
+            "id": "actionNode-1792224340416",
+            "data": {
+                "key": "data.aggregate",
+                "name": "Aggregate",
+                "config": {
+                    "field": "items"
+                }
+            },
+            "type": "actionNode",
+            "dragging": false,
+            "measured": {
+                "width": 192,
+                "height": 75
+            },
+            "position": {
+                "x": 22.98178764730535,
+                "y": 269.7847777230841
+            },
+            "selected": false
+        },
+        {
+            "id": "actionNode-1792224342073",
+            "data": {
+                "key": "logic.filter",
+                "name": "Filter",
+                "config": {
+                    "field": "status",
+                    "value": "new",
+                    "operator": "equals"
+                }
+            },
+            "type": "actionNode",
+            "dragging": false,
+            "measured": {
+                "width": 192,
+                "height": 75
+            },
+            "position": {
+                "x": 54.00290728688805,
+                "y": 117.5874094913817
+            },
+            "selected": false
+        }
+    ],
+    "viewport": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+    }
+}

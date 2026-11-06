@@ -1,0 +1,207 @@
+// key
+// category
+//config_schema
+//
+//
+//
+// data.aggregate
+//DATA_PROCESSING
+{
+    "type": "object",
+    "properties": {
+        "field": {
+            "type": "string",
+            "default": "items"
+        }
+    }
+}
+//trigger.manual
+//TRIGGER
+{
+    "type": "object",
+    "properties": {}
+}
+//integration.google_sheet.readRows
+//INTEGRATION
+{
+    "type": "object",
+    "required": [
+        "credential_id",
+        "spreadsheet_id",
+        "sheet_name"
+    ],
+    "properties": {
+        "sheet_name": {
+            "type": "string"
+        },
+        "credential_id": {
+            "type": "string",
+            "x-connectorKey": "google"
+        },
+        "spreadsheet_id": {
+            "type": "string"
+        }
+    },
+    "x-propertyOrder": [
+        "credential_id",
+        "spreadsheet_id",
+        "sheet_name"
+    ]
+}
+//logic.filter
+//LOGIC
+{
+    "type": "object",
+    "required": [
+        "field",
+        "operator",
+        "value"
+    ],
+    "properties": {
+        "field": {
+            "type": "string"
+        },
+        "value": {
+            "type": "string",
+            "x-allowExpression": true
+        },
+        "operator": {
+            "enum": [
+                "equals",
+                "not_equals",
+                "contains"
+            ],
+            "type": "string"
+        }
+    },
+    "x-propertyOrder": [
+        "field",
+        "operator",
+        "value"
+    ]
+}
+///integration.gmail.send
+//INTEGRATION
+{
+    "type": "object",
+    "required": [
+        "credential_id",
+        "to",
+        "subject",
+        "body"
+    ],
+    "properties": {
+        "to": {
+            "type": "string",
+            "default": "{{$json.email}}",
+            "x-allowExpression": true
+        },
+        "body": {
+            "type": "string",
+            "x-allowExpression": true
+        },
+        "subject": {
+            "type": "string",
+            "x-allowExpression": true
+        },
+        "credential_id": {
+            "type": "string",
+            "x-connectorKey": "google"
+        }
+    },
+    "x-propertyOrder": [
+        "credential_id",
+        "to",
+        "subject",
+        "body"
+    ]
+}
+//ai.llm.generate
+//AI
+{
+    "type": "object",
+    "required": [
+        "provider",
+        "credential_id",
+        "model",
+        "prompt"
+    ],
+    "properties": {
+        "model": {
+            "type": "string",
+            "title": "Model",
+            "x-placeholderByField": {
+                "field": "provider",
+                "values": {
+                    "gemini": "e.g. gemini-2.0-flash",
+                    "openai": "e.g. gpt-4o-mini",
+                    "anthropic": "e.g. claude-opus-5-5"
+                }
+            }
+        },
+        "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "x-multiline": true,
+            "x-allowExpression": true
+        },
+        "provider": {
+            "enum": [
+                "anthropic",
+                "openai",
+                "gemini"
+            ],
+            "type": "string",
+            "title": "Provider"
+        },
+        "max_items": {
+            "type": "integer",
+            "title": "Max items",
+            "default": 50,
+            "minimum": 1
+        },
+        "max_tokens": {
+            "type": "integer",
+            "title": "Max tokens",
+            "default": 1024,
+            "minimum": 1
+        },
+        "temperature": {
+            "type": "number",
+            "title": "Temperature",
+            "minimum": 0
+        },
+        "credential_id": {
+            "type": "string",
+            "title": "Credential",
+            "x-refType": "credential",
+            "x-connectorKeyFrom": "provider"
+        },
+        "output_format": {
+            "enum": [
+                "text",
+                "json"
+            ],
+            "type": "string",
+            "title": "Output format",
+            "default": "text"
+        },
+        "system_prompt": {
+            "type": "string",
+            "title": "System prompt",
+            "x-multiline": true,
+            "x-allowExpression": true
+        }
+    },
+    "x-propertyOrder": [
+        "provider",
+        "credential_id",
+        "model",
+        "system_prompt",
+        "prompt",
+        "output_format",
+        "max_tokens",
+        "temperature",
+        "max_items"
+    ]
+}
