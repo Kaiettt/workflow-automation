@@ -14,11 +14,48 @@ export interface ExecutionRecord {
   triggerType: TriggerType;
   // null when nobody pressed Run (webhook).
   triggeredById: string | null;
-  // QUEUED for a background run until the queue picks it up, else RUNNING.
+  idempotencyKey?: string;
+  // QUEUED until claimed by the worker, then RUNNING.
   status: ExecutionStatus.QUEUED | ExecutionStatus.RUNNING;
-  startedAt: Date;
+  queuedAt: Date;
+  startedAt: Date | null;
   // Normalized trigger payload, kept for debugging.
   context?: unknown;
+}
+
+export interface ExecutionStartRecord {
+  id: string;
+  workflowId: string;
+  workflowVersionId: string;
+  triggerType: TriggerType;
+  status: ExecutionStatus;
+  queuedAt: Date;
+  startedAt: Date | null;
+}
+
+export interface ExecutionHistoryQuery {
+  workflowId: string;
+  ownerId: string;
+  workflowVersionId?: string;
+  cursor?: string;
+  limit: number;
+}
+
+export interface ExecutionHistoryItem {
+  id: string;
+  workflowId: string;
+  workflowVersionId: string;
+  triggerType: TriggerType;
+  status: ExecutionStatus;
+  queuedAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  durationMs: number | null;
+}
+
+export interface ExecutionHistoryPage {
+  items: ExecutionHistoryItem[];
+  nextCursor: string | null;
 }
 
 export interface NodeLogRecord {

@@ -7,6 +7,9 @@ import {
 import { ExecutionRepository } from '@app/execution/domain/repositories/execution.repository';
 import {
   ExecutionRecord,
+  ExecutionStartRecord,
+  ExecutionHistoryQuery,
+  ExecutionHistoryPage,
   NodeLogRecord,
   ResolvedCredential,
   WorkflowVersionForExecution,
@@ -38,6 +41,14 @@ import {
 } from '@app/execution/application/ports/chat-memory.port';
 import { LlmGenerateExecutor } from '@app/execution/application/executors/llm-generate-executor';
 import {
+  ExecutionQueuePort,
+  QueuedExecutionJob,
+} from '@app/execution/application/ports/execution-queue.port';
+import { ExecutionStarter } from '@app/execution/application/services/execution-starter';
+import { WorkflowEngine } from '@app/execution/application/services/workflow-engine';
+import { ExecutionProcessor } from '@app/execution/infrastructure/queue/execution.processor';
+import type { Job } from 'bullmq';
+import {
   AGGREGATE_CONFIG_SCHEMA,
   FILTER_CONFIG_SCHEMA,
   GMAIL_SEND_CONFIG_SCHEMA,
@@ -65,7 +76,7 @@ export class MemoryExecutionRepository extends ExecutionRepository {
     super();
   }
 
-  findVersion(): Promise<WorkflowVersionForExecution | null> {
+  findVersion(_id: string): Promise<WorkflowVersionForExecution | null> {
     return Promise.resolve(this.version);
   }
 
@@ -78,6 +89,27 @@ export class MemoryExecutionRepository extends ExecutionRepository {
     this.created.push(input);
     this.status = input.status;
     return Promise.resolve('execution-1');
+  }
+
+  findExecutionByIdempotencyKey(
+    actorId: string,
+    idempotencyKey: string,
+  ): Promise<ExecutionStartRecord | null> {
+    const record = this.created.find(
+      (execution) =>
+        execution.triggeredById === actorId &&
+        execution.idempotencyKey === idempotencyKey,
+    );
+    if (!record) return Promise.resolve(null);
+    return Promise.resolve({
+      id: 'execution-1',
+      workflowId: record.workflowId,
+      workflowVersionId: record.workflowVersionId,
+      triggerType: record.triggerType,
+      status: this.status ?? record.status,
+      queuedAt: record.queuedAt,
+      startedAt: record.startedAt,
+    });
   }
 
   claimQueuedExecution(): Promise<boolean> {
@@ -130,12 +162,25 @@ export class MemoryExecutionRepository extends ExecutionRepository {
     return Promise.resolve();
   }
 
-  findExecutionResult(): Promise<unknown> {
+  findExecutionResult(_id: string): Promise<unknown> {
     return Promise.resolve({
       id: 'execution-1',
       status: this.finishedStatus,
       nodeLogs: this.logs,
     });
+  }
+
+  findExecutionResultForOwner(id: string, ownerId: string): Promise<unknown> {
+    if (id !== 'execution-1' || ownerId !== this.version.workflowOwnerId) {
+      return Promise.resolve(null);
+    }
+    return this.findExecutionResult(id);
+  }
+
+  listExecutionHistoryForOwner(
+    _query: ExecutionHistoryQuery,
+  ): Promise<ExecutionHistoryPage> {
+    return Promise.resolve({ items: [], nextCursor: null });
   }
 
   failStaleExecutions(): Promise<number> {
@@ -301,6 +346,14 @@ export interface BuildOptions {
   memory?: ChatMemoryPort;
 }
 
+class TestExecutionQueue extends ExecutionQueuePort {
+  jobs: QueuedExecutionJob[] = [];
+
+  async enqueue(job: QueuedExecutionJob): Promise<void> {
+    this.jobs.push(job);
+  }
+}
+
 export function build(definition: unknown, options: BuildOptions = {}) {
   const send =
     options.send ?? jest.fn().mockResolvedValue({ data: { id: 'm' } });
@@ -316,7 +369,7 @@ export function build(definition: unknown, options: BuildOptions = {}) {
     repository.llmConnectorKey = options.llmConnectorKey;
   }
 
-  const handler = new StartExecutionHandler(
+  const engine = new WorkflowEngine(
     repository,
     [
       new ManualTriggerExecutor(),
@@ -344,15 +397,22 @@ export function build(definition: unknown, options: BuildOptions = {}) {
     ],
     options.catalog ?? new FakeCatalog(),
   );
+  const queue = new TestExecutionQueue();
+  const starter = new ExecutionStarter(repository, queue);
+  const processor = new ExecutionProcessor(repository, engine);
+  const handler = new StartExecutionHandler(repository, engine, starter);
 
-  const run = async () =>
-    (await handler.execute(
-      new StartExecutionCommand('version-1', 'actor-1'),
-    )) as {
+  const start = () =>
+    handler.execute(new StartExecutionCommand('version-1', 'actor-1'));
+  const run = async () => {
+    const accepted = await start();
+    await processor.process({ data: queue.jobs[0] } as Job<QueuedExecutionJob>);
+    return (await repository.findExecutionResult(accepted.id)) as {
       nodeLogs: NodeLogRecord[];
       status: ExecutionStatus;
     };
-  return { run, send, llm };
+  };
+  return { start, run, repository, queue, send, llm };
 }
 
 export const logOf = (nodeLogs: NodeLogRecord[], key: string) =>
