@@ -5,7 +5,10 @@ import { AuthModule } from '@app/auth';
 import { ExecutionController } from './presentation/http/execution.controller';
 import { StartExecutionHandler } from './application/commands/start-execution/start-execution.command';
 import { EnqueueExecutionHandler } from './application/commands/enqueue-execution/enqueue-execution.command';
+import { GetExecutionHandler } from './application/queries/get-execution/get-execution.query';
+import { ListExecutionsHandler } from './application/queries/list-executions/list-executions.query';
 import { WorkflowEngine } from './application/services/workflow-engine';
+import { ExecutionStarter } from './application/services/execution-starter';
 import { ExecutionQueuePort } from './application/ports/execution-queue.port';
 import {
   BullMqExecutionQueue,
@@ -145,9 +148,12 @@ import { INodeExecutor } from './domain/entities/node-executor';
       inject: [ExecutionRepository, 'NODE_EXECUTORS', NodeCatalogPort],
     },
     { provide: ExecutionQueuePort, useClass: BullMqExecutionQueue },
+    ExecutionStarter,
     ExecutionProcessor,
     StartExecutionHandler,
     EnqueueExecutionHandler,
+    GetExecutionHandler,
+    ListExecutionsHandler,
   ],
 })
 export class ExecutionModule {}

@@ -2,6 +2,9 @@ import { ExecutionStatus } from '../constants/execution.constants';
 import {
   WorkflowVersionForExecution,
   ExecutionRecord,
+  ExecutionHistoryQuery,
+  ExecutionHistoryPage,
+  ExecutionStartRecord,
   NodeLogRecord,
   ResolvedCredential,
 } from '../models/execution.types';
@@ -9,6 +12,10 @@ import {
 export abstract class ExecutionRepository {
   abstract findVersion(id: string): Promise<WorkflowVersionForExecution | null>;
   abstract createExecution(input: Omit<ExecutionRecord, 'id'>): Promise<string>;
+  abstract findExecutionByIdempotencyKey(
+    actorId: string,
+    idempotencyKey: string,
+  ): Promise<ExecutionStartRecord | null>;
   abstract resolveCredential(
     credentialId: string,
     ownerId: string,
@@ -21,6 +28,13 @@ export abstract class ExecutionRepository {
     durationMs: number,
   ): Promise<void>;
   abstract findExecutionResult(id: string): Promise<unknown>;
+  abstract findExecutionResultForOwner(
+    id: string,
+    ownerId: string,
+  ): Promise<unknown>;
+  abstract listExecutionHistoryForOwner(
+    query: ExecutionHistoryQuery,
+  ): Promise<ExecutionHistoryPage>;
   // QUEUED -> RUNNING when the queue picks the run up. False when the run is
   // no longer queued (already failed or taken), so it must not run.
   abstract claimQueuedExecution(id: string, startedAt: Date): Promise<boolean>;

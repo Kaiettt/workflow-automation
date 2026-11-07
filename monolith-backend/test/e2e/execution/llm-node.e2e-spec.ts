@@ -90,18 +90,29 @@ describe('LLM node (e2e)', () => {
         },
       },
     });
-    const res = await request(getServer())
+    const accepted = await request(getServer())
       .post('/api/executions')
       .send({ workflow_version_id: version.id })
-      .expect(201);
-    return res.body.data as {
-      status: string;
-      nodeLogs: Array<{
-        status: string;
-        output: any;
-        errorMessage: string | null;
-      }>;
-    };
+      .expect(202);
+    const executionId = accepted.body.data.id as string;
+
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const result = await request(getServer())
+        .get(`/api/executions/${executionId}`)
+        .expect(200);
+      if (!['QUEUED', 'RUNNING'].includes(result.body.data.status)) {
+        return result.body.data as {
+          status: string;
+          nodeLogs: Array<{
+            status: string;
+            output: any;
+            errorMessage: string | null;
+          }>;
+        };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error(`Execution ${executionId} did not finish in time`);
   }
 
   beforeAll(async () => {

@@ -62,7 +62,8 @@ export class WorkflowEngine {
         input.triggerType === TriggerType.MANUAL
           ? ExecutionStatus.RUNNING
           : ExecutionStatus.QUEUED,
-      startedAt,
+      queuedAt: startedAt,
+      startedAt: input.triggerType === TriggerType.MANUAL ? startedAt : null,
       context:
         input.triggerType === TriggerType.MANUAL
           ? undefined
