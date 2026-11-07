@@ -1,0 +1,12 @@
+{
+  "ai-session-logger": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node scripts/log-ai-session.cjs",
+        "timeout": 15
+      }
+    ]
+  }
+}
+

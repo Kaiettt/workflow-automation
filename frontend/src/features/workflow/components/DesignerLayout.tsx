@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { PropertiesPanel } from './PropertiesPanel';
 import { ActiveToggle } from './ActiveToggle';
 import { Canvas } from './Canvas';
+import { TemplateGalleryDialog } from './TemplateGalleryDialog';
+import type { WorkflowTemplate } from '../templates/catalog';
 import { useDesignerStore } from '../store/designer.store';
 import { Button } from '@/components/ui/button';
 import { History, ArrowLeft, GitBranch, AlertCircle } from 'lucide-react';
@@ -24,6 +27,7 @@ interface DesignerLayoutProps {
   onViewVersions?: () => void;
   validationIssuesCount?: number;
   onOpenValidation?: () => void;
+  onUseTemplate: (template: WorkflowTemplate) => Promise<boolean>;
 }
 
 export function DesignerLayout({
@@ -43,8 +47,20 @@ export function DesignerLayout({
   onViewVersions,
   validationIssuesCount,
   onOpenValidation,
+  onUseTemplate,
 }: DesignerLayoutProps) {
   const setSelectedNodeId = useDesignerStore((state) => state.setSelectedNodeId);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [usingTemplate, setUsingTemplate] = useState(false);
+
+  const handleUseTemplate = async (template: WorkflowTemplate) => {
+    setUsingTemplate(true);
+    try {
+      if (await onUseTemplate(template)) setTemplatesOpen(false);
+    } finally {
+      setUsingTemplate(false);
+    }
+  };
 
   // Removes the node together with the edges attached to it.
   const handleDeleteNode = (nodeId: string) => {
@@ -103,6 +119,9 @@ export function DesignerLayout({
               Version History
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setTemplatesOpen(true)} className="text-xs">
+            Templates
+          </Button>
           {onViewVersions && (
             <Button
               variant="outline"
@@ -143,6 +162,7 @@ export function DesignerLayout({
           onDeleteNode={handleDeleteNode}
         />
       </main>
+      <TemplateGalleryDialog open={templatesOpen} onOpenChange={setTemplatesOpen} onSelect={(template) => void handleUseTemplate(template)} busy={usingTemplate} />
     </div>
   );
 }

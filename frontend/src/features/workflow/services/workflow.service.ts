@@ -19,9 +19,9 @@ function isValidationIssue(value: unknown): value is WorkflowValidationIssue {
 }
 
 export const workflowService = {
-  async createWorkflow(): Promise<string> {
+  async createWorkflow(name?: string): Promise<string> {
     try {
-      const data = await workflowApi.createWorkflow();
+      const data = await workflowApi.createWorkflow(name);
       return data.id;
     } catch (error: unknown) {
       throw new Error('Failed to create workflow', { cause: error });
@@ -33,6 +33,22 @@ export const workflowService = {
       return await workflowApi.getWorkflows();
     } catch (error: unknown) {
       throw new Error('Failed to get workflows', { cause: error });
+    }
+  },
+
+  async renameWorkflow(id: string, name: string): Promise<void> {
+    try {
+      await workflowApi.renameWorkflow(id, name);
+    } catch (error: unknown) {
+      throw new Error('Failed to rename workflow', { cause: error });
+    }
+  },
+
+  async deleteWorkflow(id: string): Promise<void> {
+    try {
+      await workflowApi.deleteWorkflow(id);
+    } catch (error: unknown) {
+      throw new Error('Failed to delete workflow', { cause: error });
     }
   },
 

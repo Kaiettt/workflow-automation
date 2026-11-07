@@ -5,4 +5,5 @@ export abstract class WorkflowRepository {
   abstract findByOwnerId(ownerId: string): Promise<Workflow[]>;
   abstract create(workflow: Workflow): Promise<string>;
   abstract update(workflow: Workflow): Promise<void>;
+  abstract delete(id: string): Promise<void>;
 }

@@ -46,4 +46,11 @@ export class PrismaWorkflowRepository implements WorkflowRepository {
       },
     });
   }
+
+  async delete(id: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.execution.deleteMany({ where: { workflowId: id } });
+      await tx.workflow.delete({ where: { id } });
+    });
+  }
 }

@@ -14,6 +14,7 @@ import {
   type WorkflowValidationIssue,
 } from '../models/workflow-validation.model';
 import { resolveOutputs, outputOfHandle } from '../utils/node-outputs';
+import type { WorkflowTemplate } from '../templates/catalog';
 
 interface DesignerPageProps {
   workflowId?: string;
@@ -301,6 +302,17 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
     [setNodes, setEdges],
   );
 
+  const handleUseTemplate = useCallback(async (template: WorkflowTemplate) => {
+    if (nodes.length > 0 && !window.confirm('Replace the current draft with this template?')) return false;
+    const nextNodes = structuredClone(template.nodes);
+    const nextEdges = structuredClone(template.edges);
+    setNodes(nextNodes);
+    setEdges(nextEdges);
+    useDesignerStore.getState().setSelectedNodeId(null);
+    await saveDraft(nextNodes, nextEdges);
+    return true;
+  }, [nodes.length, saveDraft, setNodes, setEdges]);
+
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-gray-50">
@@ -340,6 +352,7 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
             : 0
         }
         onOpenValidation={() => setValidationDialogOpen(true)}
+        onUseTemplate={handleUseTemplate}
       />
       <VersionHistoryDialog
         workflowId={workflowId}

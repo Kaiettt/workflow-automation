@@ -3,9 +3,12 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
+  Delete,
   Body,
   Param,
   NotFoundException,
+  BadRequestException,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -24,10 +27,12 @@ import {
   AuthenticatedUser,
 } from '@app/auth/infrastructure/decorators/current-user.decorator';
 import { CreateWorkflowCommand } from '../../application/commands/create-workflow.command';
+import { RenameWorkflowCommand } from '../../application/commands/rename-workflow.command';
+import { DeleteWorkflowCommand } from '../../application/commands/delete-workflow.command';
 import { PublishWorkflowCommand } from '../../application/commands/publish-workflow.command';
 import { RestoreVersionCommand } from '../../application/commands/restore-version.command';
 import { GetDraftStatusQuery } from '../../application/queries/get-draft-status.query';
-import { CreateWorkflowDto } from './dtos/create-workflow.dto';
+import { CreateWorkflowDto, RenameWorkflowDto } from './dtos/create-workflow.dto';
 import { RestoreVersionDto } from './dtos/restore-version.dto';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
 import { WorkflowVersionRepository } from '../../domain/repositories/workflow-version.repository';
@@ -60,6 +65,36 @@ export class WorkflowsController {
         updatedAt: w.updatedAt,
       })),
     };
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Rename a workflow owned by caller' })
+  async renameWorkflow(
+    @Param('id') id: string,
+    @Body() body: RenameWorkflowDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const name = body.name.trim();
+    if (!name || name.length > 255) {
+      throw new BadRequestException('Workflow name must be between 1 and 255 characters.');
+    }
+    await this.commandBus.execute(new RenameWorkflowCommand(id, user.id, name));
+    return { success: true, data: { id, name } };
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete a workflow and its execution history' })
+  async deleteWorkflow(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.commandBus.execute(new DeleteWorkflowCommand(id, user.id));
+    return { success: true, data: { id } };
   }
 
   @Post(':id/versions')
