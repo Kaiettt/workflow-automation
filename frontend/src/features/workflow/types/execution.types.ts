@@ -27,7 +27,7 @@ export interface ExecutionResult {
   nodeLogs?: NodeLogRecord[];
 }
 
-export interface ExecutionHistoryItem extends Omit<ExecutionResult, 'nodeLogs'> {}
+export type ExecutionHistoryItem = Omit<ExecutionResult, 'nodeLogs'>;
 
 export interface ExecutionHistoryPage {
   items: ExecutionHistoryItem[];

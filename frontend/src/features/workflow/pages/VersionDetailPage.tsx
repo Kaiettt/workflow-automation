@@ -263,22 +263,15 @@ export const VersionDetailPage: React.FC = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedExecutionId = searchParams.get('execution');
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
-    requestedExecutionId,
-  );
+  const selectedExecutionId = requestedExecutionId;
   const { data: executionResult, isError: executionError } =
     useExecution(selectedExecutionId);
   const { data: executionHistory } = useExecutionHistory(workflowId, versionId);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState(false);
 
-  useEffect(() => {
-    setSelectedExecutionId(requestedExecutionId);
-  }, [requestedExecutionId]);
-
   const selectExecution = useCallback(
     (executionId: string) => {
-      setSelectedExecutionId(executionId);
       setExpandedNodes({});
       setSearchParams((current) => {
         current.set('execution', executionId);
