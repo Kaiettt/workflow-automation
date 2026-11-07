@@ -12,8 +12,18 @@ export const GOOGLE_SHEET_READ_ROWS_CONFIG_SCHEMA = {
   'x-propertyOrder': ['credential_id', 'spreadsheet_id', 'sheet_name'],
   properties: {
     credential_id: { type: 'string', 'x-connectorKey': 'google' },
-    spreadsheet_id: { type: 'string' },
-    sheet_name: { type: 'string' },
+    spreadsheet_id: {
+      type: 'string',
+      title: 'Spreadsheet ID',
+      'x-placeholder': 'e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+      description: 'Chuỗi ID nằm giữa /d/ và /edit trong link Google Sheet',
+    },
+    sheet_name: {
+      type: 'string',
+      title: 'Sheet Name',
+      'x-placeholder': 'e.g. Sheet1 hoặc Trang tính1',
+      description: 'Tên tab trang tính trong bảng Google Sheet',
+    },
   },
 };
 
@@ -23,7 +33,12 @@ export const FILTER_CONFIG_SCHEMA = {
   required: ['field', 'operator', 'value'],
   'x-propertyOrder': ['field', 'operator', 'value'],
   properties: {
-    field: { type: 'string' },
+    field: {
+      type: 'string',
+      title: 'Field Path',
+      'x-placeholder': 'e.g. status hoặc customer.age',
+      description: 'Đường dẫn trường trong item (chỉ gõ tên trường, không dùng {{}})',
+    },
     operator: { type: 'string', enum: ['equals', 'not_equals', 'contains'] },
     value: { type: 'string', 'x-allowExpression': true },
   },
@@ -267,8 +282,21 @@ export const GMAIL_SEND_CONFIG_SCHEMA = {
       'x-allowExpression': true,
       default: '{{$json.email}}',
     },
-    subject: { type: 'string', 'x-allowExpression': true },
-    body: { type: 'string', 'x-allowExpression': true },
+    subject: {
+      type: 'string',
+      title: 'Subject',
+      'x-allowExpression': true,
+      'x-placeholder': 'e.g. Thông báo đơn hàng #{{$json.order_id}}',
+      description: 'Tiêu đề email gửi đi',
+    },
+    body: {
+      type: 'string',
+      title: 'Body',
+      'x-allowExpression': true,
+      'x-multiline': true,
+      'x-placeholder': 'e.g. Xin chào {{$json.name}},\n\nĐơn hàng của bạn đã sẵn sàng...',
+      description: 'Nội dung email (hỗ trợ văn bản nhiều dòng và biểu thức)',
+    },
   },
 };
 
@@ -326,6 +354,8 @@ export const LLM_GENERATE_CONFIG_SCHEMA = {
       title: 'System prompt',
       'x-allowExpression': true,
       'x-multiline': true,
+      'x-placeholder': 'e.g. Bạn là trợ lý tư vấn chuyên nghiệp, trả lời ngắn gọn...',
+      description: 'Chỉ dẫn vai trò hoặc quy tắc xử lý cho AI',
     },
     history: {
       type: 'string',
@@ -339,6 +369,8 @@ export const LLM_GENERATE_CONFIG_SCHEMA = {
       title: 'Prompt',
       'x-allowExpression': true,
       'x-multiline': true,
+      'x-placeholder': 'e.g. {{$json.text}} hoặc Hãy tóm tắt: {{$json.body}}',
+      description: 'Nội dung hoặc câu hỏi cần AI xử lý',
     },
     output_format: {
       type: 'string',

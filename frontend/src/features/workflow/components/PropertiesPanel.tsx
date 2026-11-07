@@ -15,6 +15,8 @@ import { ConfigField } from './config-fields/ConfigField';
 import { WebhookUrlField } from './config-fields/WebhookUrlField';
 import { TestEventPanel } from './TestEventPanel';
 import { triggerService } from '../services/trigger.service';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { NodeOutputInspector } from './NodeOutputInspector';
 
 interface PropertiesPanelProps {
   workflowId: string;
@@ -121,7 +123,15 @@ export function PropertiesPanel({
   return (
     <aside className={PANEL_CLASS}>
       <div className="p-4 border-b border-gray-200">
-        <p className="text-xs text-gray-500 uppercase tracking-wider">{nodeType.displayName}</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider">{nodeType.displayName}</p>
+          <span className="text-[10px] font-mono text-muted-foreground uppercase">{nodeType.category}</span>
+        </div>
+        {nodeType.description && (
+          <p className="text-xs text-muted-foreground mt-1 line-clamp-2" title={nodeType.description}>
+            {nodeType.description}
+          </p>
+        )}
         <Label htmlFor="node-name" className="mt-2 mb-1.5">
           Name
         </Label>
@@ -141,12 +151,17 @@ export function PropertiesPanel({
         )}
       </div>
 
-      <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">
+      <Tabs defaultValue="config" className="min-h-0 flex-1 p-3">
+        <TabsList aria-label="Node properties">
+          <TabsTrigger value="config">Configuration</TabsTrigger>
+          <TabsTrigger value="output">Output & Inspector</TabsTrigger>
+        </TabsList>
+        <TabsContent value="config" className="mt-3 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-1">
         {webhook?.scope === 'node' && (
           <WebhookUrlField workflowId={workflowId} nodeId={selectedNode.id} />
         )}
         {fields.length === 0 && !webhook ? (
-          <div className="text-sm text-gray-500 italic">No configuration required.</div>
+          <div className="text-sm text-gray-500 italic">No configuration is required for this node.</div>
         ) : (
           fields.map(([key, schema]) => (
             <ConfigField
@@ -169,7 +184,11 @@ export function PropertiesPanel({
             draftSaving={isSaving}
           />
         )}
-      </div>
+        </TabsContent>
+        <TabsContent value="output" className="mt-3 min-h-0 flex-1 overflow-y-auto p-1">
+          <NodeOutputInspector nodeKey={nodeType.key} nodeName={nodeName} />
+        </TabsContent>
+      </Tabs>
 
       <div className="p-4 border-t border-gray-200">
         <Button

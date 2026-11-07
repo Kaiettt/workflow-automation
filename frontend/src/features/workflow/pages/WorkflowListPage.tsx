@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { workflowService } from '../services/workflow.service';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Card,
@@ -28,12 +29,71 @@ import {
   Sparkles,
   Home,
   Layers,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import type { WorkflowSummary } from '../types/workflow.types';
+import { TemplateGalleryDialog } from '../components/TemplateGalleryDialog';
+import type { WorkflowTemplate } from '../templates/catalog';
 
 export const WorkflowListPage: React.FC = () => {
   const navigate = useNavigate();
   const { data: workflows, isLoading, isError, refetch } = useWorkflows();
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [deletingWorkflow, setDeletingWorkflow] = useState<WorkflowSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
+
+  const handleCreateFromTemplate = async (template: WorkflowTemplate) => {
+    try {
+      setCreatingTemplate(true);
+      const workflowId = await workflowService.createWorkflow(template.title);
+      await workflowService.saveDraft(workflowId, {
+        nodes: structuredClone(template.nodes),
+        edges: structuredClone(template.edges),
+        viewport: { x: 0, y: 0, zoom: 1 },
+      });
+      navigate(`/workflows/${workflowId}`);
+    } catch {
+      setActionError('Could not create a workflow from this template. Please try again.');
+    } finally {
+      setCreatingTemplate(false);
+    }
+  };
+
+  const handleRename = async () => {
+    if (!editingId || !editingName.trim()) return;
+    try {
+      setSavingName(true);
+      await workflowService.renameWorkflow(editingId, editingName.trim());
+      setEditingId(null);
+      await refetch();
+    } catch {
+      setActionError('Could not rename the workflow. Please try again.');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingWorkflow) return;
+    try {
+      setDeleting(true);
+      await workflowService.deleteWorkflow(deletingWorkflow.id);
+      setDeletingWorkflow(null);
+      await refetch();
+    } catch {
+      setActionError('Could not delete the workflow. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleCreateNew = async () => {
     try {
@@ -109,14 +169,23 @@ export const WorkflowListPage: React.FC = () => {
             </p>
           </div>
 
-          <Button
-            onClick={handleCreateNew}
-            disabled={creating}
-            className="w-fit gap-1.5 text-xs"
-          >
-            <Plus className="size-4" />
-            <span>Tạo Workflow mới</span>
-          </Button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setTemplatesOpen(true)}
+              className="w-fit gap-1.5 text-xs"
+            >
+              Browse templates
+            </Button>
+            <Button
+              onClick={handleCreateNew}
+              disabled={creating}
+              className="w-fit gap-1.5 text-xs"
+            >
+              <Plus className="size-4" />
+              <span>{creating ? 'Đang tạo...' : 'Tạo Workflow mới'}</span>
+            </Button>
+          </div>
         </div>
 
         {/* Content Area */}
@@ -183,10 +252,18 @@ export const WorkflowListPage: React.FC = () => {
                         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                           <WorkflowIcon className="size-4" />
                         </div>
-                        <div>
-                          <div className="font-semibold text-foreground text-sm hover:underline cursor-pointer" onClick={() => navigate(`/workflows/${wf.id}`)}>
-                            {wf.name || 'Untitled Workflow'}
-                          </div>
+                        <div className="min-w-0">
+                          {editingId === wf.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input aria-label="Workflow name" autoFocus value={editingName} onChange={(event) => setEditingName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void handleRename(); if (event.key === 'Escape') setEditingId(null); }} className="h-8 min-w-32" />
+                              <Button size="sm" className="h-8" disabled={!editingName.trim() || savingName} onClick={() => void handleRename()}>{savingName ? 'Saving…' : 'Save'}</Button>
+                              <Button size="sm" variant="ghost" className="h-8" disabled={savingName} onClick={() => setEditingId(null)}>Cancel</Button>
+                            </div>
+                          ) : (
+                            <button type="button" className="text-left font-semibold text-foreground text-sm hover:underline" onClick={() => navigate(`/workflows/${wf.id}`)}>
+                              {wf.name || 'Untitled workflow'}
+                            </button>
+                          )}
                           <div className="text-[11px] font-mono text-muted-foreground truncate max-w-[200px]">
                             {wf.id}
                           </div>
@@ -238,6 +315,12 @@ export const WorkflowListPage: React.FC = () => {
                           <span>Mở Designer</span>
                           <ArrowRight className="size-3" />
                         </Button>
+                        <Button variant="ghost" size="icon" aria-label={`Rename ${wf.name}`} title="Rename workflow" disabled={savingName || deleting} onClick={() => { setEditingId(wf.id); setEditingName(wf.name); }}>
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" aria-label={`Delete ${wf.name}`} title="Delete workflow" className="text-destructive hover:text-destructive" disabled={deleting} onClick={() => setDeletingWorkflow(wf)}>
+                          <Trash2 className="size-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -246,7 +329,23 @@ export const WorkflowListPage: React.FC = () => {
             </Table>
           </div>
         )}
+        {actionError && <p role="alert" className="mt-4 text-sm text-destructive">{actionError}</p>}
       </main>
+      <TemplateGalleryDialog open={templatesOpen} onOpenChange={setTemplatesOpen} onSelect={(template) => void handleCreateFromTemplate(template)} busy={creatingTemplate} />
+      <Dialog open={Boolean(deletingWorkflow)} onOpenChange={(open) => { if (!open && !deleting) setDeletingWorkflow(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete workflow?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes “{deletingWorkflow?.name}”, including its published versions and execution history. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={deleting} onClick={() => setDeletingWorkflow(null)}>Cancel</Button>
+            <Button variant="destructive" disabled={deleting} onClick={() => void handleDelete()}>{deleting ? 'Deleting…' : 'Delete workflow'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

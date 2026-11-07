@@ -5,6 +5,8 @@ import { WorkflowDraftsController } from './presentation/http/workflow-drafts.co
 import { WorkflowsController } from './presentation/http/workflows.controller';
 import { SaveDraftHandler } from './application/commands/save-draft.command';
 import { CreateWorkflowHandler } from './application/commands/create-workflow.command';
+import { RenameWorkflowHandler } from './application/commands/rename-workflow.command';
+import { DeleteWorkflowHandler } from './application/commands/delete-workflow.command';
 import { GetWorkflowDraftHandler } from './application/queries/get-workflow-draft.query';
 import { PrismaWorkflowRepository } from './infrastructure/persistence/prisma-workflow.repository';
 import { PrismaWorkflowDraftRepository } from './infrastructure/persistence/prisma-workflow-draft.repository';
@@ -21,6 +23,8 @@ import { NodeLibraryModule } from '@app/node-library';
 const CommandHandlers = [
   SaveDraftHandler,
   CreateWorkflowHandler,
+  RenameWorkflowHandler,
+  DeleteWorkflowHandler,
   PublishWorkflowHandler,
   RestoreVersionHandler,
 ];

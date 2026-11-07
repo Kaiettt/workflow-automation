@@ -5,10 +5,10 @@ import type { PublishResult } from '../types/workflow.types';
 
 
 export const workflowApi = {
-  createWorkflow: async (): Promise<{ id: string }> => {
+  createWorkflow: async (name = 'New Workflow'): Promise<{ id: string }> => {
     const user = useAuthStore.getState().user;
     const body: { name: string; ownerId?: string } = {
-      name: 'New Workflow',
+      name,
     };
     if (user?.id) {
       body.ownerId = user.id;
@@ -26,6 +26,14 @@ export const workflowApi = {
       '/api/workflows',
     );
     return res.data.data;
+  },
+
+  renameWorkflow: async (id: string, name: string): Promise<void> => {
+    await apiClient.patch(`/api/workflows/${id}`, { name });
+  },
+
+  deleteWorkflow: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/workflows/${id}`);
   },
 
   getDraft: async (id: string): Promise<unknown> => {
