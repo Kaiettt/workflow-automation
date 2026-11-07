@@ -9,7 +9,7 @@ export class EnqueueExecutionCommand {
   ) {}
 }
 
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { ExecutionRepository } from '../../../domain/repositories/execution.repository';
 import { TriggerType } from '../../../domain/constants/execution.constants';

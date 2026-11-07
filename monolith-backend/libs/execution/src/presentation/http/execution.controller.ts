@@ -57,7 +57,7 @@ export class ExecutionController {
     @Param('executionId') executionId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const result = await this.queryBus.execute(
+    const result: unknown = await this.queryBus.execute(
       new GetExecutionQuery(executionId, user.id),
     );
     return { success: true, data: result };
@@ -69,7 +69,7 @@ export class ExecutionController {
     @Query() query: ListExecutionsDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const result = await this.queryBus.execute(
+    const result: unknown = await this.queryBus.execute(
       new ListExecutionsQuery(
         query.workflow_id,
         user.id,

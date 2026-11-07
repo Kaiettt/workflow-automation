@@ -13,9 +13,10 @@ class FakeQueue extends ExecutionQueuePort {
   jobs: QueuedExecutionJob[] = [];
   failure: Error | null = null;
 
-  async enqueue(job: QueuedExecutionJob): Promise<void> {
-    if (this.failure) throw this.failure;
+  enqueue(job: QueuedExecutionJob): Promise<void> {
+    if (this.failure) return Promise.reject(this.failure);
     this.jobs.push(job);
+    return Promise.resolve();
   }
 }
 
@@ -53,9 +54,10 @@ describe('ExecutionStarter', () => {
       workflowVersionId: 'version-1',
       triggerType: TriggerType.MANUAL,
       status: ExecutionStatus.QUEUED,
-      queuedAt: expect.any(Date),
+      queuedAt: result.queuedAt,
       startedAt: null,
     });
+    expect(result.queuedAt).toBeInstanceOf(Date);
     expect(repository.created).toEqual([
       expect.objectContaining({
         workflowId: 'workflow-1',

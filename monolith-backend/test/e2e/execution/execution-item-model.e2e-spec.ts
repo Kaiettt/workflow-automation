@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, INestApplication } from '@nestjs/common';
+import { Server } from 'node:http';
 import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { PrismaModule } from '@app/database';
@@ -19,8 +20,7 @@ describe('Execution item model (e2e)', () => {
   const ownerId = randomUUID();
   const workflowIds: string[] = [];
 
-  const getServer = () =>
-    app.getHttpServer() as unknown as Parameters<typeof request>[0];
+  const getServer = (): Server => app.getHttpServer() as Server;
 
   async function publish(definition: unknown): Promise<string> {
     const workflow = await prisma.workflow.create({
@@ -50,7 +50,8 @@ describe('Execution item model (e2e)', () => {
       const result = await request(getServer())
         .get(`/api/executions/${executionId}`)
         .expect(200);
-      if (!['QUEUED', 'RUNNING'].includes(result.body.data.status)) {
+      const status: unknown = result.body.data.status;
+      if (status !== 'QUEUED' && status !== 'RUNNING') {
         return result.body.data as {
           status: string;
           nodeLogs: Array<{

@@ -8,7 +8,6 @@ import { ExecutionRepository } from '@app/execution/domain/repositories/executio
 import {
   ExecutionRecord,
   ExecutionStartRecord,
-  ExecutionHistoryQuery,
   ExecutionHistoryPage,
   NodeLogRecord,
   ResolvedCredential,
@@ -76,8 +75,8 @@ export class MemoryExecutionRepository extends ExecutionRepository {
     super();
   }
 
-  findVersion(_id: string): Promise<WorkflowVersionForExecution | null> {
-    return Promise.resolve(this.version);
+  findVersion(id: string): Promise<WorkflowVersionForExecution | null> {
+    return Promise.resolve(id === this.version.id ? this.version : null);
   }
 
   created: Array<Omit<ExecutionRecord, 'id'>> = [];
@@ -156,13 +155,15 @@ export class MemoryExecutionRepository extends ExecutionRepository {
     return Promise.resolve();
   }
 
-  finishExecution(_id: string, status: ExecutionStatus): Promise<void> {
+  finishExecution(id: string, status: ExecutionStatus): Promise<void> {
+    if (id !== 'execution-1') return Promise.resolve();
     this.finishedStatus = status;
     this.status = status;
     return Promise.resolve();
   }
 
-  findExecutionResult(_id: string): Promise<unknown> {
+  findExecutionResult(id: string): Promise<unknown> {
+    if (id !== 'execution-1') return Promise.resolve(null);
     return Promise.resolve({
       id: 'execution-1',
       status: this.finishedStatus,
@@ -177,9 +178,7 @@ export class MemoryExecutionRepository extends ExecutionRepository {
     return this.findExecutionResult(id);
   }
 
-  listExecutionHistoryForOwner(
-    _query: ExecutionHistoryQuery,
-  ): Promise<ExecutionHistoryPage> {
+  listExecutionHistoryForOwner(): Promise<ExecutionHistoryPage> {
     return Promise.resolve({ items: [], nextCursor: null });
   }
 
@@ -349,8 +348,9 @@ export interface BuildOptions {
 class TestExecutionQueue extends ExecutionQueuePort {
   jobs: QueuedExecutionJob[] = [];
 
-  async enqueue(job: QueuedExecutionJob): Promise<void> {
+  enqueue(job: QueuedExecutionJob): Promise<void> {
     this.jobs.push(job);
+    return Promise.resolve();
   }
 }
 

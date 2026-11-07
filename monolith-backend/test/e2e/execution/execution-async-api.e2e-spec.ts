@@ -1,12 +1,14 @@
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { Test } from '@nestjs/testing';
 import { ExecutionContext, INestApplication } from '@nestjs/common';
+import { Server } from 'node:http';
 import request from 'supertest';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
 import { ExecutionController } from '@app/execution/presentation/http/execution.controller';
 
 describe('Execution async API', () => {
   let app: INestApplication;
+  const getServer = (): Server => app.getHttpServer() as Server;
   const execution = {
     id: 'execution-1',
     workflowId: 'workflow-1',
@@ -39,7 +41,9 @@ describe('Execution async API', () => {
       .overrideGuard(JwtAuthGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => {
-          const request = context.switchToHttp().getRequest();
+          const request = context
+            .switchToHttp()
+            .getRequest<{ user: { id: string; email: string } }>();
           request.user = { id: 'actor-1', email: 'actor@example.test' };
           return true;
         },
@@ -55,7 +59,7 @@ describe('Execution async API', () => {
   });
 
   it('accepts a manual execution with 202 and returns its queued resource', async () => {
-    await request(app.getHttpServer())
+    await request(getServer())
       .post('/api/executions')
       .set('Idempotency-Key', 'intent-1')
       .send({ workflow_version_id: 'version-1' })
@@ -73,7 +77,7 @@ describe('Execution async API', () => {
   });
 
   it('returns the current execution resource for polling', async () => {
-    await request(app.getHttpServer())
+    await request(getServer())
       .get('/api/executions/execution-1')
       .expect(200)
       .expect(({ body }) => {
@@ -82,7 +86,7 @@ describe('Execution async API', () => {
   });
 
   it('lists recent executions for a workflow and version', async () => {
-    await request(app.getHttpServer())
+    await request(getServer())
       .get('/api/executions')
       .query({ workflow_id: 'workflow-1', workflow_version_id: 'version-1' })
       .expect(200)
