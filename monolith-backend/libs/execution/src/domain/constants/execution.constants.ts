@@ -9,6 +9,7 @@ export enum ExecutionStatus {
 export enum TriggerType {
   MANUAL = 'MANUAL',
   WEBHOOK = 'WEBHOOK',
+  SCHEDULE = 'SCHEDULE',
 }
 
 export const NodeKeys = {

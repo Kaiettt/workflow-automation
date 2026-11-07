@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   ReactFlow,
   Background,
@@ -58,8 +58,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { useWorkflowVersion } from '../hooks/useWorkflowVersions';
 import { useStartExecution } from '../hooks/useStartExecution';
-import type { ExecutionResult } from '../types/execution.types';
+import { useExecution } from '../hooks/useExecution';
+import { useExecutionHistory } from '../hooks/useExecutionHistory';
+import { ExecutionHistoryList } from '../components/ExecutionHistoryList';
 import { countItems } from '../utils/node-config';
+import { mapExecutionNodeStates } from '../utils/execution-view.util';
 import { EventTriggerInfo } from '../components/EventTriggerInfo';
 import { triggerService } from '../services/trigger.service';
 import { workflowService } from '../services/workflow.service';
@@ -258,9 +261,32 @@ export const VersionDetailPage: React.FC = () => {
     refetch,
   } = useWorkflowVersion(workflowId, versionId);
 
-  const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedExecutionId = searchParams.get('execution');
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
+    requestedExecutionId,
+  );
+  const { data: executionResult, isError: executionError } =
+    useExecution(selectedExecutionId);
+  const { data: executionHistory } = useExecutionHistory(workflowId, versionId);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState(false);
+
+  useEffect(() => {
+    setSelectedExecutionId(requestedExecutionId);
+  }, [requestedExecutionId]);
+
+  const selectExecution = useCallback(
+    (executionId: string) => {
+      setSelectedExecutionId(executionId);
+      setExpandedNodes({});
+      setSearchParams((current) => {
+        current.set('execution', executionId);
+        return current;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
 
   const definition = useMemo(() => {
     return (
@@ -314,64 +340,8 @@ export const VersionDetailPage: React.FC = () => {
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const startExecutionMutation = useStartExecution({
-    onSuccess: (data: ExecutionResult) => {
-      setExecutionResult(data);
-
-      // Update nodes on canvas with actual backend results
-      setNodes((prev) =>
-        prev.map((n) => {
-          const log = data.nodeLogs?.find((l) => l.nodeId === n.id);
-          if (log) {
-            if (log.status === 'SUCCESS') {
-              return {
-                ...n,
-                data: {
-                  ...n.data,
-                  status: 'success',
-                  outputSummary: `✓ Thành công (${log.durationMs ?? 0}ms)`,
-                  errorMessage: undefined,
-                  durationMs: log.durationMs ?? undefined,
-                },
-              };
-            } else if (log.status === 'SKIPPED') {
-              return {
-                ...n,
-                data: {
-                  ...n.data,
-                  status: 'skipped',
-                  outputSummary: undefined,
-                  errorMessage: undefined,
-                  durationMs: undefined,
-                },
-              };
-            } else {
-              return {
-                ...n,
-                data: {
-                  ...n.data,
-                  status: 'failed',
-                  outputSummary: undefined,
-                  errorMessage: log.errorMessage || 'Lỗi thực thi',
-                  durationMs: log.durationMs ?? undefined,
-                },
-              };
-            }
-          }
-          return n;
-        }),
-      );
-
-      // Animate edges
-      setEdges((prev) =>
-        prev.map((e) => ({
-          ...e,
-          animated: true,
-          style: {
-            stroke: data.status === 'SUCCESS' ? '#10b981' : '#f43f5e',
-            strokeWidth: 2,
-          },
-        })),
-      );
+    onSuccess: (data) => {
+      selectExecution(data.id);
     },
     onError: (err: unknown) => {
       console.error('Run execution error:', err);
@@ -383,16 +353,52 @@ export const VersionDetailPage: React.FC = () => {
     },
   });
 
+  useEffect(() => {
+    if (!executionResult) return;
+    setNodes((previous) => {
+      const states = mapExecutionNodeStates(
+        previous.map((node) => node.id),
+        executionResult.nodeLogs ?? [],
+      );
+      return previous.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          status: 'idle',
+          outputSummary: undefined,
+          errorMessage: undefined,
+          durationMs: undefined,
+          ...states.get(node.id),
+        },
+      }));
+    });
+    setEdges((previous) =>
+      previous.map((edge) => ({
+        ...edge,
+        animated: executionResult.status === 'QUEUED' || executionResult.status === 'RUNNING',
+        style: {
+          stroke:
+            executionResult.status === 'SUCCESS'
+              ? '#10b981'
+              : executionResult.status === 'FAILED'
+                ? '#f43f5e'
+                : '#94a3b8',
+          strokeWidth: 2,
+        },
+      })),
+    );
+  }, [executionResult, setNodes, setEdges]);
+
   const handleRun = useCallback(() => {
     if (!versionId || startExecutionMutation.isPending) return;
 
-    // Reset canvas to running
+    // Clear the previous run while the new execution is being accepted.
     setNodes((prev) =>
-      prev.map((n, idx) => ({
+      prev.map((n) => ({
         ...n,
         data: {
           ...n.data,
-          status: idx === 0 ? 'running' : 'idle',
+          status: 'idle',
           outputSummary: undefined,
           errorMessage: undefined,
         },
@@ -402,13 +408,14 @@ export const VersionDetailPage: React.FC = () => {
     setEdges((prev) =>
       prev.map((e) => ({
         ...e,
-        animated: true,
-        style: { stroke: '#6366f1', strokeWidth: 2 },
+        animated: false,
+        style: { stroke: '#94a3b8', strokeWidth: 2 },
       })),
     );
 
     startExecutionMutation.mutate({
       workflow_version_id: versionId,
+      idempotency_key: crypto.randomUUID(),
     });
   }, [versionId, startExecutionMutation, setNodes, setEdges]);
 
@@ -530,15 +537,15 @@ export const VersionDetailPage: React.FC = () => {
                   >
                     {isPending ? (
                       <Loader2 className="size-4 animate-spin" />
-                    ) : executionResult ? (
+                    ) : selectedExecutionId ? (
                       <RotateCcw className="size-4" />
                     ) : (
                       <Play className="size-4 fill-current" />
                     )}
                     <span>
                       {isPending
-                        ? 'Đang thực thi Engine...'
-                        : executionResult
+                        ? 'Đang gửi yêu cầu...'
+                        : selectedExecutionId
                           ? 'Chạy lại phiên bản (Rerun)'
                           : 'Kích hoạt chạy ngay (Run)'}
                     </span>
@@ -547,7 +554,25 @@ export const VersionDetailPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Execution Result Stat Cards (Real Backend Execution Result) */}
+            {executionError && selectedExecutionId && (
+              <Alert variant="destructive" role="alert">
+                <AlertCircle className="size-4" />
+                <AlertTitle>Execution could not be loaded</AlertTitle>
+                <AlertDescription>
+                  Refresh the selected run or choose another execution from history.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {executionHistory && (
+              <ExecutionHistoryList
+                executions={executionHistory.items}
+                selectedId={selectedExecutionId}
+                onSelect={selectExecution}
+              />
+            )}
+
+            {/* Execution Result Stat Cards */}
             {executionResult && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -567,10 +592,17 @@ export const VersionDetailPage: React.FC = () => {
                             SUCCESS
                           </span>
                         </>
-                      ) : (
+                      ) : executionResult.status === 'FAILED' ? (
                         <>
                           <XCircle className="size-5 text-destructive" />
                           <span className="text-base font-bold text-destructive font-mono">
+                            {executionResult.status}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Loader2 className="size-5 animate-spin text-primary" />
+                          <span className="text-base font-bold font-mono">
                             {executionResult.status}
                           </span>
                         </>
@@ -582,7 +614,9 @@ export const VersionDetailPage: React.FC = () => {
                   <Card className="p-4 flex flex-col justify-between">
                     <span className="text-xs text-muted-foreground font-medium">Thời gian thực thi</span>
                     <div className="mt-2 text-xl font-bold font-mono text-foreground">
-                      {executionResult.durationMs ?? 0} ms
+                      {executionResult.durationMs == null
+                        ? 'In progress'
+                        : `${executionResult.durationMs} ms`}
                     </div>
                   </Card>
 
@@ -590,7 +624,9 @@ export const VersionDetailPage: React.FC = () => {
                   <Card className="p-4 flex flex-col justify-between">
                     <span className="text-xs text-muted-foreground font-medium">Thời gian bắt đầu</span>
                     <div className="mt-2 text-sm font-semibold font-mono text-foreground">
-                      {new Date(executionResult.startedAt).toLocaleTimeString('vi-VN')}
+                      {executionResult.startedAt
+                        ? new Date(executionResult.startedAt).toLocaleTimeString('vi-VN')
+                        : 'Waiting in queue'}
                     </div>
                   </Card>
 

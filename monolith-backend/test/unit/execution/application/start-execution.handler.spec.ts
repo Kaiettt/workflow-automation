@@ -18,6 +18,16 @@ import {
 import { NodeCatalogPort } from '@app/execution/application/ports/node-catalog.port';
 
 describe('StartExecutionHandler', () => {
+  it('returns a queued execution before running any nodes', async () => {
+    const { start, repository } = build(chain([trigger, sheetNode]));
+
+    const accepted = await start();
+
+    expect(accepted.status).toBe(ExecutionStatus.QUEUED);
+    expect(accepted.id).toBe('execution-1');
+    expect(repository.logs).toEqual([]);
+  });
+
   it('filters sheet rows to those whose status equals new', async () => {
     const { run } = build(chain([trigger, sheetNode, filterNode()]));
     const result = await run();

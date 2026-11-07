@@ -259,8 +259,10 @@ model Execution {
 
   triggeredById String? @map("triggered_by_id") @db.Uuid // null với schedule/webhook
   triggeredBy   User?   @relation("TriggeredBy", fields: [triggeredById], references: [id])
+  idempotencyKey String? @map("idempotency_key") @db.VarChar(128)
 
-  startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  queuedAt   DateTime  @default(now()) @map("queued_at") @db.Timestamptz
+  startedAt  DateTime? @map("started_at") @db.Timestamptz
   finishedAt DateTime? @map("finished_at") @db.Timestamptz
   durationMs Int?      @map("duration_ms") // FR-EM-02, tính sẵn khi finish
   context    Json? // Biến môi trường hoặc context đầu vào của execution
@@ -268,6 +270,8 @@ model Execution {
   nodeLogs ExecutionNodeLog[]
 
   @@index([workflowId, startedAt(sort: Desc)]) // FR-EM-04 danh sách execution gần nhất
+  @@index([workflowId, queuedAt(sort: Desc), id(sort: Desc)])
+  @@unique([triggeredById, idempotencyKey])
   @@index([status])
   @@map("executions")
 }

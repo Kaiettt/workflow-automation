@@ -2,6 +2,7 @@ export class StartExecutionCommand {
   constructor(
     readonly workflowVersionId: string,
     readonly actorId: string,
+    readonly idempotencyKey?: string,
   ) {}
 }
 
@@ -16,23 +17,18 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { ExecutionRepository } from '../../../domain/repositories/execution.repository';
 import { WorkflowVersionForExecution } from '../../../domain/models/execution.types';
 import { TriggerType } from '../../../domain/constants/execution.constants';
-import { INodeExecutor } from '../../../domain/entities/node-executor';
-import { NodeCatalogPort } from '../../ports/node-catalog.port';
+import { ExecutionStarter } from '../../services/execution-starter';
 import { WorkflowEngine } from '../../services/workflow-engine';
 
-// Manual run: executes synchronously and returns the result in the response.
+// Manual run: validates the published version and queues it for the worker.
 @Injectable()
 @CommandHandler(StartExecutionCommand)
 export class StartExecutionHandler implements ICommandHandler<StartExecutionCommand> {
-  private readonly engine: WorkflowEngine;
-
   constructor(
     private readonly repository: ExecutionRepository,
-    @Inject('NODE_EXECUTORS') executors: INodeExecutor[],
-    catalog: NodeCatalogPort,
-  ) {
-    this.engine = new WorkflowEngine(repository, executors, catalog);
-  }
+    @Inject(WorkflowEngine) private readonly engine: WorkflowEngine,
+    private readonly starter: ExecutionStarter,
+  ) {}
 
   private async validateAndFetchWorkflow(
     versionId: string,
@@ -65,18 +61,13 @@ export class StartExecutionHandler implements ICommandHandler<StartExecutionComm
     );
     this.checkExecutionOrder(version.definition);
 
-    const startedAt = new Date();
-    const executionId = await this.engine.createExecution(
-      {
-        version,
-        triggerType: TriggerType.MANUAL,
-        triggeredById: command.actorId,
-        triggerItems: [],
-      },
-      startedAt,
-    );
-    await this.engine.run(executionId, version, [], startedAt);
-
-    return this.repository.findExecutionResult(executionId);
+    const accepted = await this.starter.start({
+      version,
+      triggerType: TriggerType.MANUAL,
+      triggeredById: command.actorId,
+      triggerItems: [],
+      idempotencyKey: command.idempotencyKey,
+    });
+    return accepted;
   }
 }

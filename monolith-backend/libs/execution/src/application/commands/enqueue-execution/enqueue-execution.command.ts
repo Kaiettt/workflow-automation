@@ -13,16 +13,14 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { ExecutionRepository } from '../../../domain/repositories/execution.repository';
 import { TriggerType } from '../../../domain/constants/execution.constants';
-import { ExecutionQueuePort } from '../../ports/execution-queue.port';
-import { WorkflowEngine } from '../../services/workflow-engine';
+import { ExecutionStarter } from '../../services/execution-starter';
 
 @Injectable()
 @CommandHandler(EnqueueExecutionCommand)
 export class EnqueueExecutionHandler implements ICommandHandler<EnqueueExecutionCommand> {
   constructor(
     private readonly repository: ExecutionRepository,
-    @Inject(WorkflowEngine) private readonly engine: WorkflowEngine,
-    private readonly queue: ExecutionQueuePort,
+    private readonly starter: ExecutionStarter,
   ) {}
 
   async execute(command: EnqueueExecutionCommand): Promise<string> {
@@ -31,28 +29,12 @@ export class EnqueueExecutionHandler implements ICommandHandler<EnqueueExecution
     );
     if (!version) throw new NotFoundException('Workflow version not found');
 
-    const startedAt = new Date();
-    const executionId = await this.engine.createExecution(
-      {
-        version,
-        triggerType: TriggerType.WEBHOOK,
-        triggeredById: null,
-        triggerItems: command.triggerItems,
-      },
-      startedAt,
-    );
-    try {
-      await this.queue.enqueue({
-        executionId,
-        workflowVersionId: version.id,
-        triggerItems: command.triggerItems,
-        queuedAt: startedAt.toISOString(),
-      });
-    } catch (error) {
-      // Never picked up: the row must not stay QUEUED.
-      await this.repository.failUnfinishedExecution(executionId, new Date());
-      throw error;
-    }
-    return executionId;
+    const accepted = await this.starter.start({
+      version,
+      triggerType: TriggerType.WEBHOOK,
+      triggeredById: null,
+      triggerItems: command.triggerItems,
+    });
+    return accepted.id;
   }
 }

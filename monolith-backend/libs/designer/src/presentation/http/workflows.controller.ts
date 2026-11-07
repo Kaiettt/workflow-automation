@@ -32,7 +32,10 @@ import { DeleteWorkflowCommand } from '../../application/commands/delete-workflo
 import { PublishWorkflowCommand } from '../../application/commands/publish-workflow.command';
 import { RestoreVersionCommand } from '../../application/commands/restore-version.command';
 import { GetDraftStatusQuery } from '../../application/queries/get-draft-status.query';
-import { CreateWorkflowDto, RenameWorkflowDto } from './dtos/create-workflow.dto';
+import {
+  CreateWorkflowDto,
+  RenameWorkflowDto,
+} from './dtos/create-workflow.dto';
 import { RestoreVersionDto } from './dtos/restore-version.dto';
 import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
 import { WorkflowVersionRepository } from '../../domain/repositories/workflow-version.repository';
@@ -78,7 +81,9 @@ export class WorkflowsController {
   ) {
     const name = body.name.trim();
     if (!name || name.length > 255) {
-      throw new BadRequestException('Workflow name must be between 1 and 255 characters.');
+      throw new BadRequestException(
+        'Workflow name must be between 1 and 255 characters.',
+      );
     }
     await this.commandBus.execute(new RenameWorkflowCommand(id, user.id, name));
     return { success: true, data: { id, name } };

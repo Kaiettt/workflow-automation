@@ -5,6 +5,7 @@ import {
 } from '@app/execution/domain/constants/execution.constants';
 import { Item } from '@app/execution/domain/models/item';
 import { WorkflowEngine } from '@app/execution/application/services/workflow-engine';
+import { ExecutionStarter } from '@app/execution/application/services/execution-starter';
 import {
   ExecutionQueuePort,
   QueuedExecutionJob,
@@ -86,7 +87,8 @@ function setup(definition: unknown) {
     new FakeCatalog(),
   );
   const queue = new FakeQueue();
-  const enqueue = new EnqueueExecutionHandler(repository, engine, queue);
+  const starter = new ExecutionStarter(repository, queue);
+  const enqueue = new EnqueueExecutionHandler(repository, starter);
   const processor = new ExecutionProcessor(repository, engine);
   const process = (job: QueuedExecutionJob) =>
     processor.process({ data: job } as Job<QueuedExecutionJob>);

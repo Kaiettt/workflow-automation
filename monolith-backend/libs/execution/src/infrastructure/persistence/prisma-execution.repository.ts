@@ -9,6 +9,10 @@ import {
 } from '../../domain/constants/execution.constants';
 import {
   ExecutionRecord,
+  ExecutionHistoryItem,
+  ExecutionHistoryPage,
+  ExecutionHistoryQuery,
+  ExecutionStartRecord,
   NodeLogRecord,
   ResolvedCredential,
   WorkflowVersionForExecution,
@@ -44,7 +48,9 @@ export class PrismaExecutionRepository implements ExecutionRepository {
         workflowVersionId: input.workflowVersionId,
         triggerType: input.triggerType,
         triggeredById: input.triggeredById,
+        idempotencyKey: input.idempotencyKey,
         status: input.status,
+        queuedAt: input.queuedAt,
         startedAt: input.startedAt,
         context:
           input.context === undefined ? undefined : jsonValue(input.context),
@@ -52,6 +58,30 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       select: { id: true },
     });
     return row.id;
+  }
+
+  async findExecutionByIdempotencyKey(
+    actorId: string,
+    idempotencyKey: string,
+  ): Promise<ExecutionStartRecord | null> {
+    const row = await this.prisma.execution.findFirst({
+      where: { triggeredById: actorId, idempotencyKey },
+      select: {
+        id: true,
+        workflowId: true,
+        workflowVersionId: true,
+        triggerType: true,
+        status: true,
+        queuedAt: true,
+        startedAt: true,
+      },
+    });
+    if (!row) return null;
+    return {
+      ...row,
+      triggerType: row.triggerType as TriggerType,
+      status: row.status as ExecutionStatus,
+    };
   }
 
   async resolveCredential(
@@ -151,7 +181,11 @@ export class PrismaExecutionRepository implements ExecutionRepository {
     if (!row) return null;
     return {
       id: row.id,
+      workflowId: row.workflowId,
+      workflowVersionId: row.workflowVersionId,
+      triggerType: row.triggerType as TriggerType,
       status: row.status,
+      queuedAt: row.queuedAt,
       startedAt: row.startedAt,
       finishedAt: row.finishedAt,
       durationMs: row.durationMs,
@@ -167,6 +201,80 @@ export class PrismaExecutionRepository implements ExecutionRepository {
         finishedAt: log.finishedAt,
         durationMs: log.durationMs,
       })),
+    };
+  }
+
+  async findExecutionResultForOwner(
+    id: string,
+    ownerId: string,
+  ): Promise<unknown> {
+    const row = await this.prisma.execution.findFirst({
+      where: { id, workflow: { is: { ownerId } } },
+      include: { nodeLogs: { orderBy: { startedAt: 'asc' } } },
+    });
+    if (!row) return null;
+    return {
+      id: row.id,
+      workflowId: row.workflowId,
+      workflowVersionId: row.workflowVersionId,
+      triggerType: row.triggerType,
+      status: row.status,
+      queuedAt: row.queuedAt,
+      startedAt: row.startedAt,
+      finishedAt: row.finishedAt,
+      durationMs: row.durationMs,
+      nodeLogs: row.nodeLogs.map((log) => ({
+        id: log.id,
+        nodeId: log.nodeId,
+        nodeKey: log.nodeKey,
+        status: log.status as ExecutionStatus,
+        input: log.input,
+        output: log.output,
+        errorMessage: log.errorMessage,
+        startedAt: log.startedAt,
+        finishedAt: log.finishedAt,
+        durationMs: log.durationMs,
+      })),
+    };
+  }
+
+  async listExecutionHistoryForOwner(
+    query: ExecutionHistoryQuery,
+  ): Promise<ExecutionHistoryPage> {
+    const rows = await this.prisma.execution.findMany({
+      where: {
+        workflowId: query.workflowId,
+        workflow: { is: { ownerId: query.ownerId } },
+        ...(query.workflowVersionId
+          ? { workflowVersionId: query.workflowVersionId }
+          : {}),
+      },
+      orderBy: [{ queuedAt: 'desc' }, { id: 'desc' }],
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      take: query.limit + 1,
+      select: {
+        id: true,
+        workflowId: true,
+        workflowVersionId: true,
+        triggerType: true,
+        status: true,
+        queuedAt: true,
+        startedAt: true,
+        finishedAt: true,
+        durationMs: true,
+      },
+    });
+    const hasMore = rows.length > query.limit;
+    const items: ExecutionHistoryItem[] = rows
+      .slice(0, query.limit)
+      .map((row) => ({
+        ...row,
+        triggerType: row.triggerType as TriggerType,
+        status: row.status as ExecutionStatus,
+      }));
+    return {
+      items,
+      nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
     };
   }
 }
