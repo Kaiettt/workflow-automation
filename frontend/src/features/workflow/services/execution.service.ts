@@ -1,4 +1,4 @@
-import { AxiosError } from 'axios';
+import { AxiosError, isAxiosError } from 'axios';
 import { executionApi } from '../api/execution.api';
 import { useAuthStore } from '../../auth/store/auth.store';
 import type {
@@ -7,6 +7,7 @@ import type {
   ListExecutionsRequest,
   StartExecutionInput,
 } from '../types/execution.types';
+import { isTerminalExecutionState } from '../utils/execution-status.util';
 
 export type ExecutionConnectionState = 'connected' | 'reconnecting' | 'disconnected';
 
@@ -15,6 +16,28 @@ export interface ExecutionStreamEvent {
   executionId: string;
   ts: string;
   [key: string]: unknown;
+}
+
+class ExecutionStreamHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`Execution stream rejected with status ${status}`);
+    this.status = status;
+  }
+}
+
+const MAX_SEEN_EVENTS = 500;
+const MAX_RECONNECT_DELAY_MS = 15_000;
+
+function isPermanentHttpStatus(status: number | undefined): boolean {
+  return (
+    status !== undefined &&
+    status >= 400 &&
+    status < 500 &&
+    status !== 408 &&
+    status !== 429
+  );
 }
 
 export const executionService = {
@@ -52,21 +75,37 @@ export const executionService = {
   ): (() => void) => {
     const controller = new AbortController();
     const token = useAuthStore.getState().token;
-    const terminalEvents = new Set([
-      'execution.completed',
-      'execution.failed',
-    ]);
     const seenEventKeys = new Set<string>();
-    let hasReachedTerminalState = false;
+    const seenEventOrder: string[] = [];
+    let stopped = false;
+    let reconnectAttempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
     const notifyState = (state: ExecutionConnectionState) => {
       onConnectionChange?.(state);
     };
 
+    const handleEvent = (event: ExecutionStreamEvent) => {
+      const payload = event.payload;
+      const snapshotStatus =
+        payload && typeof payload === 'object' && 'status' in payload
+          ? payload.status
+          : undefined;
+      onEvent(event);
+      if (isTerminalExecutionState(event.event, event.status ?? snapshotStatus)) {
+        stopped = true;
+        controller.abort();
+        notifyState('disconnected');
+        if (event.event !== 'execution.snapshot') {
+          void refreshSnapshot();
+        }
+      }
+    };
+
     const refreshSnapshot = async () => {
       try {
         const snapshot = await executionService.getExecution(executionId);
-        onEvent({
+        handleEvent({
           event: 'execution.snapshot',
           executionId,
           payload: snapshot,
@@ -75,11 +114,33 @@ export const executionService = {
       } catch (error) {
         console.error('Execution snapshot refresh failed after reconnect:', error);
         notifyState('disconnected');
+        if (
+          isAxiosError(error) &&
+          isPermanentHttpStatus(error.response?.status)
+        ) {
+          stopped = true;
+        }
       }
     };
 
+    const waitBeforeReconnect = () =>
+      new Promise<void>((resolve) => {
+        const delay = Math.min(500 * 2 ** reconnectAttempt, MAX_RECONNECT_DELAY_MS);
+        reconnectAttempt += 1;
+        const onAbort = () => {
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            controller.signal.removeEventListener('abort', onAbort);
+            resolve();
+          };
+        reconnectTimer = setTimeout(() => {
+          controller.signal.removeEventListener('abort', onAbort);
+          resolve();
+        }, delay);
+        controller.signal.addEventListener('abort', onAbort, { once: true });
+      });
+
     const connect = async (): Promise<void> => {
-      if (controller.signal.aborted || hasReachedTerminalState) {
+      if (controller.signal.aborted || stopped) {
         return;
       }
 
@@ -98,20 +159,21 @@ export const executionService = {
         );
 
         if (!response.ok) {
-          throw new Error(`Execution stream rejected with status ${response.status}`);
+          throw new ExecutionStreamHttpError(response.status);
         }
-
-        notifyState('connected');
 
         const reader = response.body?.getReader();
         if (!reader) {
-          return;
+          throw new Error('Execution stream response has no body');
         }
+
+        notifyState('connected');
+        const connectedAt = Date.now();
 
         const decoder = new TextDecoder();
         let buffer = '';
 
-        while (!controller.signal.aborted && !hasReachedTerminalState) {
+        while (!controller.signal.aborted && !stopped) {
           const { done, value } = await reader.read();
           if (done) {
             break;
@@ -157,51 +219,52 @@ export const executionService = {
                 continue;
               }
               seenEventKeys.add(dedupeKey);
-
-              if (terminalEvents.has(eventName)) {
-                hasReachedTerminalState = true;
-                controller.abort();
+              seenEventOrder.push(dedupeKey);
+              if (seenEventOrder.length > MAX_SEEN_EVENTS) {
+                const oldest = seenEventOrder.shift();
+                if (oldest) seenEventKeys.delete(oldest);
               }
 
-              onEvent({ ...payload, event: eventName });
+              handleEvent({ ...payload, event: eventName });
             } catch (error) {
               console.error('Execution stream payload parse failed:', error);
-              const rawEvent = {
+              handleEvent({
                 event: eventName,
                 executionId,
                 ts: new Date().toISOString(),
                 raw: trimmed,
-              };
-              if (terminalEvents.has(eventName)) {
-                hasReachedTerminalState = true;
-                controller.abort();
-              }
-              onEvent(rawEvent);
+              });
             }
           }
         }
+        if (Date.now() - connectedAt >= 10_000) {
+          reconnectAttempt = 0;
+        }
       } catch (error) {
+        if (controller.signal.aborted || stopped) return;
         console.error('Execution stream connection failed:', error);
         notifyState('disconnected');
-        if (!controller.signal.aborted && !hasReachedTerminalState) {
-          try {
-            await refreshSnapshot();
-          } finally {
-            setTimeout(() => {
-              if (!controller.signal.aborted && !hasReachedTerminalState) {
-                void connect();
-              }
-            }, 1000);
-          }
+        if (
+          (error instanceof ExecutionStreamHttpError &&
+            isPermanentHttpStatus(error.status)) ||
+          (isAxiosError(error) && isPermanentHttpStatus(error.response?.status))
+        ) {
+          stopped = true;
+          return;
+        }
+        await refreshSnapshot();
+        if (!controller.signal.aborted && !stopped) {
+          await waitBeforeReconnect();
+          await connect();
         }
         return;
       }
 
-      if (!controller.signal.aborted && !hasReachedTerminalState) {
+      if (!controller.signal.aborted && !stopped) {
         notifyState('reconnecting');
         await refreshSnapshot();
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        if (!controller.signal.aborted && !hasReachedTerminalState) {
+        if (!controller.signal.aborted && !stopped) {
+          await waitBeforeReconnect();
           await connect();
         }
       }
@@ -209,13 +272,14 @@ export const executionService = {
 
     void connect().catch((error) => {
       console.error('Execution stream lifecycle failed:', error);
-      if (!controller.signal.aborted && !hasReachedTerminalState) {
+      if (!controller.signal.aborted && !stopped) {
         notifyState('disconnected');
       }
     });
 
     return () => {
-      hasReachedTerminalState = true;
+      stopped = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       controller.abort();
     };
   },

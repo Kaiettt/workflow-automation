@@ -61,6 +61,8 @@ import { useStartExecution } from '../hooks/useStartExecution';
 import { useExecution } from '../hooks/useExecution';
 import { useExecutionHistory } from '../hooks/useExecutionHistory';
 import { useExecutionStream } from '../hooks/useExecutionStream';
+import { applyExecutionStreamEvent } from '../utils/execution-cache.util';
+import type { ExecutionResult } from '../types/execution.types';
 import { ExecutionHistoryList } from '../components/ExecutionHistoryList';
 import { countItems } from '../utils/node-config';
 import { mapExecutionNodeStates } from '../utils/execution-view.util';
@@ -268,80 +270,15 @@ export const VersionDetailPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [streamState, setStreamState] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   const { data: executionResult, isError: executionError } =
-    useExecution(selectedExecutionId);
+    useExecution(selectedExecutionId, 1000, streamState !== 'connected');
 
   useExecutionStream(selectedExecutionId, (event) => {
     if (!selectedExecutionId) return;
 
-    queryClient.setQueryData(['execution', selectedExecutionId], (prev: unknown) => {
-      if (!prev || typeof prev !== 'object') return prev;
-      const current = prev as {
-        status?: string;
-        nodeLogs?: Array<Record<string, unknown>>;
-      };
-
-      if (event.event === 'execution.snapshot' && event.payload) {
-        return event.payload as typeof prev;
-      }
-
-      if (
-        event.event === 'execution.started' ||
-        event.event === 'execution.completed' ||
-        event.event === 'execution.failed'
-      ) {
-        return {
-          ...(current ?? {}),
-          status: String(event.status ?? current.status ?? 'RUNNING'),
-          startedAt: String(event.startedAt ?? current.startedAt ?? null),
-          finishedAt:
-            event.finishedAt ?? current.finishedAt ?? null,
-          durationMs:
-            typeof event.durationMs === 'number'
-              ? event.durationMs
-              : current.durationMs ?? null,
-        };
-      }
-
-      if (
-        event.event === 'node.started' ||
-        event.event === 'node.completed' ||
-        event.event === 'node.failed' ||
-        event.event === 'node.skipped'
-      ) {
-        const nextNodeLogs = [...(current.nodeLogs ?? [])];
-        const nodeIndex = nextNodeLogs.findIndex(
-          (log) => log.nodeId === event.nodeId,
-        );
-        const nextLog = {
-          ...(nodeIndex >= 0 ? nextNodeLogs[nodeIndex] : {}),
-          nodeId: String(event.nodeId ?? ''),
-          nodeKey: String(event.nodeKey ?? ''),
-          status: String(event.status ?? 'RUNNING'),
-          input: event.input ?? (nodeIndex >= 0 ? nextNodeLogs[nodeIndex].input : []),
-          output: event.output ?? (nodeIndex >= 0 ? nextNodeLogs[nodeIndex].output : null),
-          errorMessage: event.errorMessage ?? null,
-          startedAt: String(event.startedAt ?? new Date().toISOString()),
-          finishedAt: event.finishedAt ? String(event.finishedAt) : null,
-          durationMs:
-            typeof event.durationMs === 'number'
-              ? event.durationMs
-              : (nodeIndex >= 0 ? nextNodeLogs[nodeIndex].durationMs : null),
-        };
-
-        if (nodeIndex >= 0) {
-          nextNodeLogs[nodeIndex] = nextLog;
-        } else {
-          nextNodeLogs.push(nextLog);
-        }
-
-        return {
-          ...(current ?? {}),
-          nodeLogs: nextNodeLogs,
-        };
-      }
-
-      return current;
-    });
+    queryClient.setQueryData<ExecutionResult>(
+      ['execution', selectedExecutionId],
+      (current) => applyExecutionStreamEvent(current, event),
+    );
   }, setStreamState);
   const { data: executionHistory } = useExecutionHistory(workflowId, versionId);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   executionService,
   type ExecutionStreamEvent,
@@ -9,14 +9,22 @@ export function useExecutionStream(
   onEvent: (event: ExecutionStreamEvent) => void,
   onConnectionChange?: (state: 'connected' | 'reconnecting' | 'disconnected') => void,
 ) {
+  const onEventRef = useRef(onEvent);
+  const onConnectionChangeRef = useRef(onConnectionChange);
+
+  useEffect(() => {
+    onEventRef.current = onEvent;
+    onConnectionChangeRef.current = onConnectionChange;
+  }, [onEvent, onConnectionChange]);
+
   useEffect(() => {
     if (!executionId) return;
 
     const stop = executionService.subscribeExecution(
       executionId,
-      onEvent,
-      onConnectionChange,
+      (event) => onEventRef.current(event),
+      (state) => onConnectionChangeRef.current?.(state),
     );
     return () => stop();
-  }, [executionId, onEvent, onConnectionChange]);
+  }, [executionId]);
 }
