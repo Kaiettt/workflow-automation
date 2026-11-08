@@ -19,6 +19,7 @@ import {
 } from '@app/execution/domain/constants/execution.constants';
 import { Item } from '@app/execution/domain/models/item';
 import { NodeCatalogPort } from '@app/execution/application/ports/node-catalog.port';
+import { ExecutionEventPublisher } from '@app/execution/application/ports/execution-event-publisher.port';
 import {
   LlmGenerateRequest,
   LlmGenerateResult,
@@ -66,6 +67,8 @@ export const LLM_API_KEY = 'sk-live-SECRETSECRETSECRET1234567890';
 
 export class MemoryExecutionRepository extends ExecutionRepository {
   logs: NodeLogRecord[] = [];
+  logWrites: NodeLogRecord[] = [];
+  private readonly logIndex = new Map<string, number>();
   finishedStatus: ExecutionStatus | null = null;
   // Connector the stored credentials belong to.
   connectorKey = 'google';
@@ -150,7 +153,17 @@ export class MemoryExecutionRepository extends ExecutionRepository {
     return Promise.reject(new Error('credential was not found'));
   }
 
-  saveNodeLog(_executionId: string, log: NodeLogRecord): Promise<void> {
+  saveNodeLog(executionId: string, log: NodeLogRecord): Promise<void> {
+    this.logWrites.push(log);
+    const key = `${executionId}:${log.nodeId}`;
+    const existingIndex = this.logIndex.get(key);
+
+    if (existingIndex !== undefined) {
+      this.logs[existingIndex] = log;
+      return Promise.resolve();
+    }
+
+    this.logIndex.set(key, this.logs.length);
     this.logs.push(log);
     return Promise.resolve();
   }
@@ -343,6 +356,7 @@ export interface BuildOptions {
   llmCeiling?: number;
   catalog?: NodeCatalogPort;
   memory?: ChatMemoryPort;
+  eventPublisher?: ExecutionEventPublisher;
 }
 
 class TestExecutionQueue extends ExecutionQueuePort {
@@ -396,10 +410,19 @@ export function build(definition: unknown, options: BuildOptions = {}) {
       ),
     ],
     options.catalog ?? new FakeCatalog(),
+    options.eventPublisher,
   );
   const queue = new TestExecutionQueue();
-  const starter = new ExecutionStarter(repository, queue);
-  const processor = new ExecutionProcessor(repository, engine);
+  const starter = new ExecutionStarter(
+    repository,
+    queue,
+    options.eventPublisher,
+  );
+  const processor = new ExecutionProcessor(
+    repository,
+    engine,
+    options.eventPublisher,
+  );
   const handler = new StartExecutionHandler(repository, engine, starter);
 
   const start = () =>

@@ -367,6 +367,7 @@ model ExecutionNodeLog {
 
   @@index([executionId])
   @@index([executionId, status]) // FR-LG-05 tra cứu/lọc log
+  @@unique([executionId, nodeId])
   @@map("execution_node_logs")
 }
 

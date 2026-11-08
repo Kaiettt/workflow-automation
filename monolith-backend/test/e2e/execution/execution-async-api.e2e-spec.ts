@@ -5,6 +5,7 @@ import { Server } from 'node:http';
 import request from 'supertest';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
 import { ExecutionController } from '@app/execution/presentation/http/execution.controller';
+import { ExecutionEventPublisher } from '@app/execution/application/ports/execution-event-publisher.port';
 
 describe('Execution async API', () => {
   let app: INestApplication;
@@ -36,6 +37,13 @@ describe('Execution async API', () => {
       providers: [
         { provide: CommandBus, useValue: commandBus },
         { provide: QueryBus, useValue: queryBus },
+        {
+          provide: ExecutionEventPublisher,
+          useValue: {
+            publish: jest.fn().mockResolvedValue(undefined),
+            subscribe: jest.fn().mockReturnValue(() => undefined),
+          },
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)

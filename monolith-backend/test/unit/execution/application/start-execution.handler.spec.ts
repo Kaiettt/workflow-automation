@@ -16,6 +16,10 @@ import {
   trigger,
 } from '@test/support/execution/start-execution.test-support';
 import { NodeCatalogPort } from '@app/execution/application/ports/node-catalog.port';
+import {
+  ExecutionEvent,
+  ExecutionEventPublisher,
+} from '@app/execution/application/ports/execution-event-publisher.port';
 
 describe('StartExecutionHandler', () => {
   it('returns a queued execution before running any nodes', async () => {
@@ -26,6 +30,112 @@ describe('StartExecutionHandler', () => {
     expect(accepted.status).toBe(ExecutionStatus.QUEUED);
     expect(accepted.id).toBe('execution-1');
     expect(repository.logs).toEqual([]);
+  });
+
+  it('updates the same node log row as it moves from RUNNING to SUCCESS', async () => {
+    const { repository } = build(chain([trigger, sheetNode]));
+
+    await repository.saveNodeLog('execution-1', {
+      nodeId: 'node-1',
+      nodeKey: 'trigger.manual',
+      status: ExecutionStatus.RUNNING,
+      input: [],
+      output: null,
+      startedAt: new Date('2026-01-01T00:00:00.000Z'),
+      finishedAt: new Date('2026-01-01T00:00:00.100Z'),
+    });
+
+    await repository.saveNodeLog('execution-1', {
+      nodeId: 'node-1',
+      nodeKey: 'trigger.manual',
+      status: ExecutionStatus.SUCCESS,
+      input: [],
+      output: [{ json: {} }],
+      startedAt: new Date('2026-01-01T00:00:00.000Z'),
+      finishedAt: new Date('2026-01-01T00:00:00.250Z'),
+    });
+
+    expect(repository.logs).toHaveLength(1);
+    expect(repository.logs[0]).toMatchObject({
+      nodeId: 'node-1',
+      status: ExecutionStatus.SUCCESS,
+      output: [{ json: {} }],
+    });
+  });
+
+  it('stores a null finish time while the node is RUNNING, then updates one record', async () => {
+    const { run, repository } = build(chain([trigger, filterNode()]));
+
+    await run();
+
+    expect(
+      repository.logWrites.find((log) => log.status === ExecutionStatus.RUNNING)
+        ?.finishedAt,
+    ).toBeNull();
+    expect(repository.logs).toHaveLength(2);
+    expect(
+      repository.logs.find((log) => log.nodeId === 'trigger')?.status,
+    ).toBe(ExecutionStatus.SUCCESS);
+  });
+
+  it('does not fail execution when event publication rejects', async () => {
+    const publish = jest
+      .fn()
+      .mockRejectedValue(new Error('monitor unavailable'));
+    const publisher = {
+      publish,
+      subscribe: jest.fn().mockReturnValue(() => undefined),
+    } as unknown as ExecutionEventPublisher;
+    const consoleError = jest.spyOn(console, 'error').mockImplementation();
+    const { run, repository } = build(chain([trigger, filterNode()]), {
+      eventPublisher: publisher,
+    });
+
+    try {
+      const result = await run();
+
+      expect(result.status).toBe(ExecutionStatus.SUCCESS);
+      expect(repository.status).toBe(ExecutionStatus.SUCCESS);
+      expect(publish.mock.calls.length).toBeGreaterThan(0);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it('publishes node lifecycle events after their state has been persisted', async () => {
+    const observations: Array<{
+      event: ExecutionEvent;
+      persistedStatuses: string[];
+    }> = [];
+    let readPersistedStatuses = () => [] as string[];
+    const publisher = {
+      publish: jest.fn((event: ExecutionEvent) => {
+        observations.push({
+          event,
+          persistedStatuses: readPersistedStatuses(),
+        });
+        return Promise.resolve();
+      }),
+      subscribe: jest.fn().mockReturnValue(() => undefined),
+    } as unknown as ExecutionEventPublisher;
+    const { run, repository } = build(chain([trigger, filterNode()]), {
+      eventPublisher: publisher,
+    });
+    readPersistedStatuses = () =>
+      repository.logWrites.map((log) => `${log.nodeId}:${log.status}`);
+
+    await run();
+
+    const startedEvent = observations.find(
+      ({ event }) => event.event === 'node.started',
+    );
+    const completedEvent = observations.find(
+      ({ event }) => event.event === 'node.completed',
+    );
+    expect(startedEvent?.persistedStatuses).toContain('trigger:RUNNING');
+    expect(completedEvent?.persistedStatuses).toContain('trigger:SUCCESS');
+    expect(startedEvent?.event).not.toHaveProperty('input');
+    expect(completedEvent?.event).not.toHaveProperty('output');
   });
 
   it('filters sheet rows to those whose status equals new', async () => {

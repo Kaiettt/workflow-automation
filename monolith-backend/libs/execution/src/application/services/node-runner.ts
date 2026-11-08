@@ -22,6 +22,10 @@ import {
   resolveConfig,
 } from '../../domain/expression/resolve-config';
 import { isPlainObject, Item, RoutedItem } from '../../domain/models/item';
+import {
+  ExecutionEventPublisher,
+  publishExecutionEventSafely,
+} from '../ports/execution-event-publisher.port';
 
 const UUID_PATTERN =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -69,11 +73,33 @@ export class NodeRunner {
   constructor(
     private readonly repository: ExecutionRepository,
     private readonly executors: ReadonlyMap<string, INodeExecutor>,
+    private readonly eventPublisher?: ExecutionEventPublisher,
   ) {}
 
   async run(params: NodeRunParams): Promise<NodeRunResult> {
     const { node, items } = params;
     const startedAt = new Date();
+
+    await this.repository.saveNodeLog(params.executionId, {
+      nodeId: node.id,
+      nodeKey: node.data?.key ?? 'unknown',
+      status: ExecutionStatus.RUNNING,
+      input: items,
+      output: null,
+      startedAt,
+      finishedAt: null,
+    });
+    await publishExecutionEventSafely(this.eventPublisher, {
+      event: 'node.started',
+      executionId: params.executionId,
+      workflowId: params.workflowId,
+      nodeId: node.id,
+      nodeKey: node.data?.key ?? 'unknown',
+      status: ExecutionStatus.RUNNING,
+      startedAt: startedAt.toISOString(),
+      finishedAt: null,
+      ts: startedAt.toISOString(),
+    });
 
     try {
       const executor = this.executors.get(node.data?.key);

@@ -60,13 +60,16 @@ import { useWorkflowVersion } from '../hooks/useWorkflowVersions';
 import { useStartExecution } from '../hooks/useStartExecution';
 import { useExecution } from '../hooks/useExecution';
 import { useExecutionHistory } from '../hooks/useExecutionHistory';
+import { useExecutionStream } from '../hooks/useExecutionStream';
+import { applyExecutionStreamEvent } from '../utils/execution-cache.util';
+import type { ExecutionResult } from '../types/execution.types';
 import { ExecutionHistoryList } from '../components/ExecutionHistoryList';
 import { countItems } from '../utils/node-config';
 import { mapExecutionNodeStates } from '../utils/execution-view.util';
 import { EventTriggerInfo } from '../components/EventTriggerInfo';
 import { triggerService } from '../services/trigger.service';
 import { workflowService } from '../services/workflow.service';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 // --- Custom Interactive Canvas Node ---
 interface RunnerNodeData extends Record<string, unknown> {
@@ -264,8 +267,19 @@ export const VersionDetailPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedExecutionId = searchParams.get('execution');
   const selectedExecutionId = requestedExecutionId;
+  const queryClient = useQueryClient();
+  const [streamState, setStreamState] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   const { data: executionResult, isError: executionError } =
-    useExecution(selectedExecutionId);
+    useExecution(selectedExecutionId, 1000, streamState !== 'connected');
+
+  useExecutionStream(selectedExecutionId, (event) => {
+    if (!selectedExecutionId) return;
+
+    queryClient.setQueryData<ExecutionResult>(
+      ['execution', selectedExecutionId],
+      (current) => applyExecutionStreamEvent(current, event),
+    );
+  }, setStreamState);
   const { data: executionHistory } = useExecutionHistory(workflowId, versionId);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState(false);
@@ -517,6 +531,22 @@ export const VersionDetailPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
+                <Badge
+                  variant={
+                    streamState === 'connected'
+                      ? 'default'
+                      : streamState === 'reconnecting'
+                        ? 'secondary'
+                        : 'outline'
+                  }
+                  className="text-[10px] uppercase tracking-wide"
+                >
+                  {streamState === 'connected'
+                    ? 'Connected'
+                    : streamState === 'reconnecting'
+                      ? 'Reconnecting'
+                      : 'Disconnected'}
+                </Badge>
                 {eventTriggerNode ? (
                   <EventTriggerInfo
                     workflowId={workflowId}

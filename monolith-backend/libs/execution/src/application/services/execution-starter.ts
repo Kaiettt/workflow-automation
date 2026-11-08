@@ -10,6 +10,11 @@ import {
   WorkflowVersionForExecution,
 } from '../../domain/models/execution.types';
 import { Item } from '../../domain/models/item';
+import {
+  ExecutionEventPublisher,
+  ExecutionEvent,
+  publishExecutionEventSafely,
+} from '../ports/execution-event-publisher.port';
 
 export interface StartQueuedExecutionInput {
   version: WorkflowVersionForExecution;
@@ -34,6 +39,7 @@ export class ExecutionStarter {
   constructor(
     private readonly repository: ExecutionRepository,
     @Inject(ExecutionQueuePort) private readonly queue: ExecutionQueuePort,
+    private readonly eventPublisher?: ExecutionEventPublisher,
   ) {}
 
   async start(
@@ -62,6 +68,18 @@ export class ExecutionStarter {
       throw error;
     }
 
+    const queuedEvent: ExecutionEvent = {
+      event: 'execution.queued',
+      executionId,
+      workflowId: input.version.workflowId,
+      workflowVersionId: input.version.id,
+      status: ExecutionStatus.QUEUED,
+      startedAt: null,
+      finishedAt: null,
+      ts: queuedAt.toISOString(),
+    };
+    await publishExecutionEventSafely(this.eventPublisher, queuedEvent);
+
     try {
       await this.queue.enqueue({
         executionId,
@@ -70,7 +88,17 @@ export class ExecutionStarter {
         queuedAt: queuedAt.toISOString(),
       });
     } catch (error) {
-      await this.repository.failUnfinishedExecution(executionId, new Date());
+      const finishedAt = new Date();
+      await this.repository.failUnfinishedExecution(executionId, finishedAt);
+      await publishExecutionEventSafely(this.eventPublisher, {
+        event: 'execution.failed',
+        executionId,
+        workflowId: input.version.workflowId,
+        workflowVersionId: input.version.id,
+        status: ExecutionStatus.FAILED,
+        finishedAt: finishedAt.toISOString(),
+        ts: finishedAt.toISOString(),
+      });
       throw error;
     }
 
