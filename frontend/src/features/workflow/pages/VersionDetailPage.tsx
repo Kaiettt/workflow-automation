@@ -333,6 +333,8 @@ export const VersionDetailPage: React.FC = () => {
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const startExecutionMutation = useStartExecution({
+    workflowId,
+    workflowVersionId: versionId,
     onSuccess: (data) => {
       selectExecution(data.id);
     },
