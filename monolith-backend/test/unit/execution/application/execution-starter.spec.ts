@@ -8,30 +8,36 @@ import {
   QueuedExecutionJob,
 } from '@app/execution/application/ports/execution-queue.port';
 import { MemoryExecutionRepository } from '@test/support/execution/start-execution.test-support';
+import { ExecutionEventPublisher } from '@app/execution/application/ports/execution-event-publisher.port';
 
 class FakeQueue extends ExecutionQueuePort {
   jobs: QueuedExecutionJob[] = [];
   failure: Error | null = null;
 
+  constructor(private readonly order?: string[]) {
+    super();
+  }
+
   enqueue(job: QueuedExecutionJob): Promise<void> {
+    this.order?.push('enqueue');
     if (this.failure) return Promise.reject(this.failure);
     this.jobs.push(job);
     return Promise.resolve();
   }
 }
 
-function setup() {
+function setup(publisher?: ExecutionEventPublisher, order?: string[]) {
   const repository = new MemoryExecutionRepository({
     id: 'version-1',
     workflowId: 'workflow-1',
     workflowOwnerId: 'actor-1',
     definition: { nodes: [], edges: [] },
   });
-  const queue = new FakeQueue();
+  const queue = new FakeQueue(order);
   return {
     repository,
     queue,
-    starter: new ExecutionStarter(repository, queue),
+    starter: new ExecutionStarter(repository, queue, publisher),
   };
 }
 
@@ -75,6 +81,29 @@ describe('ExecutionStarter', () => {
         queuedAt: repository.created[0].queuedAt.toISOString(),
       }),
     ]);
+  });
+
+  it('publishes the queued event before the worker can be enqueued', async () => {
+    const order: string[] = [];
+    const publisher = {
+      publish: jest.fn((event: { event: string }) => {
+        order.push(event.event);
+        return Promise.resolve();
+      }),
+      subscribe: jest.fn().mockReturnValue(() => undefined),
+    } as unknown as ExecutionEventPublisher;
+    const { repository, starter } = setup(publisher, order);
+    const version = await repository.findVersion('version-1');
+    if (!version) throw new Error('test workflow version is missing');
+
+    await starter.start({
+      version,
+      triggerType: TriggerType.WEBHOOK,
+      triggeredById: null,
+      triggerItems: [],
+    });
+
+    expect(order).toEqual(['execution.queued', 'enqueue']);
   });
 
   it('marks the execution failed when the queue rejects the job', async () => {

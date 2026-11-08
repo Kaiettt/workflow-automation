@@ -23,6 +23,7 @@ import { NodeCatalogPort } from '../ports/node-catalog.port';
 import {
   ExecutionEvent,
   ExecutionEventPublisher,
+  publishExecutionEventSafely,
 } from '../ports/execution-event-publisher.port';
 import { NodeRunner } from './node-runner';
 
@@ -109,7 +110,7 @@ export class WorkflowEngine {
         durationMs: finishedAt.getTime() - startedAt.getTime(),
         ts: finishedAt.toISOString(),
       };
-      await this.eventPublisher?.publish(event);
+      await publishExecutionEventSafely(this.eventPublisher, event);
     }
     return finalStatus;
   }
@@ -178,7 +179,7 @@ export class WorkflowEngine {
             startedAt: now,
             finishedAt: now,
           });
-          await this.eventPublisher?.publish({
+          await publishExecutionEventSafely(this.eventPublisher, {
             event: 'node.skipped',
             executionId,
             workflowId: version.workflowId,
@@ -215,7 +216,8 @@ export class WorkflowEngine {
       });
 
       await this.repository.saveNodeLog(executionId, result.log);
-      await this.eventPublisher?.publish({
+      const finishedAt = result.log.finishedAt ?? new Date();
+      await publishExecutionEventSafely(this.eventPublisher, {
         event:
           result.status === ExecutionStatus.SUCCESS
             ? 'node.completed'
@@ -227,12 +229,9 @@ export class WorkflowEngine {
         nodeKey: node.data?.key ?? 'unknown',
         status: result.status,
         startedAt: result.log.startedAt.toISOString(),
-        finishedAt: result.log.finishedAt.toISOString(),
-        durationMs:
-          result.log.finishedAt.getTime() - result.log.startedAt.getTime(),
-        output: result.log.output,
-        errorMessage: result.log.errorMessage,
-        ts: result.log.finishedAt.toISOString(),
+        finishedAt: finishedAt.toISOString(),
+        durationMs: finishedAt.getTime() - result.log.startedAt.getTime(),
+        ts: finishedAt.toISOString(),
       });
 
       if (result.status === ExecutionStatus.FAILED) {

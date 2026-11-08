@@ -19,9 +19,6 @@ export interface ExecutionEvent {
   startedAt?: string | null;
   finishedAt?: string | null;
   durationMs?: number | null;
-  input?: unknown;
-  output?: unknown;
-  errorMessage?: string | null;
   ts: string;
 }
 
@@ -31,4 +28,19 @@ export abstract class ExecutionEventPublisher {
     executionId: string,
     listener: (event: ExecutionEvent) => void,
   ): () => void;
+}
+
+export async function publishExecutionEventSafely(
+  publisher: ExecutionEventPublisher | undefined,
+  event: ExecutionEvent,
+): Promise<void> {
+  if (!publisher) return;
+  try {
+    await publisher.publish(event);
+  } catch (error) {
+    console.error(
+      `Could not publish ${event.event} for execution ${event.executionId}:`,
+      error,
+    );
+  }
 }

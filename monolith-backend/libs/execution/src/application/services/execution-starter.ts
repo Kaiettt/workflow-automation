@@ -13,6 +13,7 @@ import { Item } from '../../domain/models/item';
 import {
   ExecutionEventPublisher,
   ExecutionEvent,
+  publishExecutionEventSafely,
 } from '../ports/execution-event-publisher.port';
 
 export interface StartQueuedExecutionInput {
@@ -67,18 +68,6 @@ export class ExecutionStarter {
       throw error;
     }
 
-    try {
-      await this.queue.enqueue({
-        executionId,
-        workflowVersionId: input.version.id,
-        triggerItems: input.triggerItems,
-        queuedAt: queuedAt.toISOString(),
-      });
-    } catch (error) {
-      await this.repository.failUnfinishedExecution(executionId, new Date());
-      throw error;
-    }
-
     const queuedEvent: ExecutionEvent = {
       event: 'execution.queued',
       executionId,
@@ -89,7 +78,29 @@ export class ExecutionStarter {
       finishedAt: null,
       ts: queuedAt.toISOString(),
     };
-    await this.eventPublisher?.publish(queuedEvent);
+    await publishExecutionEventSafely(this.eventPublisher, queuedEvent);
+
+    try {
+      await this.queue.enqueue({
+        executionId,
+        workflowVersionId: input.version.id,
+        triggerItems: input.triggerItems,
+        queuedAt: queuedAt.toISOString(),
+      });
+    } catch (error) {
+      const finishedAt = new Date();
+      await this.repository.failUnfinishedExecution(executionId, finishedAt);
+      await publishExecutionEventSafely(this.eventPublisher, {
+        event: 'execution.failed',
+        executionId,
+        workflowId: input.version.workflowId,
+        workflowVersionId: input.version.id,
+        status: ExecutionStatus.FAILED,
+        finishedAt: finishedAt.toISOString(),
+        ts: finishedAt.toISOString(),
+      });
+      throw error;
+    }
 
     return {
       id: executionId,

@@ -6,6 +6,24 @@ export enum ExecutionStatus {
   FAILED = 'FAILED',
 }
 
+const TERMINAL_EXECUTION_STATUSES = new Set<string>([
+  ExecutionStatus.SUCCESS,
+  ExecutionStatus.FAILED,
+  'CANCELLED',
+]);
+
+export function isTerminalExecutionState(
+  event: string,
+  status: unknown,
+): boolean {
+  return (
+    (typeof status === 'string' && TERMINAL_EXECUTION_STATUSES.has(status)) ||
+    event === 'execution.completed' ||
+    event === 'execution.failed' ||
+    event === 'execution.cancelled'
+  );
+}
+
 export enum TriggerType {
   MANUAL = 'MANUAL',
   WEBHOOK = 'WEBHOOK',

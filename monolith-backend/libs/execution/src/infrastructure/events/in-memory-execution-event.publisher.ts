@@ -3,6 +3,7 @@ import {
   ExecutionEvent,
   ExecutionEventPublisher,
 } from '../../application/ports/execution-event-publisher.port';
+import { isTerminalExecutionState } from '../../domain/constants/execution.constants';
 
 @Injectable()
 export class InMemoryExecutionEventPublisher extends ExecutionEventPublisher {
@@ -14,13 +15,17 @@ export class InMemoryExecutionEventPublisher extends ExecutionEventPublisher {
   publish(event: ExecutionEvent): Promise<void> {
     const subscribers = this.listeners.get(event.executionId) ?? new Set();
     for (const listener of Array.from(subscribers)) {
-      listener(event);
+      try {
+        listener(event);
+      } catch (error) {
+        console.error(
+          `Execution event listener failed for ${event.executionId}:`,
+          error,
+        );
+      }
     }
 
-    if (
-      event.event === 'execution.completed' ||
-      event.event === 'execution.failed'
-    ) {
+    if (isTerminalExecutionState(event.event, event.status)) {
       this.listeners.delete(event.executionId);
     }
 

@@ -22,7 +22,10 @@ import {
   resolveConfig,
 } from '../../domain/expression/resolve-config';
 import { isPlainObject, Item, RoutedItem } from '../../domain/models/item';
-import { ExecutionEventPublisher } from '../ports/execution-event-publisher.port';
+import {
+  ExecutionEventPublisher,
+  publishExecutionEventSafely,
+} from '../ports/execution-event-publisher.port';
 
 const UUID_PATTERN =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -84,9 +87,9 @@ export class NodeRunner {
       input: items,
       output: null,
       startedAt,
-      finishedAt: startedAt,
+      finishedAt: null,
     });
-    await this.eventPublisher?.publish({
+    await publishExecutionEventSafely(this.eventPublisher, {
       event: 'node.started',
       executionId: params.executionId,
       workflowId: params.workflowId,
@@ -94,8 +97,7 @@ export class NodeRunner {
       nodeKey: node.data?.key ?? 'unknown',
       status: ExecutionStatus.RUNNING,
       startedAt: startedAt.toISOString(),
-      finishedAt: startedAt.toISOString(),
-      input: items,
+      finishedAt: null,
       ts: startedAt.toISOString(),
     });
 

@@ -67,7 +67,7 @@ export interface NodeLogRecord {
   output: unknown;
   errorMessage?: string;
   startedAt: Date;
-  finishedAt: Date;
+  finishedAt: Date | null;
 }
 
 export interface ResolvedCredential {
