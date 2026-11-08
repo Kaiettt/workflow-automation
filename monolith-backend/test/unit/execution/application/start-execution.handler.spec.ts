@@ -28,6 +28,37 @@ describe('StartExecutionHandler', () => {
     expect(repository.logs).toEqual([]);
   });
 
+  it('updates the same node log row as it moves from RUNNING to SUCCESS', async () => {
+    const { repository } = build(chain([trigger, sheetNode]));
+
+    await repository.saveNodeLog('execution-1', {
+      nodeId: 'node-1',
+      nodeKey: 'trigger.manual',
+      status: ExecutionStatus.RUNNING,
+      input: [],
+      output: null,
+      startedAt: new Date('2026-01-01T00:00:00.000Z'),
+      finishedAt: new Date('2026-01-01T00:00:00.100Z'),
+    });
+
+    await repository.saveNodeLog('execution-1', {
+      nodeId: 'node-1',
+      nodeKey: 'trigger.manual',
+      status: ExecutionStatus.SUCCESS,
+      input: [],
+      output: [{ json: {} }],
+      startedAt: new Date('2026-01-01T00:00:00.000Z'),
+      finishedAt: new Date('2026-01-01T00:00:00.250Z'),
+    });
+
+    expect(repository.logs).toHaveLength(1);
+    expect(repository.logs[0]).toMatchObject({
+      nodeId: 'node-1',
+      status: ExecutionStatus.SUCCESS,
+      output: [{ json: {} }],
+    });
+  });
+
   it('filters sheet rows to those whose status equals new', async () => {
     const { run } = build(chain([trigger, sheetNode, filterNode()]));
     const result = await run();

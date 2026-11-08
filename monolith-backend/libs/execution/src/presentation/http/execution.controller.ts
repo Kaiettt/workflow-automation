@@ -8,8 +8,11 @@ import {
   Param,
   Post,
   Query,
+  Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
@@ -22,6 +25,7 @@ import { StartExecutionDto } from './dtos/start-execution.dto';
 import { GetExecutionQuery } from '../../application/queries/get-execution/get-execution.query';
 import { ListExecutionsQuery } from '../../application/queries/list-executions/list-executions.query';
 import { ListExecutionsDto } from './dtos/list-executions.dto';
+import { ExecutionEventPublisher } from '../../application/ports/execution-event-publisher.port';
 
 @ApiTags('executions')
 @ApiBearerAuth()
@@ -31,6 +35,7 @@ export class ExecutionController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
+    private readonly eventPublisher: ExecutionEventPublisher,
   ) {}
 
   @Post()
@@ -49,6 +54,67 @@ export class ExecutionController {
       ),
     );
     return { success: true, data: result };
+  }
+
+  @Get(':executionId/events')
+  @ApiOperation({ summary: 'Subscribe to execution lifecycle events' })
+  async stream(
+    @Param('executionId') executionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    await this.queryBus.execute(new GetExecutionQuery(executionId, user.id));
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const send = (event: { event: string; data: unknown }) => {
+      res.write(`event: ${event.event}\n`);
+      res.write(`data: ${JSON.stringify(event.data)}\n\n`);
+    };
+
+    const unsubscribe = this.eventPublisher.subscribe(executionId, (event) => {
+      send({ event: event.event, data: event });
+
+      if (
+        event.event === 'execution.completed' ||
+        event.event === 'execution.failed'
+      ) {
+        cleanup();
+      }
+    });
+
+    const heartbeat = setInterval(() => {
+      res.write(': heartbeat\n\n');
+    }, 15000);
+
+    const cleanup = () => {
+      unsubscribe();
+      clearInterval(heartbeat);
+      if (!res.writableEnded) {
+        res.end();
+      }
+    };
+
+    req.on('close', cleanup);
+    req.on('end', cleanup);
+
+    const snapshot: unknown = await this.queryBus.execute(
+      new GetExecutionQuery(executionId, user.id),
+    );
+    send({
+      event: 'execution.snapshot',
+      data: {
+        event: 'execution.snapshot',
+        executionId,
+        payload: snapshot,
+        ts: new Date().toISOString(),
+      },
+    });
   }
 
   @Get(':executionId')

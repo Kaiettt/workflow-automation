@@ -66,6 +66,7 @@ export const LLM_API_KEY = 'sk-live-SECRETSECRETSECRET1234567890';
 
 export class MemoryExecutionRepository extends ExecutionRepository {
   logs: NodeLogRecord[] = [];
+  private readonly logIndex = new Map<string, number>();
   finishedStatus: ExecutionStatus | null = null;
   // Connector the stored credentials belong to.
   connectorKey = 'google';
@@ -150,7 +151,16 @@ export class MemoryExecutionRepository extends ExecutionRepository {
     return Promise.reject(new Error('credential was not found'));
   }
 
-  saveNodeLog(_executionId: string, log: NodeLogRecord): Promise<void> {
+  saveNodeLog(executionId: string, log: NodeLogRecord): Promise<void> {
+    const key = `${executionId}:${log.nodeId}`;
+    const existingIndex = this.logIndex.get(key);
+
+    if (existingIndex !== undefined) {
+      this.logs[existingIndex] = log;
+      return Promise.resolve();
+    }
+
+    this.logIndex.set(key, this.logs.length);
     this.logs.push(log);
     return Promise.resolve();
   }

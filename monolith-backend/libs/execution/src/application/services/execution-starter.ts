@@ -10,6 +10,10 @@ import {
   WorkflowVersionForExecution,
 } from '../../domain/models/execution.types';
 import { Item } from '../../domain/models/item';
+import {
+  ExecutionEventPublisher,
+  ExecutionEvent,
+} from '../ports/execution-event-publisher.port';
 
 export interface StartQueuedExecutionInput {
   version: WorkflowVersionForExecution;
@@ -34,6 +38,7 @@ export class ExecutionStarter {
   constructor(
     private readonly repository: ExecutionRepository,
     @Inject(ExecutionQueuePort) private readonly queue: ExecutionQueuePort,
+    private readonly eventPublisher?: ExecutionEventPublisher,
   ) {}
 
   async start(
@@ -73,6 +78,18 @@ export class ExecutionStarter {
       await this.repository.failUnfinishedExecution(executionId, new Date());
       throw error;
     }
+
+    const queuedEvent: ExecutionEvent = {
+      event: 'execution.queued',
+      executionId,
+      workflowId: input.version.workflowId,
+      workflowVersionId: input.version.id,
+      status: ExecutionStatus.QUEUED,
+      startedAt: null,
+      finishedAt: null,
+      ts: queuedAt.toISOString(),
+    };
+    await this.eventPublisher?.publish(queuedEvent);
 
     return {
       id: executionId,

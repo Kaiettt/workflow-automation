@@ -5,6 +5,7 @@ import { ExecutionRepository } from '../../domain/repositories/execution.reposit
 import { ExecutionStatus } from '../../domain/constants/execution.constants';
 import { QueuedExecutionJob } from '../../application/ports/execution-queue.port';
 import { WorkflowEngine } from '../../application/services/workflow-engine';
+import { ExecutionEventPublisher } from '../../application/ports/execution-event-publisher.port';
 import { EXECUTION_QUEUE } from './execution-queue.module';
 
 const DEFAULT_CONCURRENCY = 5;
@@ -23,6 +24,7 @@ export class ExecutionProcessor
   constructor(
     private readonly repository: ExecutionRepository,
     @Inject(WorkflowEngine) private readonly engine: WorkflowEngine,
+    private readonly eventPublisher?: ExecutionEventPublisher,
   ) {
     super();
   }
@@ -68,6 +70,16 @@ export class ExecutionProcessor
     }
 
     try {
+      await this.eventPublisher?.publish({
+        event: 'execution.started',
+        executionId,
+        workflowId: version.workflowId,
+        workflowVersionId: version.id,
+        status: ExecutionStatus.RUNNING,
+        startedAt: startedAt.toISOString(),
+        ts: startedAt.toISOString(),
+      });
+
       return await this.engine.run(
         executionId,
         version,

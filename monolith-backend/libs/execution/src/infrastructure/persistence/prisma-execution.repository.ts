@@ -115,6 +115,28 @@ export class PrismaExecutionRepository implements ExecutionRepository {
   }
 
   async saveNodeLog(executionId: string, log: NodeLogRecord): Promise<void> {
+    const existing = await this.prisma.executionNodeLog.findFirst({
+      where: { executionId, nodeId: log.nodeId },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await this.prisma.executionNodeLog.update({
+        where: { id: existing.id },
+        data: {
+          nodeKey: log.nodeKey,
+          status: log.status,
+          input: jsonValue(log.input),
+          output: jsonValue(log.output),
+          errorMessage: log.errorMessage,
+          startedAt: log.startedAt,
+          finishedAt: log.finishedAt,
+          durationMs: log.finishedAt.getTime() - log.startedAt.getTime(),
+        },
+      });
+      return;
+    }
+
     await this.prisma.executionNodeLog.create({
       data: {
         executionId,

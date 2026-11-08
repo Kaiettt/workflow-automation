@@ -42,6 +42,8 @@ import {
   parseMaxItemsCeiling,
 } from './application/executors/llm-generate-executor';
 import { INodeExecutor } from './domain/entities/node-executor';
+import { ExecutionEventPublisher } from './application/ports/execution-event-publisher.port';
+import { InMemoryExecutionEventPublisher } from './infrastructure/events/in-memory-execution-event.publisher';
 
 @Module({
   imports: [
@@ -95,6 +97,10 @@ import { INodeExecutor } from './domain/entities/node-executor';
       inject: [LlmProviderRegistry],
     },
     { provide: ExecutionRepository, useClass: PrismaExecutionRepository },
+    {
+      provide: ExecutionEventPublisher,
+      useClass: InMemoryExecutionEventPublisher,
+    },
     { provide: NodeCatalogPort, useClass: NodeCatalogAdapter },
     {
       provide: 'NODE_EXECUTORS',
@@ -144,8 +150,14 @@ import { INodeExecutor } from './domain/entities/node-executor';
         repository: ExecutionRepository,
         executors: INodeExecutor[],
         catalog: NodeCatalogPort,
-      ) => new WorkflowEngine(repository, executors, catalog),
-      inject: [ExecutionRepository, 'NODE_EXECUTORS', NodeCatalogPort],
+        publisher: ExecutionEventPublisher,
+      ) => new WorkflowEngine(repository, executors, catalog, publisher),
+      inject: [
+        ExecutionRepository,
+        'NODE_EXECUTORS',
+        NodeCatalogPort,
+        ExecutionEventPublisher,
+      ],
     },
     { provide: ExecutionQueuePort, useClass: BullMqExecutionQueue },
     ExecutionStarter,

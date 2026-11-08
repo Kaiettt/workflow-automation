@@ -60,13 +60,14 @@ import { useWorkflowVersion } from '../hooks/useWorkflowVersions';
 import { useStartExecution } from '../hooks/useStartExecution';
 import { useExecution } from '../hooks/useExecution';
 import { useExecutionHistory } from '../hooks/useExecutionHistory';
+import { useExecutionStream } from '../hooks/useExecutionStream';
 import { ExecutionHistoryList } from '../components/ExecutionHistoryList';
 import { countItems } from '../utils/node-config';
 import { mapExecutionNodeStates } from '../utils/execution-view.util';
 import { EventTriggerInfo } from '../components/EventTriggerInfo';
 import { triggerService } from '../services/trigger.service';
 import { workflowService } from '../services/workflow.service';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 // --- Custom Interactive Canvas Node ---
 interface RunnerNodeData extends Record<string, unknown> {
@@ -264,8 +265,84 @@ export const VersionDetailPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedExecutionId = searchParams.get('execution');
   const selectedExecutionId = requestedExecutionId;
+  const queryClient = useQueryClient();
+  const [streamState, setStreamState] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   const { data: executionResult, isError: executionError } =
     useExecution(selectedExecutionId);
+
+  useExecutionStream(selectedExecutionId, (event) => {
+    if (!selectedExecutionId) return;
+
+    queryClient.setQueryData(['execution', selectedExecutionId], (prev: unknown) => {
+      if (!prev || typeof prev !== 'object') return prev;
+      const current = prev as {
+        status?: string;
+        nodeLogs?: Array<Record<string, unknown>>;
+      };
+
+      if (event.event === 'execution.snapshot' && event.payload) {
+        return event.payload as typeof prev;
+      }
+
+      if (
+        event.event === 'execution.started' ||
+        event.event === 'execution.completed' ||
+        event.event === 'execution.failed'
+      ) {
+        return {
+          ...(current ?? {}),
+          status: String(event.status ?? current.status ?? 'RUNNING'),
+          startedAt: String(event.startedAt ?? current.startedAt ?? null),
+          finishedAt:
+            event.finishedAt ?? current.finishedAt ?? null,
+          durationMs:
+            typeof event.durationMs === 'number'
+              ? event.durationMs
+              : current.durationMs ?? null,
+        };
+      }
+
+      if (
+        event.event === 'node.started' ||
+        event.event === 'node.completed' ||
+        event.event === 'node.failed' ||
+        event.event === 'node.skipped'
+      ) {
+        const nextNodeLogs = [...(current.nodeLogs ?? [])];
+        const nodeIndex = nextNodeLogs.findIndex(
+          (log) => log.nodeId === event.nodeId,
+        );
+        const nextLog = {
+          ...(nodeIndex >= 0 ? nextNodeLogs[nodeIndex] : {}),
+          nodeId: String(event.nodeId ?? ''),
+          nodeKey: String(event.nodeKey ?? ''),
+          status: String(event.status ?? 'RUNNING'),
+          input: event.input ?? (nodeIndex >= 0 ? nextNodeLogs[nodeIndex].input : []),
+          output: event.output ?? (nodeIndex >= 0 ? nextNodeLogs[nodeIndex].output : null),
+          errorMessage: event.errorMessage ?? null,
+          startedAt: String(event.startedAt ?? new Date().toISOString()),
+          finishedAt: event.finishedAt ? String(event.finishedAt) : null,
+          durationMs:
+            typeof event.durationMs === 'number'
+              ? event.durationMs
+              : (nodeIndex >= 0 ? nextNodeLogs[nodeIndex].durationMs : null),
+        };
+
+        if (nodeIndex >= 0) {
+          nextNodeLogs[nodeIndex] = nextLog;
+        } else {
+          nextNodeLogs.push(nextLog);
+        }
+
+        return {
+          ...(current ?? {}),
+          nodeLogs: nextNodeLogs,
+        };
+      }
+
+      return current;
+    });
+  }, setStreamState);
   const { data: executionHistory } = useExecutionHistory(workflowId, versionId);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState(false);
@@ -517,6 +594,22 @@ export const VersionDetailPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
+                <Badge
+                  variant={
+                    streamState === 'connected'
+                      ? 'default'
+                      : streamState === 'reconnecting'
+                        ? 'secondary'
+                        : 'outline'
+                  }
+                  className="text-[10px] uppercase tracking-wide"
+                >
+                  {streamState === 'connected'
+                    ? 'Connected'
+                    : streamState === 'reconnecting'
+                      ? 'Reconnecting'
+                      : 'Disconnected'}
+                </Badge>
                 {eventTriggerNode ? (
                   <EventTriggerInfo
                     workflowId={workflowId}

@@ -20,6 +20,10 @@ import {
 } from '../../domain/entities/run-state';
 import { Item } from '../../domain/models/item';
 import { NodeCatalogPort } from '../ports/node-catalog.port';
+import {
+  ExecutionEvent,
+  ExecutionEventPublisher,
+} from '../ports/execution-event-publisher.port';
 import { NodeRunner } from './node-runner';
 
 export interface StartRunInput {
@@ -39,10 +43,12 @@ export class WorkflowEngine {
     private readonly repository: ExecutionRepository,
     executors: INodeExecutor[],
     private readonly catalog: NodeCatalogPort,
+    private readonly eventPublisher?: ExecutionEventPublisher,
   ) {
     this.runner = new NodeRunner(
       repository,
       new Map(executors.map((executor) => [executor.key, executor])),
+      eventPublisher,
     );
   }
 
@@ -90,6 +96,20 @@ export class WorkflowEngine {
         finishedAt,
         finishedAt.getTime() - startedAt.getTime(),
       );
+      const event: ExecutionEvent = {
+        event:
+          finalStatus === ExecutionStatus.SUCCESS
+            ? 'execution.completed'
+            : 'execution.failed',
+        executionId,
+        workflowId: version.workflowId,
+        workflowVersionId: version.id,
+        status: finalStatus,
+        finishedAt: finishedAt.toISOString(),
+        durationMs: finishedAt.getTime() - startedAt.getTime(),
+        ts: finishedAt.toISOString(),
+      };
+      await this.eventPublisher?.publish(event);
     }
     return finalStatus;
   }
@@ -158,6 +178,18 @@ export class WorkflowEngine {
             startedAt: now,
             finishedAt: now,
           });
+          await this.eventPublisher?.publish({
+            event: 'node.skipped',
+            executionId,
+            workflowId: version.workflowId,
+            workflowVersionId: version.id,
+            nodeId: node.id,
+            nodeKey: node.data?.key ?? 'unknown',
+            status: 'SKIPPED',
+            startedAt: now.toISOString(),
+            finishedAt: now.toISOString(),
+            ts: now.toISOString(),
+          });
           continue;
         }
       }
@@ -183,6 +215,25 @@ export class WorkflowEngine {
       });
 
       await this.repository.saveNodeLog(executionId, result.log);
+      await this.eventPublisher?.publish({
+        event:
+          result.status === ExecutionStatus.SUCCESS
+            ? 'node.completed'
+            : 'node.failed',
+        executionId,
+        workflowId: version.workflowId,
+        workflowVersionId: version.id,
+        nodeId: node.id,
+        nodeKey: node.data?.key ?? 'unknown',
+        status: result.status,
+        startedAt: result.log.startedAt.toISOString(),
+        finishedAt: result.log.finishedAt.toISOString(),
+        durationMs:
+          result.log.finishedAt.getTime() - result.log.startedAt.getTime(),
+        output: result.log.output,
+        errorMessage: result.log.errorMessage,
+        ts: result.log.finishedAt.toISOString(),
+      });
 
       if (result.status === ExecutionStatus.FAILED) {
         status = ExecutionStatus.FAILED;
