@@ -1,10 +1,11 @@
-import { EventEmitter } from 'node:events';
 import { QueryBus } from '@nestjs/cqrs';
 jest.mock('@app/auth/infrastructure/guards/jwt-auth.guard', () => ({
   JwtAuthGuard: class JwtAuthGuard {},
 }));
 import { ExecutionController } from '@app/execution/presentation/http/execution.controller';
+import { ExecutionStreamService } from '@app/execution/application/services/execution-stream.service';
 import { ExecutionEventPublisher } from '@app/execution/application/ports/execution-event-publisher.port';
+import { ExecutionLifecycleEvent } from '@app/execution/application/ports/execution-event-publisher.port';
 
 describe('ExecutionController SSE lifecycle', () => {
   const user = { id: 'owner-1', email: 'owner@example.test' };
@@ -14,83 +15,147 @@ describe('ExecutionController SSE lifecycle', () => {
     const queryBus = {
       execute: queryBusExecute,
     } as unknown as QueryBus;
-    const listeners = new Map<string, (event: never) => void>();
+    const listeners = new Map<
+      string,
+      (event: ExecutionLifecycleEvent) => void
+    >();
     const unsubscribe = jest.fn();
     const eventPublisher = {
       subscribe: jest.fn(
-        (executionId: string, listener: (event: never) => void) => {
+        (
+          executionId: string,
+          listener: (event: ExecutionLifecycleEvent) => void,
+        ) => {
           listeners.set(executionId, listener);
           return unsubscribe;
         },
       ),
     } as unknown as ExecutionEventPublisher;
+
+    const streamService = new ExecutionStreamService(queryBus, eventPublisher);
     const controller = new ExecutionController(
       {} as never,
       queryBus,
-      eventPublisher,
+      streamService,
     );
-    const response = new EventEmitter() as EventEmitter & {
-      writableEnded: boolean;
-      writes: string[];
-      setHeader: jest.Mock;
-      flushHeaders: jest.Mock;
-      write: jest.Mock;
-      end: jest.Mock;
+
+    return {
+      controller,
+      streamService,
+      queryBusExecute,
+      eventPublisher,
+      listeners,
+      unsubscribe,
     };
-    response.writableEnded = false;
-    response.writes = [];
-    response.setHeader = jest.fn();
-    response.flushHeaders = jest.fn();
-    response.write = jest.fn((chunk: string) => {
-      response.writes.push(chunk);
-      return true;
-    });
-    response.end = jest.fn(() => {
-      response.writableEnded = true;
-    });
-    return { controller, queryBusExecute, response, unsubscribe };
   }
 
-  it('keeps a running stream open until the response disconnects', async () => {
-    const { controller, response, unsubscribe } = createController({
+  it('keeps a running stream open until client unsubscribes', async () => {
+    const { controller, unsubscribe } = createController({
       status: 'RUNNING',
     });
 
-    await controller.stream('execution-1', user, response as never);
+    const stream$ = controller.stream('execution-1', user);
+    const emitted: unknown[] = [];
+    let completed = false;
 
-    expect(response.writes.join('')).toContain('execution.snapshot');
-    expect(response.end.mock.calls).toHaveLength(0);
+    const subscription = stream$.subscribe({
+      next: (val) => emitted.push(val),
+      complete: () => {
+        completed = true;
+      },
+    });
 
-    response.emit('close');
-    response.emit('close');
+    // Wait for initial async snapshot
+    await new Promise((resolve) => setTimeout(resolve, 20));
 
+    expect(emitted).toHaveLength(1);
+    expect((emitted[0] as { type: string }).type).toBe('execution.snapshot');
+    expect(completed).toBe(false);
+    expect(unsubscribe).not.toHaveBeenCalled();
+
+    subscription.unsubscribe();
     expect(unsubscribe).toHaveBeenCalledTimes(1);
-    expect(response.end.mock.calls).toHaveLength(1);
   });
 
   it.each(['SUCCESS', 'FAILED', 'CANCELLED'])(
-    'closes after sending a terminal %s snapshot',
+    'completes after emitting a terminal %s snapshot',
     async (status) => {
-      const { controller, response, unsubscribe } = createController({
+      const { controller, unsubscribe } = createController({
         status,
       });
 
-      await controller.stream('execution-1', user, response as never);
+      const stream$ = controller.stream('execution-1', user);
+      const emitted: unknown[] = [];
+      let completed = false;
 
-      expect(response.writes.join('')).toContain('execution.snapshot');
-      expect(response.end.mock.calls).toHaveLength(1);
-      expect(unsubscribe).toHaveBeenCalledTimes(1);
+      stream$.subscribe({
+        next: (val) => emitted.push(val),
+        complete: () => {
+          completed = true;
+        },
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(emitted).toHaveLength(1);
+      expect((emitted[0] as { type: string }).type).toBe('execution.snapshot');
+      expect(completed).toBe(true);
+      expect(unsubscribe).not.toHaveBeenCalled();
     },
   );
 
+  it('completes when a terminal event is received from publisher', async () => {
+    const { controller, listeners, unsubscribe } = createController({
+      status: 'RUNNING',
+    });
+
+    const stream$ = controller.stream('execution-1', user);
+    const emitted: unknown[] = [];
+    let completed = false;
+
+    stream$.subscribe({
+      next: (val) => emitted.push(val),
+      complete: () => {
+        completed = true;
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(emitted).toHaveLength(1);
+
+    const listener = listeners.get('execution-1');
+    expect(listener).toBeDefined();
+
+    listener!({
+      event: 'execution.completed',
+      executionId: 'execution-1',
+      status: 'SUCCESS',
+      ts: new Date().toISOString(),
+    });
+
+    expect(emitted).toHaveLength(2);
+    expect((emitted[1] as { type: string }).type).toBe('execution.completed');
+    expect(completed).toBe(true);
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
   it('does not open a stream when the execution is not accessible', async () => {
-    const { controller, queryBusExecute, response } = createController(null);
+    const { controller, queryBusExecute } = createController(null);
     queryBusExecute.mockRejectedValueOnce(new Error('not found'));
 
-    await expect(
-      controller.stream('execution-1', user, response as never),
-    ).rejects.toThrow('not found');
+    const stream$ = controller.stream('execution-1', user);
+    let capturedError: Error | null = null;
 
-    expect(response.flushHeaders.mock.calls).toHaveLength(0);
+    await new Promise<void>((resolve) => {
+      stream$.subscribe({
+        error: (err: Error) => {
+          capturedError = err;
+          resolve();
+        },
+      });
+    });
+
+    expect(capturedError).toBeDefined();
+    expect((capturedError as unknown as Error).message).toBe('not found');
   });
 });

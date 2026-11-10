@@ -1,10 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { triggerKeys } from '../hooks/useWorkflowTriggers';
 import { useNodesState, useEdgesState, useReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
-import { workflowService } from '../services/workflow.service';
 import { DesignerLayout } from '../components/DesignerLayout';
 import { VersionHistoryDialog } from '../components/VersionHistoryDialog';
 import { useDesignerStore } from '../store/designer.store';
@@ -15,21 +12,22 @@ import {
 } from '../models/workflow-validation.model';
 import { resolveOutputs, outputOfHandle } from '../utils/node-outputs';
 import type { WorkflowTemplate } from '../templates/catalog';
+import { useWorkflowDraft, useNodeTypes } from '../hooks/useWorkflowDraft';
+import { useWorkflowMutations } from '../hooks/useWorkflowMutations';
+import { useDraftAutoSave } from '../hooks/useDraftAutoSave';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface DesignerPageProps {
   workflowId?: string;
   onBack?: () => void;
-}
-
-interface WorkflowDraft {
-  definition?: {
-    nodes?: Node[];
-    edges?: Edge[];
-  };
-  validationErrors?: {
-    message?: string;
-    issues?: WorkflowValidationIssue[];
-  } | null;
 }
 
 const VALIDATION_NODE_CLASS = 'workflow-validation-error';
@@ -77,115 +75,73 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
   const onBack = propOnBack || (() => navigate('/workflows'));
 
   const { setCenter, getNode } = useReactFlow();
-  const queryClient = useQueryClient();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [loading, setLoading] = useState(true);
 
-  const isSaving = useDesignerStore((state) => state.isSaving);
-  const setIsSaving = useDesignerStore((state) => state.setIsSaving);
+  // React Query hooks for server state
+  const { data: draft, isLoading: isDraftLoading } = useWorkflowDraft(workflowId);
+  const { data: nodeTypes, isLoading: isNodeTypesLoading } = useNodeTypes();
+  const loading = isDraftLoading || isNodeTypesLoading;
+
+  const { publishWorkflowMutation } = useWorkflowMutations();
+  const isPublishing = publishWorkflowMutation.isPending;
+
   const setValidationIssues = useDesignerStore((state) => state.setValidationIssues);
+  const setNodeTypes = useDesignerStore((state) => state.setNodeTypes);
 
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isFirstLoad = useRef(true);
+  const { isSaving, forceSave } = useDraftAutoSave({
+    workflowId,
+    nodes,
+    edges,
+    loading,
+    debounceMs: 2000,
+  });
+
   const [publishValidation, setPublishValidation] = useState<{
     message: string;
     issues: WorkflowValidationIssue[];
   } | null>(null);
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const setNodeTypes = useDesignerStore((state) => state.setNodeTypes);
+  // Dialog state replacements for window.confirm
+  const [publishSuccessInfo, setPublishSuccessInfo] = useState<{
+    versionNumber: number;
+    isActive: boolean;
+  } | null>(null);
+  const [pendingTemplate, setPendingTemplate] = useState<WorkflowTemplate | null>(null);
 
-  // Load draft on mount
+  // Synchronize draft definition into React Flow state
   useEffect(() => {
-    let isMounted = true;
+    if (!draft) return;
 
-    async function loadData() {
-      try {
-        const [draft, nodeTypes] = await Promise.all([
-          workflowService.getDraft(workflowId) as Promise<WorkflowDraft>,
-          workflowService.getNodeTypes(),
-        ]);
-
-        if (isMounted) {
-          if (draft?.definition) {
-            const rawNodes = (draft.definition.nodes || []) as Node[];
-            const safeNodes = rawNodes.map((n, idx) => ({
-              ...n,
-              position: n.position || { x: 250, y: 100 + idx * 120 },
-            }));
-            setNodes(safeNodes);
-            setEdges(draft.definition.edges || []);
-          }
-          if (draft?.validationErrors) {
-            const issues = draft.validationErrors.issues ?? [];
-            setPublishValidation({
-              message:
-                draft.validationErrors.message ?? 'Workflow validation failed.',
-              issues,
-            });
-            setValidationIssues(issues);
-            setNodes((currentNodes) =>
-              updateValidationHighlights(currentNodes, issues),
-            );
-          }
-          setNodeTypes(nodeTypes);
-        }
-      } catch (error) {
-        console.error('Failed to load workflow data', error);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
+    if (draft.definition) {
+      const rawNodes = (draft.definition.nodes || []) as Node[];
+      const safeNodes = rawNodes.map((n, idx) => ({
+        ...n,
+        position: n.position || { x: 250, y: 100 + idx * 120 },
+      }));
+      setNodes(safeNodes);
+      setEdges(draft.definition.edges || []);
     }
-
-    loadData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [workflowId, setNodes, setEdges, setNodeTypes, setValidationIssues]);
-
-  // Auto-save logic (debounced)
-  const saveDraft = useCallback(async (currentNodes: Node[], currentEdges: Edge[]) => {
-    setIsSaving(true);
-    try {
-      const definition = {
-        nodes: currentNodes,
-        edges: currentEdges,
-        viewport: { x: 0, y: 0, zoom: 1 },
-      };
-      await workflowService.saveDraft(workflowId, definition);
-    } catch (error) {
-      console.error('Failed to save draft', error);
-    } finally {
-      setIsSaving(false);
+    if (draft.validationErrors) {
+      const issues = draft.validationErrors.issues ?? [];
+      setPublishValidation({
+        message: draft.validationErrors.message ?? 'Workflow validation failed.',
+        issues,
+      });
+      setValidationIssues(issues);
+      setNodes((currentNodes) => updateValidationHighlights(currentNodes, issues));
     }
-  }, [workflowId, setIsSaving]);
+  }, [draft, setNodes, setEdges, setValidationIssues]);
 
+  // Synchronize node types definition into designer store
   useEffect(() => {
-    if (loading) return;
-    if (isFirstLoad.current) {
-      isFirstLoad.current = false;
-      return;
+    if (nodeTypes) {
+      setNodeTypes(nodeTypes);
     }
-
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    saveTimeoutRef.current = setTimeout(() => {
-      saveDraft(nodes, edges);
-    }, 2000);
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [nodes, edges, loading, saveDraft]);
+  }, [nodeTypes, setNodeTypes]);
 
   const handleNodeDataChange = useCallback((nodeId: string, data: Record<string, unknown>) => {
     setNodes((nds) =>
@@ -209,21 +165,19 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
   }, [setNodes, setEdges]);
 
   const handlePublish = async () => {
-    setIsPublishing(true);
     setPublishValidation(null);
     setValidationDialogOpen(false);
 
     // Ensure latest changes are saved first
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    await saveDraft(nodes, edges);
+    await forceSave();
 
     try {
-      const published = await workflowService.publishWorkflow(workflowId);
+      const published = await publishWorkflowMutation.mutateAsync(workflowId);
       setPublishValidation(null);
       setValidationDialogOpen(false);
       useDesignerStore.getState().setValidationIssues([]);
       setNodes((currentNodes) => updateValidationHighlights(currentNodes, []));
-      void queryClient.invalidateQueries({ queryKey: triggerKeys.activation(workflowId) });
+
       const activation = published.activation;
       if (activation && (activation.error || !activation.active)) {
         // The new version could not listen.
@@ -237,16 +191,11 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
         setValidationDialogOpen(true);
         return;
       }
-      const followUp = published.activation?.active
-        ? `Workflow published! Version ${published.versionNumber} is now listening.`
-        : 'Workflow published successfully!';
-      if (
-        window.confirm(
-          `${followUp} Would you like to view the version history and run it?`,
-        )
-      ) {
-        navigate(`/workflows/${workflowId}/versions`);
-      }
+
+      setPublishSuccessInfo({
+        versionNumber: published.versionNumber,
+        isActive: Boolean(published.activation?.active),
+      });
     } catch (err: unknown) {
       if (err instanceof WorkflowPublishValidationError) {
         setPublishValidation({ message: err.message, issues: err.issues });
@@ -262,8 +211,6 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
         setPublishValidation({ message: String(err), issues: [] });
         setValidationDialogOpen(true);
       }
-    } finally {
-      setIsPublishing(false);
     }
   };
 
@@ -302,16 +249,30 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
     [setNodes, setEdges],
   );
 
-  const handleUseTemplate = useCallback(async (template: WorkflowTemplate) => {
-    if (nodes.length > 0 && !window.confirm('Replace the current draft with this template?')) return false;
-    const nextNodes = structuredClone(template.nodes);
-    const nextEdges = structuredClone(template.edges);
-    setNodes(nextNodes);
-    setEdges(nextEdges);
-    useDesignerStore.getState().setSelectedNodeId(null);
-    await saveDraft(nextNodes, nextEdges);
-    return true;
-  }, [nodes.length, saveDraft, setNodes, setEdges]);
+  const applyTemplate = useCallback(
+    async (template: WorkflowTemplate) => {
+      const nextNodes = structuredClone(template.nodes);
+      const nextEdges = structuredClone(template.edges);
+      setNodes(nextNodes);
+      setEdges(nextEdges);
+      useDesignerStore.getState().setSelectedNodeId(null);
+      await forceSave(nextNodes, nextEdges);
+      setPendingTemplate(null);
+    },
+    [forceSave, setNodes, setEdges],
+  );
+
+  const handleUseTemplate = useCallback(
+    async (template: WorkflowTemplate) => {
+      if (nodes.length > 0) {
+        setPendingTemplate(template);
+        return false;
+      }
+      await applyTemplate(template);
+      return true;
+    },
+    [applyTemplate, nodes.length],
+  );
 
   if (loading) {
     return (
@@ -360,6 +321,75 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
         onOpenChange={setHistoryOpen}
         onRestoreSuccess={handleRestoreSuccess}
       />
+
+      {/* Publish Success Dialog */}
+      <Dialog
+        open={Boolean(publishSuccessInfo)}
+        onOpenChange={(open) => {
+          if (!open) setPublishSuccessInfo(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Workflow Published</DialogTitle>
+            <DialogDescription>
+              {publishSuccessInfo?.isActive
+                ? `Version ${publishSuccessInfo.versionNumber} is now published and listening for events.`
+                : `Version ${publishSuccessInfo?.versionNumber} has been published successfully.`}{' '}
+              Would you like to view the version history and run it?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPublishSuccessInfo(null)}
+            >
+              Stay in Designer
+            </Button>
+            <Button
+              onClick={() => {
+                setPublishSuccessInfo(null);
+                navigate(`/workflows/${workflowId}/versions`);
+              }}
+            >
+              View Version History
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Replacement Confirmation Dialog */}
+      <Dialog
+        open={Boolean(pendingTemplate)}
+        onOpenChange={(open) => {
+          if (!open) setPendingTemplate(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Replace Current Draft?</DialogTitle>
+            <DialogDescription>
+              Applying the “{pendingTemplate?.title}” template will overwrite your existing canvas nodes and connections. Any unsaved changes will be lost.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPendingTemplate(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (pendingTemplate) void applyTemplate(pendingTemplate);
+              }}
+            >
+              Replace Draft
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

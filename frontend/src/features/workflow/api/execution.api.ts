@@ -42,4 +42,9 @@ export const executionApi = {
     );
     return res.data.data;
   },
+
+  getEventStreamUrl: (executionId: string): string => {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081';
+    return `${baseUrl}/api/executions/${executionId}/events`;
+  },
 };

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
-
 import { resolveOutputs } from '@app/shared/utils/node-outputs';
 
 export interface PublishValidationIssue {
@@ -21,21 +19,59 @@ export interface NodeCatalogTypeInfo {
   configSchema: unknown;
 }
 
+export interface ValidationWorkflowNodeData {
+  key?: string;
+  name?: string;
+  config?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface ValidationWorkflowNode {
+  id: string;
+  type?: string;
+  data?: ValidationWorkflowNodeData;
+  [key: string]: unknown;
+}
+
+export interface ValidationWorkflowEdge {
+  id?: string;
+  source: string;
+  target: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
+  [key: string]: unknown;
+}
+
+export interface NodeCatalogTypeMetadata {
+  category?: string;
+  configSchema?: unknown;
+}
+
+export interface WorkflowDraftDefinition {
+  nodes?: ValidationWorkflowNode[];
+  edges?: ValidationWorkflowEdge[];
+  [key: string]: unknown;
+}
+
 /**
  * Extracts the catalog key from a workflow node.
  * React Flow designer nodes store the catalog key in `node.data.key`.
  * Legacy/unit test mock nodes may store the catalog key in `node.type`.
  */
-export function getNodeKey(node: any): string | undefined {
-  if (typeof node?.data?.key === 'string' && node.data.key.length > 0) {
-    return node.data.key;
+export function getNodeKey(
+  node: ValidationWorkflowNode | Record<string, unknown>,
+): string | undefined {
+  const data = node?.data as ValidationWorkflowNodeData | undefined;
+  if (typeof data?.key === 'string' && data.key.length > 0) {
+    return data.key;
   }
+  const type = node?.type;
   if (
-    typeof node?.type === 'string' &&
-    node.type !== 'actionNode' &&
-    node.type !== 'triggerNode'
+    typeof type === 'string' &&
+    type !== 'actionNode' &&
+    type !== 'triggerNode'
   ) {
-    return node.type;
+    return type;
   }
   return undefined;
 }
@@ -43,7 +79,9 @@ export function getNodeKey(node: any): string | undefined {
 /**
  * Extracts all unique node catalog keys present in the nodes array.
  */
-export function extractNodeCatalogKeys(nodes: any[]): string[] {
+export function extractNodeCatalogKeys(
+  nodes: ValidationWorkflowNode[],
+): string[] {
   const nodeKeys = new Set<string>();
   for (const node of nodes) {
     const key = getNodeKey(node);
@@ -58,10 +96,10 @@ export function extractNodeCatalogKeys(nodes: any[]): string[] {
  * Filters trigger nodes (category TRIGGER or UI triggerNode).
  */
 export function getTriggerNodes(
-  nodes: any[],
-  nodeTypesByKey: Map<string, { category?: string }>,
-): any[] {
-  return nodes.filter((node: any) => {
+  nodes: ValidationWorkflowNode[],
+  nodeTypesByKey: Map<string, NodeCatalogTypeMetadata>,
+): ValidationWorkflowNode[] {
+  return nodes.filter((node) => {
     const key = getNodeKey(node);
     const category = key ? nodeTypesByKey.get(key)?.category : undefined;
     return category === 'TRIGGER' || node.type === 'triggerNode';
@@ -72,10 +110,10 @@ export function getTriggerNodes(
  * Filters action/processing nodes (any operational node that is not a trigger).
  */
 export function getActionNodes(
-  nodes: any[],
-  nodeTypesByKey: Map<string, { category?: string }>,
-): any[] {
-  return nodes.filter((node: any) => {
+  nodes: ValidationWorkflowNode[],
+  nodeTypesByKey: Map<string, NodeCatalogTypeMetadata>,
+): ValidationWorkflowNode[] {
+  return nodes.filter((node) => {
     const key = getNodeKey(node);
     const category = key ? nodeTypesByKey.get(key)?.category : undefined;
     return category ? category !== 'TRIGGER' : node.type !== 'triggerNode';
@@ -86,11 +124,11 @@ export function getActionNodes(
  * Validates a workflow draft definition against node catalog schemas and graph reachability rules.
  */
 export function validateWorkflowDraft(
-  definition: { nodes?: any[]; edges?: any[] },
-  nodeTypesByKey: Map<string, { category: string; configSchema: unknown }>,
+  definition: WorkflowDraftDefinition,
+  nodeTypesByKey: Map<string, NodeCatalogTypeMetadata>,
 ): PublishValidationReport {
-  const nodes = definition.nodes || [];
-  const edges = definition.edges || [];
+  const nodes = definition.nodes ?? [];
+  const edges = definition.edges ?? [];
   const issues: PublishValidationIssue[] = [];
 
   const triggers = getTriggerNodes(nodes, nodeTypesByKey);
@@ -127,7 +165,13 @@ export function validateWorkflowDraft(
       continue;
     }
 
-    const schema = nodeType.configSchema as { required?: unknown } | null;
+    const schema =
+      nodeType.configSchema &&
+      typeof nodeType.configSchema === 'object' &&
+      'required' in nodeType.configSchema
+        ? (nodeType.configSchema as { required?: unknown })
+        : null;
+
     const requiredFields = Array.isArray(schema?.required)
       ? schema.required.filter(
           (field): field is string => typeof field === 'string',
@@ -167,7 +211,7 @@ export function validateWorkflowDraft(
   }
 
   const reachable = new Set<string>();
-  const pending = triggers.map((trigger: any) => trigger.id);
+  const pending = triggers.map((trigger) => trigger.id);
   while (pending.length > 0) {
     const nodeId = pending.pop();
     if (typeof nodeId !== 'string' || reachable.has(nodeId)) {
@@ -202,13 +246,13 @@ export function validateWorkflowDraft(
  * from an output its node still has (a Switch rule may have been deleted).
  */
 function validateGraphShape(
-  nodes: any[],
-  edges: any[],
-  nodeTypesByKey: Map<string, { configSchema: unknown }>,
+  nodes: ValidationWorkflowNode[],
+  edges: ValidationWorkflowEdge[],
+  nodeTypesByKey: Map<string, NodeCatalogTypeMetadata>,
 ): PublishValidationIssue[] {
   const issues: PublishValidationIssue[] = [];
   const valid = edges.filter(
-    (edge: any) =>
+    (edge) =>
       typeof edge?.source === 'string' && typeof edge?.target === 'string',
   );
 
@@ -256,7 +300,7 @@ function validateGraphShape(
     });
   }
 
-  const nodesById = new Map(nodes.map((node: any) => [node.id, node]));
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
   for (const edge of valid) {
     const handle = edge.sourceHandle;
     if (typeof handle !== 'string' || !handle.startsWith('out:')) continue;

@@ -128,11 +128,30 @@ export class PrismaExecutionRepository implements ExecutionRepository {
         : null,
     };
 
-    await this.prisma.executionNodeLog.upsert({
-      where: { executionId_nodeId: { executionId, nodeId: log.nodeId } },
-      create: { executionId, nodeId: log.nodeId, ...data },
-      update: data,
-    });
+    try {
+      await this.prisma.executionNodeLog.upsert({
+        where: { executionId_nodeId: { executionId, nodeId: log.nodeId } },
+        create: { executionId, nodeId: log.nodeId, ...data },
+        update: data,
+      });
+    } catch {
+      // Fallback if the database has not yet applied the unique constraint migration (Postgres 42P10)
+      const existing = await this.prisma.executionNodeLog.findFirst({
+        where: { executionId, nodeId: log.nodeId },
+        select: { id: true },
+      });
+
+      if (existing) {
+        await this.prisma.executionNodeLog.update({
+          where: { id: existing.id },
+          data,
+        });
+      } else {
+        await this.prisma.executionNodeLog.create({
+          data: { executionId, nodeId: log.nodeId, ...data },
+        });
+      }
+    }
   }
 
   async finishExecution(
