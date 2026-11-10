@@ -16,6 +16,9 @@ import { WorkflowDraftRepository } from './domain/repositories/workflow-draft.re
 import { PublishWorkflowHandler } from './application/commands/publish-workflow.command';
 import { RestoreVersionHandler } from './application/commands/restore-version.command';
 import { GetDraftStatusHandler } from './application/queries/get-draft-status.query';
+import { GetWorkflowsHandler } from './application/queries/get-workflows.query';
+import { GetWorkflowVersionsHandler } from './application/queries/get-workflow-versions.query';
+import { GetWorkflowVersionHandler } from './application/queries/get-workflow-version.query';
 import { WorkflowVersionRepository } from './domain/repositories/workflow-version.repository';
 import { PrismaWorkflowVersionRepository } from './infrastructure/persistence/prisma-workflow-version.repository';
 import { NodeLibraryModule } from '@app/node-library';
@@ -28,7 +31,13 @@ const CommandHandlers = [
   PublishWorkflowHandler,
   RestoreVersionHandler,
 ];
-const QueryHandlers = [GetWorkflowDraftHandler, GetDraftStatusHandler];
+const QueryHandlers = [
+  GetWorkflowDraftHandler,
+  GetDraftStatusHandler,
+  GetWorkflowsHandler,
+  GetWorkflowVersionsHandler,
+  GetWorkflowVersionHandler,
+];
 const Repositories = [
   {
     provide: WorkflowRepository,

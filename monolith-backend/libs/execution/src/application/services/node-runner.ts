@@ -1,38 +1,31 @@
-import { BadRequestException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ExecutionRepository } from '../../domain/repositories/execution.repository';
 import { NodeLogRecord } from '../../domain/models/execution.types';
 import { ExecutionStatus } from '../../domain/constants/execution.constants';
+import { WorkflowNode } from '../../domain/entities/workflow-execution.entity';
+import { INodeExecutor } from '../../domain/entities/node-executor';
 import {
-  MAIN_OUTPUT,
-  WorkflowNode,
-} from '../../domain/entities/workflow-execution.entity';
-import {
-  INodeExecutor,
-  IOnceExecutor,
-  IPerItemExecutor,
-} from '../../domain/entities/node-executor';
-import {
-  createExpressionContext,
   ItemSource,
   NodeNameIndex,
   NodeRun,
 } from '../../domain/entities/run-state';
+import { Item } from '../../domain/models/item';
+import { ExecutionEventPublisher } from '../ports/execution-event-publisher.port';
 import {
-  applySchemaDefaults,
-  resolveConfig,
-} from '../../domain/expression/resolve-config';
-import { isPlainObject, Item, RoutedItem } from '../../domain/models/item';
-import {
-  ExecutionEventPublisher,
-  publishExecutionEventSafely,
-} from '../ports/execution-event-publisher.port';
+  ItemRunError,
+  NodeExecutionObserver,
+  sanitizeErrorText,
+} from './node-execution-observer';
+import { NodeConfigResolver } from './node-config-resolver';
+import { OnceExecutionStrategy } from './strategies/once-execution.strategy';
+import { PerItemExecutionStrategy } from './strategies/per-item-execution.strategy';
 
-const UUID_PATTERN =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+export { ItemRunError, sanitizeErrorText };
 
 export interface NodeRunParams {
   node: WorkflowNode;
   workflowId: string;
+  workflowVersionId?: string;
   executionId: string;
   items: Item[];
   // Where each input item came from; absent for the start node.
@@ -55,272 +48,105 @@ export interface NodeRunResult {
   status: ExecutionStatus;
 }
 
-// Raised when a per_item node fails part-way; carries the progress summary for the log.
-class ItemRunError extends Error {
-  constructor(
-    message: string,
-    readonly summary: {
-      total_items: number;
-      processed: number;
-      failed_at_index: number;
-    },
-  ) {
-    super(message);
-  }
-}
-
+@Injectable()
 export class NodeRunner {
+  private readonly configResolver: NodeConfigResolver;
+  private readonly observer: NodeExecutionObserver;
+  private readonly onceStrategy: OnceExecutionStrategy;
+  private readonly perItemStrategy: PerItemExecutionStrategy;
+  private readonly executors: ReadonlyMap<string, INodeExecutor>;
+
   constructor(
-    private readonly repository: ExecutionRepository,
-    private readonly executors: ReadonlyMap<string, INodeExecutor>,
-    private readonly eventPublisher?: ExecutionEventPublisher,
-  ) {}
+    configResolverOrRepo: NodeConfigResolver | ExecutionRepository,
+    observerOrExecutors:
+      NodeExecutionObserver | ReadonlyMap<string, INodeExecutor>,
+    onceStrategyOrPublisher?: OnceExecutionStrategy | ExecutionEventPublisher,
+    perItemStrategy?: PerItemExecutionStrategy,
+    @Inject('NODE_EXECUTORS_MAP')
+    executorsMap?: ReadonlyMap<string, INodeExecutor>,
+  ) {
+    // Injected DI signature: (configResolver, observer, onceStrategy, perItemStrategy, executorsMap)
+    if (
+      perItemStrategy !== undefined ||
+      (configResolverOrRepo &&
+        typeof (configResolverOrRepo as NodeConfigResolver).applyDefaults ===
+          'function')
+    ) {
+      this.configResolver = configResolverOrRepo as NodeConfigResolver;
+      this.observer = observerOrExecutors as NodeExecutionObserver;
+      this.onceStrategy = onceStrategyOrPublisher as OnceExecutionStrategy;
+      this.perItemStrategy = perItemStrategy as PerItemExecutionStrategy;
+      this.executors = executorsMap ?? new Map();
+    } else {
+      // Backward-compatible signature: (repository, executorsMap, eventPublisher?)
+      const repo = configResolverOrRepo as ExecutionRepository;
+      const publisher = onceStrategyOrPublisher as
+        ExecutionEventPublisher | undefined;
+      const rawExecutors = observerOrExecutors as ReadonlyMap<
+        string,
+        INodeExecutor
+      >;
+      this.configResolver = new NodeConfigResolver(repo);
+      this.observer = new NodeExecutionObserver(repo, publisher);
+      this.onceStrategy = new OnceExecutionStrategy(this.configResolver);
+      this.perItemStrategy = new PerItemExecutionStrategy(this.configResolver);
+      this.executors = rawExecutors;
+    }
+  }
+
+  static create(
+    repository: ExecutionRepository,
+    executors: ReadonlyMap<string, INodeExecutor> | INodeExecutor[],
+    eventPublisher?: ExecutionEventPublisher,
+  ): NodeRunner {
+    const executorsMap =
+      executors instanceof Map
+        ? executors
+        : Array.isArray(executors)
+          ? new Map(executors.map((e) => [e.key, e]))
+          : executors;
+    const resolver = new NodeConfigResolver(repository);
+    const observer = new NodeExecutionObserver(repository, eventPublisher);
+    const once = new OnceExecutionStrategy(resolver);
+    const perItem = new PerItemExecutionStrategy(resolver);
+    return new NodeRunner(resolver, observer, once, perItem, executorsMap);
+  }
 
   async run(params: NodeRunParams): Promise<NodeRunResult> {
-    const { node, items } = params;
     const startedAt = new Date();
-
-    await this.repository.saveNodeLog(params.executionId, {
-      nodeId: node.id,
-      nodeKey: node.data?.key ?? 'unknown',
-      status: ExecutionStatus.RUNNING,
-      input: items,
-      output: null,
-      startedAt,
-      finishedAt: null,
-    });
-    await publishExecutionEventSafely(this.eventPublisher, {
-      event: 'node.started',
-      executionId: params.executionId,
-      workflowId: params.workflowId,
-      nodeId: node.id,
-      nodeKey: node.data?.key ?? 'unknown',
-      status: ExecutionStatus.RUNNING,
-      startedAt: startedAt.toISOString(),
-      finishedAt: null,
-      ts: startedAt.toISOString(),
-    });
+    await this.observer.notifyStarted(params, startedAt);
 
     try {
-      const executor = this.executors.get(node.data?.key);
+      const executor = this.executors.get(params.node.data?.key);
       if (!executor) {
         throw new Error(
-          `No executor registered for node key: ${String(node.data?.key)}`,
+          `No executor registered for node key: ${String(params.node.data?.key)}`,
         );
       }
 
-      const rawConfig = applySchemaDefaults(
-        toRecord(node.data.config),
+      const rawConfig = this.configResolver.applyDefaults(
+        params.node.data?.config,
         params.configSchema,
       );
+
       const outputs =
         executor.runMode === 'once'
-          ? await this.runOnce(executor, rawConfig, params)
-          : await this.runPerItem(executor, rawConfig, params);
-      const output = [...outputs.values()].flat();
+          ? await this.onceStrategy.execute(executor, rawConfig, params)
+          : await this.perItemStrategy.execute(executor, rawConfig, params);
 
-      return {
-        log: {
-          nodeId: node.id,
-          nodeKey: node.data.key,
-          status: ExecutionStatus.SUCCESS,
-          input: items,
-          output,
-          startedAt,
-          finishedAt: new Date(),
-        },
-        output,
+      return await this.observer.notifyCompleted(
+        params,
         outputs,
-        status: ExecutionStatus.SUCCESS,
-      };
+        startedAt,
+        new Date(),
+      );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Node execution failed';
-      return {
-        log: {
-          nodeId: node.id,
-          nodeKey: node.data?.key ?? 'unknown',
-          status: ExecutionStatus.FAILED,
-          input: items,
-          output: error instanceof ItemRunError ? error.summary : null,
-          errorMessage: sanitizeErrorText(message),
-          startedAt,
-          finishedAt: new Date(),
-        },
-        output: [],
-        outputs: new Map(),
-        status: ExecutionStatus.FAILED,
-      };
-    }
-  }
-
-  private async runOnce(
-    executor: IOnceExecutor,
-    rawConfig: Record<string, unknown>,
-    params: NodeRunParams,
-  ): Promise<Map<string, Item[]>> {
-    const secret = await this.resolveCredential(
-      executor,
-      rawConfig,
-      params.credentialOwnerId,
-    );
-    const currentItem = params.items[0] ?? { json: {} };
-    const config = executor.parseConfig(
-      resolveConfig(
-        rawConfig,
-        params.configSchema,
-        createExpressionContext({
-          runs: params.runs,
-          names: params.names,
-          currentItem,
-          currentIndex: 0,
-          currentSources: params.inputSources,
-        }),
-      ),
-    );
-
-    const output = await executor.execute({
-      config,
-      items: params.items,
-      credential: secret,
-    });
-    if (
-      !Array.isArray(output) ||
-      !output.every((item) => isPlainObject(item) && isPlainObject(item.json))
-    ) {
-      throw new Error('Node returned an invalid list of items');
-    }
-    return new Map([[MAIN_OUTPUT, output]]);
-  }
-
-  private async runPerItem(
-    executor: IPerItemExecutor,
-    rawConfig: Record<string, unknown>,
-    params: NodeRunParams,
-  ): Promise<Map<string, Item[]>> {
-    const { items } = params;
-    const outputs = new Map<string, Item[]>(
-      (params.outputKeys ?? [MAIN_OUTPUT]).map((key) => [key, []]),
-    );
-    // Nothing to process: no credential lookup, no config validation.
-    if (items.length === 0) return outputs;
-
-    const cap = executor.maxItems?.(rawConfig);
-    if (cap && items.length > cap.limit) {
-      throw new Error(
-        `Node received ${items.length} items, which exceeds ${cap.reason}`,
+      return await this.observer.notifyFailed(
+        params,
+        error,
+        startedAt,
+        new Date(),
       );
     }
-
-    const secret = await this.resolveCredential(
-      executor,
-      rawConfig,
-      params.credentialOwnerId,
-    );
-
-    for (let index = 0; index < items.length; index += 1) {
-      try {
-        const config = executor.parseConfig(
-          resolveConfig(
-            rawConfig,
-            params.configSchema,
-            createExpressionContext({
-              runs: params.runs,
-              names: params.names,
-              currentItem: items[index],
-              currentIndex: index,
-              currentSources: params.inputSources,
-            }),
-          ),
-        );
-        const result = await executor.executeItem({
-          config,
-          item: items[index],
-          credential: secret,
-          context: {
-            workflowId: params.workflowId,
-            executionId: params.executionId,
-          },
-        });
-
-        const jsons =
-          result === null || result === undefined
-            ? []
-            : Array.isArray(result)
-              ? result
-              : [result];
-        for (const entry of jsons) {
-          const routed = entry instanceof RoutedItem;
-          const json = routed ? entry.json : entry;
-          if (!isPlainObject(json)) {
-            throw new Error('Node returned an invalid item');
-          }
-          const key = routed ? entry.output : MAIN_OUTPUT;
-          const target = outputs.get(key);
-          if (!target) {
-            throw new Error(
-              `Node returned an item for an unknown output "${key}"`,
-            );
-          }
-          target.push({ json, pairedItem: index });
-        }
-      } catch (error) {
-        throw new ItemRunError(
-          error instanceof Error ? error.message : 'Node execution failed',
-          {
-            total_items: items.length,
-            processed: index,
-            failed_at_index: index,
-          },
-        );
-      }
-    }
-    return outputs;
   }
-
-  // Runs once per node (not per item); credential_id is never an expression.
-  private async resolveCredential(
-    executor: INodeExecutor,
-    rawConfig: Record<string, unknown>,
-    ownerId: string,
-  ): Promise<unknown> {
-    const candidate = rawConfig.credential_id;
-    if (candidate === undefined) return null;
-    if (typeof candidate !== 'string' || !UUID_PATTERN.test(candidate)) {
-      throw new BadRequestException('Invalid credential ID format');
-    }
-
-    const resolved = await this.repository.resolveCredential(
-      candidate,
-      ownerId,
-    );
-    if (!resolved) throw new Error('credential was not found');
-
-    const expected = executor.expectedConnectorKey?.(rawConfig);
-    if (expected && resolved.connectorKey !== expected) {
-      throw new Error(
-        `Credential does not belong to the "${expected}" connector`,
-      );
-    }
-    return resolved.secret;
-  }
-}
-
-function toRecord(value: unknown): Record<string, unknown> {
-  return isPlainObject(value) ? value : {};
-}
-
-export function sanitizeErrorText(message: string): string {
-  return (
-    message
-      .replace(/\b(?:sk-ant-|sk-)[A-Za-z0-9_-]{16,}/g, '[REDACTED]')
-      .replace(/\bAIza[0-9A-Za-z_-]{20,}/g, '[REDACTED]')
-      // Meta Page / user access tokens.
-      .replace(/\bEAA[A-Za-z0-9]{20,}/g, '[REDACTED]')
-      .replace(
-        /(access_token|refresh_token|token|encrypted_secret|ENCRYPTION_KEY|client_secret|Bearer [A-Za-z0-9._~+/=-]+)/gi,
-        '[REDACTED]',
-      )
-      .replace(/\b[a-fA-F0-9]{32,}\b/g, '[REDACTED]')
-  );
 }

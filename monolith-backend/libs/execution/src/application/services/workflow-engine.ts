@@ -1,3 +1,4 @@
+import { Injectable, Optional } from '@nestjs/common';
 import { ExecutionRepository } from '../../domain/repositories/execution.repository';
 import { WorkflowVersionForExecution } from '../../domain/models/execution.types';
 import {
@@ -26,6 +27,7 @@ import {
   publishExecutionEventSafely,
 } from '../ports/execution-event-publisher.port';
 import { NodeRunner } from './node-runner';
+import { NodeExecutionObserver } from './node-execution-observer';
 
 export interface StartRunInput {
   version: WorkflowVersionForExecution;
@@ -37,20 +39,43 @@ export interface StartRunInput {
 
 // Runs a published version node by node. Shared by the manual (synchronous)
 // path and the queue processor (webhook).
+@Injectable()
 export class WorkflowEngine {
+  private readonly catalog: NodeCatalogPort;
   private readonly runner: NodeRunner;
+  private readonly observer: NodeExecutionObserver;
+  private readonly eventPublisher?: ExecutionEventPublisher;
 
   constructor(
     private readonly repository: ExecutionRepository,
-    executors: INodeExecutor[],
-    private readonly catalog: NodeCatalogPort,
-    private readonly eventPublisher?: ExecutionEventPublisher,
+    executorsOrCatalog: INodeExecutor[] | NodeCatalogPort,
+    catalogOrRunner?: NodeCatalogPort | NodeRunner,
+    runnerOrObserver?:
+      NodeRunner | NodeExecutionObserver | ExecutionEventPublisher,
+    @Optional() eventPublisher?: ExecutionEventPublisher,
   ) {
-    this.runner = new NodeRunner(
-      repository,
-      new Map(executors.map((executor) => [executor.key, executor])),
-      eventPublisher,
-    );
+    if (Array.isArray(executorsOrCatalog)) {
+      // Legacy signature: (repository, executors, catalog, publisher?)
+      const executors = executorsOrCatalog;
+      this.catalog = catalogOrRunner as NodeCatalogPort;
+      this.eventPublisher = runnerOrObserver as
+        ExecutionEventPublisher | undefined;
+      this.observer = new NodeExecutionObserver(
+        repository,
+        this.eventPublisher,
+      );
+      this.runner = NodeRunner.create(
+        repository,
+        executors,
+        this.eventPublisher,
+      );
+    } else {
+      // Clean DI signature: (repository, catalog, runner, observer, publisher?)
+      this.catalog = executorsOrCatalog;
+      this.runner = catalogOrRunner as NodeRunner;
+      this.observer = runnerOrObserver as NodeExecutionObserver;
+      this.eventPublisher = eventPublisher;
+    }
   }
 
   // Throws when the definition cannot be run, before anything is stored.
@@ -169,27 +194,12 @@ export class WorkflowEngine {
           activated = true;
         }
         if (!activated) {
-          const now = new Date();
-          await this.repository.saveNodeLog(executionId, {
-            nodeId: node.id,
-            nodeKey: node.data?.key ?? 'unknown',
-            status: 'SKIPPED',
-            input: [],
-            output: null,
-            startedAt: now,
-            finishedAt: now,
-          });
-          await publishExecutionEventSafely(this.eventPublisher, {
-            event: 'node.skipped',
+          await this.observer.notifySkipped({
             executionId,
             workflowId: version.workflowId,
             workflowVersionId: version.id,
             nodeId: node.id,
             nodeKey: node.data?.key ?? 'unknown',
-            status: 'SKIPPED',
-            startedAt: now.toISOString(),
-            finishedAt: now.toISOString(),
-            ts: now.toISOString(),
           });
           continue;
         }
@@ -205,6 +215,7 @@ export class WorkflowEngine {
       const result = await this.runner.run({
         node,
         workflowId: version.workflowId,
+        workflowVersionId: version.id,
         executionId,
         items,
         inputSources: edges.length > 0 ? inputSources : undefined,
@@ -213,25 +224,6 @@ export class WorkflowEngine {
         names,
         configSchema,
         credentialOwnerId: version.workflowOwnerId,
-      });
-
-      await this.repository.saveNodeLog(executionId, result.log);
-      const finishedAt = result.log.finishedAt ?? new Date();
-      await publishExecutionEventSafely(this.eventPublisher, {
-        event:
-          result.status === ExecutionStatus.SUCCESS
-            ? 'node.completed'
-            : 'node.failed',
-        executionId,
-        workflowId: version.workflowId,
-        workflowVersionId: version.id,
-        nodeId: node.id,
-        nodeKey: node.data?.key ?? 'unknown',
-        status: result.status,
-        startedAt: result.log.startedAt.toISOString(),
-        finishedAt: finishedAt.toISOString(),
-        durationMs: finishedAt.getTime() - result.log.startedAt.getTime(),
-        ts: finishedAt.toISOString(),
       });
 
       if (result.status === ExecutionStatus.FAILED) {

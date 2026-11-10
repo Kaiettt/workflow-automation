@@ -44,6 +44,12 @@ import {
 import { INodeExecutor } from './domain/entities/node-executor';
 import { ExecutionEventPublisher } from './application/ports/execution-event-publisher.port';
 import { InMemoryExecutionEventPublisher } from './infrastructure/events/in-memory-execution-event.publisher';
+import { ExecutionStreamService } from './application/services/execution-stream.service';
+import { NodeConfigResolver } from './application/services/node-config-resolver';
+import { NodeExecutionObserver } from './application/services/node-execution-observer';
+import { OnceExecutionStrategy } from './application/services/strategies/once-execution.strategy';
+import { PerItemExecutionStrategy } from './application/services/strategies/per-item-execution.strategy';
+import { NodeRunner } from './application/services/node-runner';
 
 @Module({
   imports: [
@@ -145,23 +151,60 @@ import { InMemoryExecutionEventPublisher } from './infrastructure/events/in-memo
       ],
     },
     {
+      provide: 'NODE_EXECUTORS_MAP',
+      useFactory: (executors: INodeExecutor[]) =>
+        new Map(executors.map((e) => [e.key, e])),
+      inject: ['NODE_EXECUTORS'],
+    },
+    NodeConfigResolver,
+    NodeExecutionObserver,
+    OnceExecutionStrategy,
+    PerItemExecutionStrategy,
+    {
+      provide: NodeRunner,
+      useFactory: (
+        configResolver: NodeConfigResolver,
+        observer: NodeExecutionObserver,
+        onceStrategy: OnceExecutionStrategy,
+        perItemStrategy: PerItemExecutionStrategy,
+        executorsMap: ReadonlyMap<string, INodeExecutor>,
+      ) =>
+        new NodeRunner(
+          configResolver,
+          observer,
+          onceStrategy,
+          perItemStrategy,
+          executorsMap,
+        ),
+      inject: [
+        NodeConfigResolver,
+        NodeExecutionObserver,
+        OnceExecutionStrategy,
+        PerItemExecutionStrategy,
+        'NODE_EXECUTORS_MAP',
+      ],
+    },
+    {
       provide: WorkflowEngine,
       useFactory: (
         repository: ExecutionRepository,
-        executors: INodeExecutor[],
         catalog: NodeCatalogPort,
+        runner: NodeRunner,
+        observer: NodeExecutionObserver,
         publisher: ExecutionEventPublisher,
-      ) => new WorkflowEngine(repository, executors, catalog, publisher),
+      ) => new WorkflowEngine(repository, catalog, runner, observer, publisher),
       inject: [
         ExecutionRepository,
-        'NODE_EXECUTORS',
         NodeCatalogPort,
+        NodeRunner,
+        NodeExecutionObserver,
         ExecutionEventPublisher,
       ],
     },
     { provide: ExecutionQueuePort, useClass: BullMqExecutionQueue },
     ExecutionStarter,
     ExecutionProcessor,
+    ExecutionStreamService,
     StartExecutionHandler,
     EnqueueExecutionHandler,
     GetExecutionHandler,

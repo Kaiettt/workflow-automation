@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Controller,
   Post,
@@ -7,7 +6,6 @@ import {
   Delete,
   Body,
   Param,
-  NotFoundException,
   BadRequestException,
   HttpCode,
   HttpStatus,
@@ -31,14 +29,23 @@ import { RenameWorkflowCommand } from '../../application/commands/rename-workflo
 import { DeleteWorkflowCommand } from '../../application/commands/delete-workflow.command';
 import { PublishWorkflowCommand } from '../../application/commands/publish-workflow.command';
 import { RestoreVersionCommand } from '../../application/commands/restore-version.command';
-import { GetDraftStatusQuery } from '../../application/queries/get-draft-status.query';
+import {
+  GetDraftStatusQuery,
+  DraftStatusResult,
+} from '../../application/queries/get-draft-status.query';
+import { GetWorkflowsQuery } from '../../application/queries/get-workflows.query';
+import { GetWorkflowVersionsQuery } from '../../application/queries/get-workflow-versions.query';
+import { GetWorkflowVersionQuery } from '../../application/queries/get-workflow-version.query';
+import {
+  WorkflowSummaryDto,
+  WorkflowVersionSummaryDto,
+  WorkflowVersionDetailDto,
+} from '../../application/dtos/workflow-queries.dto';
 import {
   CreateWorkflowDto,
   RenameWorkflowDto,
 } from './dtos/create-workflow.dto';
 import { RestoreVersionDto } from './dtos/restore-version.dto';
-import { WorkflowRepository } from '../../domain/repositories/workflow.repository';
-import { WorkflowVersionRepository } from '../../domain/repositories/workflow-version.repository';
 
 @ApiTags('workflows')
 @Controller('api/workflows')
@@ -46,8 +53,6 @@ export class WorkflowsController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
-    private readonly workflowRepo: WorkflowRepository,
-    private readonly workflowVersionRepo: WorkflowVersionRepository,
   ) {}
 
   @Get()
@@ -56,17 +61,12 @@ export class WorkflowsController {
   @ApiOperation({ summary: 'Get list of workflows owned by caller' })
   @ApiResponse({ status: 200, description: 'List of workflows returned' })
   async getWorkflows(@CurrentUser() user: AuthenticatedUser) {
-    const workflows = await this.workflowRepo.findByOwnerId(user.id);
+    const workflows: WorkflowSummaryDto[] = await this.queryBus.execute(
+      new GetWorkflowsQuery(user.id),
+    );
     return {
       success: true,
-      data: workflows.map((w) => ({
-        id: w.id,
-        name: w.name,
-        status: w.status,
-        active: w.active,
-        createdAt: w.createdAt,
-        updatedAt: w.updatedAt,
-      })),
+      data: workflows,
     };
   }
 
@@ -115,7 +115,7 @@ export class WorkflowsController {
     const command = new PublishWorkflowCommand(id, user.id);
 
     // Command handler returns { versionId, versionNumber }
-    const result = await this.commandBus.execute(command);
+    const result: unknown = await this.commandBus.execute(command);
 
     return {
       success: true,
@@ -129,20 +129,12 @@ export class WorkflowsController {
   @ApiResponse({ status: 200, description: 'List of versions returned' })
   @ApiResponse({ status: 404, description: 'Workflow not found' })
   async getVersions(@Param('id') id: string) {
-    const workflow = await this.workflowRepo.findById(id);
-    if (!workflow) {
-      throw new NotFoundException(`Workflow with ID ${id} not found.`);
-    }
-    const versions = await this.workflowVersionRepo.findByWorkflowId(id);
+    const versions: WorkflowVersionSummaryDto[] = await this.queryBus.execute(
+      new GetWorkflowVersionsQuery(id),
+    );
     return {
       success: true,
-      data: versions.map((v) => ({
-        id: v.id,
-        workflowId: v.workflowId,
-        versionNumber: v.versionNumber,
-        publishedAt: v.publishedAt,
-        publishedById: v.publishedById,
-      })),
+      data: versions,
     };
   }
 
@@ -156,14 +148,9 @@ export class WorkflowsController {
     @Param('id') id: string,
     @Param('versionId') versionId: string,
   ) {
-    const workflow = await this.workflowRepo.findById(id);
-    if (!workflow) {
-      throw new NotFoundException(`Workflow with ID ${id} not found.`);
-    }
-    const version = await this.workflowVersionRepo.findById(versionId);
-    if (!version || version.workflowId !== id) {
-      throw new NotFoundException(`Version with ID ${versionId} not found.`);
-    }
+    const version: WorkflowVersionDetailDto = await this.queryBus.execute(
+      new GetWorkflowVersionQuery(id, versionId),
+    );
     return {
       success: true,
       data: version,
@@ -209,7 +196,7 @@ export class WorkflowsController {
   @ApiResponse({ status: 200, description: 'Draft status returned' })
   async getDraftStatus(@Param('id') id: string) {
     const query = new GetDraftStatusQuery(id);
-    const result = await this.queryBus.execute(query);
+    const result: DraftStatusResult = await this.queryBus.execute(query);
     return {
       success: true,
       data: result,
