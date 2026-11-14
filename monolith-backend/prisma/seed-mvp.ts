@@ -1,4 +1,9 @@
-import { PrismaClient, UserRole, ConnectorAuthType, NodeCategory } from '@prisma/client';
+import {
+  PrismaClient,
+  UserRole,
+  ConnectorAuthType,
+  NodeCategory,
+} from '@prisma/client';
 import {
   AGGREGATE_CONFIG_SCHEMA,
   API_KEY_CONNECTOR_CONFIG_SCHEMA,
@@ -26,9 +31,10 @@ export async function seedMvp(prisma: PrismaClient) {
     create: {
       id: userId,
       email: 'kiet@flowpilot.local',
-      passwordHash: '$2b$10$qhBGHlAqCdvFzfzIJU5E6uE47odBXUD2pAFD50a6TY85o59vD6mTm', // Dummy hash
+      passwordHash:
+        '$2b$10$qhBGHlAqCdvFzfzIJU5E6uE47odBXUD2pAFD50a6TY85o59vD6mTm', // Dummy hash
       name: 'Kiet Nguyen',
-      role: UserRole.DEVELOPER,
+      role: UserRole.CLIENT,
       isActive: true,
     },
   });
@@ -55,9 +61,21 @@ export async function seedMvp(prisma: PrismaClient) {
 
   // LLM vendors: the user brings an API key (stored encrypted as a credential).
   const llmConnectors = [
-    { id: '22222222-2222-2222-2222-222222222222', key: 'anthropic', name: 'Anthropic' },
-    { id: '22222222-2222-2222-2222-222222222223', key: 'openai', name: 'OpenAI' },
-    { id: '22222222-2222-2222-2222-222222222224', key: 'gemini', name: 'Google Gemini' },
+    {
+      id: '22222222-2222-2222-2222-222222222222',
+      key: 'anthropic',
+      name: 'Anthropic',
+    },
+    {
+      id: '22222222-2222-2222-2222-222222222223',
+      key: 'openai',
+      name: 'OpenAI',
+    },
+    {
+      id: '22222222-2222-2222-2222-222222222224',
+      key: 'gemini',
+      name: 'Google Gemini',
+    },
   ];
   for (const { id, ...llmConnector } of llmConnectors) {
     const data = {

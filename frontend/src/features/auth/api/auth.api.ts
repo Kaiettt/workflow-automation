@@ -102,9 +102,9 @@ export const authApi = {
     }
   },
 
-  getMe: async (): Promise<{ success: boolean; data: User }> => {
+  getMe: async (signal?: AbortSignal): Promise<{ success: boolean; data: User }> => {
     try {
-      const res = await apiClient.get<{ success: boolean; data: User }>('/api/auth/me');
+      const res = await apiClient.get<{ success: boolean; data: User }>('/api/auth/me', { signal });
       return res.data;
     } catch (error: unknown) {
       throw new Error(extractErrorMessage(error, 'Failed to fetch user profile'), {

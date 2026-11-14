@@ -19,16 +19,16 @@ export function EventTriggerInfo({ workflowId, versionId, triggerName }: EventTr
     <div className="w-full max-w-md space-y-2 rounded-xl border border-border bg-muted/40 p-4">
       <div className="flex items-center gap-2 text-sm font-semibold">
         <Zap className="size-4 text-primary" />
-        Tự chạy khi “{triggerName}” nhận sự kiện
+        Runs automatically when “{triggerName}” receives an event
       </div>
       <p className="text-xs text-muted-foreground">
         {isLoading
-          ? 'Đang tải…'
+          ? 'Loading…'
           : listening
-            ? 'Phiên bản này đang lắng nghe (workflow đang Active).'
+            ? 'This version is listening for events while the workflow is active.'
             : state?.active
-              ? 'Workflow đang Active bằng một phiên bản khác; phiên bản này không nhận sự kiện.'
-              : 'Workflow đang tắt. Bật công tắc Active trong Designer để bắt đầu lắng nghe.'}
+              ? 'Another version is active. This version will not receive events.'
+              : 'This workflow is inactive. Turn on Active in the designer to start listening.'}
       </p>
       {listening &&
         urls.map((webhook) => (

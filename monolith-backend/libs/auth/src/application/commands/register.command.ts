@@ -73,7 +73,7 @@ export class RegisterHandler implements ICommandHandler<
       email,
       passwordHash,
       name: command.name,
-      role: command.role || UserRole.DEVELOPER,
+      role: UserRole.CLIENT,
       isActive: true,
     });
 
@@ -84,11 +84,12 @@ export class RegisterHandler implements ICommandHandler<
       sub: userId,
       email: user.email,
       role: user.role,
+      sessionVersion: user.sessionVersion,
     };
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshToken = this.jwtService.sign(
-      { sub: userId, type: 'refresh' },
+      { sub: userId, type: 'refresh', sessionVersion: user.sessionVersion },
       { expiresIn: '7d' },
     );
 

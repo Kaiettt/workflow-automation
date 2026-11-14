@@ -35,11 +35,11 @@ export const VersionStructureCard: React.FC<VersionStructureCardProps> = ({
             <CardTitle className="text-base flex items-center gap-2">
               <Layers className="size-4 text-primary" />
               <span>
-                Cấu trúc quy trình trong phiên bản ({nodes.length} nodes, {edgesCount} edges)
+                Workflow structure ({nodes.length} nodes, {edgesCount} edges)
               </span>
             </CardTitle>
             <CardDescription>
-              Tóm tắt các bước tuần tự được đóng băng trong phiên bản này.
+              A summary of the steps saved in this version.
             </CardDescription>
           </div>
         </div>
@@ -47,7 +47,7 @@ export const VersionStructureCard: React.FC<VersionStructureCardProps> = ({
       <CardContent>
         {nodes.length === 0 ? (
           <div className="py-6 text-center text-muted-foreground text-sm">
-            Phiên bản này không có node nào.
+            This version does not contain any nodes.
           </div>
         ) : (
           <div className="space-y-3">

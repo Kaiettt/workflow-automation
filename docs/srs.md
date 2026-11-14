@@ -21,6 +21,8 @@ MVP hướng tới hỗ trợ connectors: HTTP, Webhook, Gmail, Google Sheets, G
 
 | Thuật ngữ | Giải thích |
 | --- | --- |
+| Client | Người sử dụng FlowPilot để thiết kế và vận hành workflow, quản lý kết nối và theo dõi tài nguyên thuộc quyền của mình |
+| Admin | Người quản trị tài khoản, quyền truy cập và các kết nối dịch vụ của nền tảng |
 | Workflow | Đồ thị các node và edge mô tả quy trình tự động hóa |
 | Node type | Mẫu node trong catalog, định danh bởi `key` |
 | Node instance | Một node được đặt trên canvas, có ID, tên, vị trí và config riêng |
@@ -40,10 +42,10 @@ MVP hướng tới hỗ trợ connectors: HTTP, Webhook, Gmail, Google Sheets, G
 
 | Vai trò | Mục tiêu |
 | --- | --- |
-| Developer / Business User | Tạo tài khoản, thiết kế và publish workflow, kết nối dịch vụ, chạy version và xem kết quả |
-| Administrator | Quản trị người dùng và hệ thống theo quyền được cấp |
+| Client | Tạo tài khoản, thiết kế và publish workflow, quản lý kết nối của mình, chạy version, theo dõi kết quả và quản lý lịch sử phiên bản |
+| Admin | Quản trị tài khoản, trạng thái hoạt động, quyền truy cập và các kết nối dịch vụ của nền tảng |
 
-Các role tài khoản gồm `ADMIN`, `DEVELOPER`, `BUSINESS_USER`. Quyền truy cập tài nguyên phải được kiểm tra ở backend; không được dựa riêng vào trạng thái giao diện.
+Hệ thống chỉ có hai role tài khoản: `CLIENT` và `ADMIN`. Client bao gồm cả người dùng có nền tảng kỹ thuật và nhân sự nghiệp vụ; trình độ kỹ thuật không tạo ra vai trò phân quyền riêng. Tài khoản tự đăng ký luôn được cấp role `CLIENT`; role `ADMIN` được cấp qua quy trình quản trị. Quyền truy cập tài nguyên phải được kiểm tra ở backend; không được dựa riêng vào trạng thái giao diện.
 
 ### 2.2 Ràng buộc MVP
 
@@ -73,15 +75,15 @@ Mỗi yêu cầu có mã `FR-<module>-<số>`. Yêu cầu mô tả hành vi đí
 
 | Mã | Yêu cầu | Mô tả |
 | --- | --- | --- |
-| FR-AU-01 | Đăng ký tài khoản | Người dùng đăng ký bằng tên, email, password và role ban đầu `DEVELOPER` hoặc `BUSINESS_USER`; email đã tồn tại phải được phát hiện trước khi gửi mã đăng ký. |
+| FR-AU-01 | Đăng ký tài khoản | Người dùng đăng ký bằng tên, email và password; backend luôn cấp role `CLIENT`, không cho phép tự chọn role hoặc đăng ký thành `ADMIN`. Email đã tồn tại phải được phát hiện trước khi gửi mã đăng ký. |
 | FR-AU-02 | Xác minh email bằng OTP | Hệ thống gửi OTP 6 chữ số qua email; OTP hết hạn sau 5 phút, chỉ dùng một lần và có thể yêu cầu gửi lại. Xác minh thành công tạo trạng thái email đã xác minh có thời hạn 15 phút để hoàn tất đăng ký. |
 | FR-AU-03 | Đăng nhập và hồ sơ | Người dùng đăng nhập bằng email/password và lấy hồ sơ hiện tại qua API xác thực. Giao diện hiển thị danh tính và role của tài khoản đang đăng nhập. |
-| FR-AU-04 | Duy trì phiên | Access token có thời hạn 15 phút; refresh token có thời hạn 7 ngày. Refresh phải xác minh token, kiểm tra user còn active, xoay vòng token và cấp cặp token mới. Client tự refresh khi API trả `401`; refresh thất bại thì đăng xuất. |
+| FR-AU-04 | Duy trì phiên | Access token có thời hạn 15 phút; refresh token có thời hạn 7 ngày. Refresh phải xác minh token, kiểm tra user còn active, xoay vòng token và cấp cặp token mới. Ứng dụng frontend tự refresh khi API trả `401`; refresh thất bại thì đăng xuất. |
 | FR-AU-05 | Đăng xuất | Người dùng có thể đăng xuất; refresh token/session phía server bị vô hiệu hóa để không tiếp tục dùng trên thiết bị dùng chung. |
 | FR-AU-06 | Khôi phục mật khẩu | Người dùng yêu cầu OTP reset qua email, sau đó xác minh OTP và đặt mật khẩu mới cùng xác nhận. OTP reset dùng TTL và quy tắc sử dụng một lần như quy định trong auth spec. |
-| FR-AU-07 | Phân quyền | Backend xác thực JWT và áp dụng quyền theo role/ownership cho workflow, version, credential và execution. User chỉ được truy cập tài nguyên mà họ có quyền; endpoint quản trị yêu cầu quyền Admin. |
+| FR-AU-07 | Phân quyền | Backend xác thực JWT và áp dụng hai role `CLIENT`, `ADMIN` cùng kiểm tra ownership cho workflow, version, credential và execution. Client được thiết kế, publish, chạy và theo dõi workflow thuộc quyền của mình; không được truy cập tài nguyên của người dùng khác hoặc chức năng quản trị. Endpoint quản trị chỉ cho phép role `ADMIN`. |
 | FR-AU-08 | Kiểm tra mật khẩu | Mật khẩu đăng ký/đổi mới tối thiểu 8 ký tự, có chữ hoa, chữ thường, chữ số và ký tự đặc biệt; UI phản hồi độ mạnh và lỗi xác nhận mật khẩu trước khi gửi. |
-| FR-AU-09 | Quản lý người dùng | Administrator có thể tra cứu và quản lý tài khoản, trạng thái hoạt động và role theo chính sách phân quyền; mọi thay đổi quyền phải được kiểm tra ở backend. |
+| FR-AU-09 | Quản lý người dùng | Admin có thể tra cứu và quản lý tài khoản, trạng thái hoạt động và thay đổi role giữa `CLIENT` và `ADMIN` theo chính sách quản trị. Client không được tự thay đổi role; mọi thao tác thay đổi quyền phải được backend kiểm tra quyền Admin. |
 
 ### 3.2 Workflow Designer và Draft
 
@@ -117,7 +119,7 @@ Draft API phải trả lỗi not-found nếu workflow cha không tồn tại; up
 | FR-CF-04 | Credential bảo mật | Backend mã hóa credential bằng AES-256-GCM trước khi lưu; chỉ giải mã trong bộ nhớ khi cần gọi dịch vụ. Kiểm tra credential thuộc user hiện tại và connector mong đợi trước khi gọi executor. |
 | FR-CF-05 | Credential riêng tư | Không ghi plaintext secret, ciphertext credential, encryption key hoặc token vào workflow definition, execution context, node input/output log, API response hay error message. |
 | FR-CF-06 | Bộ connector MVP theo PRD | Mục tiêu hỗ trợ HTTP, Webhook, Gmail, Google Sheets, Google Drive, và OpenAI. Connector phải có contract mở rộng nhất quán; catalog/provider hiện có không thay thế yêu cầu triển khai từng integration này. |
-| FR-CF-07 | Quản lý kết nối bởi Admin | Administrator có thể cấu hình, xem trạng thái và quản lý các kết nối dịch vụ bên ngoài theo quyền được cấp; secret không được hiển thị lại khi xem thông tin kết nối. |
+| FR-CF-07 | Quản lý kết nối bởi Admin | Admin có thể cấu hình, xem trạng thái và quản lý các kết nối dịch vụ của nền tảng theo quyền quản trị; secret không được hiển thị lại khi xem thông tin kết nối. Client quản lý credential riêng theo các yêu cầu FR-CF-01 đến FR-CF-05. |
 
 MVP credential API yêu cầu không hiển thị lại API key sau khi tạo. Test connection, thu hồi/ngắt kết nối Google và refresh token tự động chưa được xác định đầy đủ trong các đặc tả hiện có.
 
@@ -202,6 +204,24 @@ PRD yêu cầu compare; chi tiết cách trình bày diff cần được đặc 
 
 Runtime baseline hiện trả kết quả của lần run từ version detail; màn hình history/filter và cập nhật trạng thái gần realtime là mục tiêu PRD cần bổ sung ngoài contract run đồng bộ hiện tại.
 
+### 3.10 Quản trị nền tảng
+
+Các yêu cầu Admin MVP được phân tích trong [Admin analysis](../specs/admin-management/analysis.md) và đặc tả chi tiết trong [Admin spec](../specs/admin-management/spec.md). Quy tắc khóa tài khoản, phạm vi dữ liệu và tác động connector trong spec là đề xuất để review trước khi triển khai.
+
+| Mã | Yêu cầu | Mô tả |
+| --- | --- | --- |
+| FR-AD-01 | Truy cập Admin và hai role | Backend chỉ cho Admin active truy cập khu vực quản trị; chuyển role cũ thành Client, public registration không cấp Admin. |
+| FR-AD-02 | Danh sách tài khoản | Admin tìm/lọc tài khoản theo tên, email, role và trạng thái, có phân trang. |
+| FR-AD-03 | Chi tiết tài khoản | Hiển thị metadata và số liệu tài nguyên thuộc tài khoản; không hiển thị password, token hoặc nội dung workflow. |
+| FR-AD-04 | Khóa/mở khóa | Bảo toàn dữ liệu, chặn truy cập và lượt chạy mới khi khóa; queued/running được xử lý theo Admin spec. |
+| FR-AD-05 | Thay đổi role | Cho phép đổi role tài khoản khác, chặn tự thay đổi và bảo đảm luôn có ít nhất một Admin active, kể cả khi thao tác đồng thời. |
+| FR-AD-06 | Hiệu lực phiên | Khóa/đổi role làm phiên cũ hết hiệu lực; mở khóa không hồi sinh token cũ. |
+| FR-AD-07 | Dashboard | Thống kê tài khoản/workflow, execution theo trạng thái, tỷ lệ thành công và xu hướng theo thời gian. |
+| FR-AD-08 | Catalog connector | Admin xem catalog, mức sử dụng và policy tạo credential mới mà không đọc secret. |
+| FR-AD-09 | Chính sách credential mới | Chặn/cho phép tạo credential mới độc lập với catalog/runtime; giữ credential cũ và chính sách qua seed/restart. |
+| FR-AD-10 | Theo dõi execution | Admin tra cứu metadata toàn nền tảng; projection không chứa definition, input/output, context hoặc raw error. |
+| FR-AD-11 | Nhật ký quản trị | Ghi actor, action, target, lý do và trạng thái trước/sau cùng transaction với thay đổi; Admin chỉ đọc. |
+
 ---
 
 ## 4. Yêu cầu phi chức năng
@@ -211,7 +231,7 @@ Runtime baseline hiện trả kết quả của lần run từ version detail; m
 | NFR-01 | Kiến trúc | Backend theo modular monolith, Clean Architecture và CQRS; module giao tiếp qua service/port rõ ràng thay vì truy cập trực tiếp data access của module khác. |
 | NFR-02 | Bảo mật tài khoản | Password lưu dưới dạng bcrypt hash; OTP và refresh token lưu Redis với TTL, không lưu OTP trong PostgreSQL hoặc log. SMTP chỉ cấu hình qua biến môi trường. |
 | NFR-03 | Bảo mật credential | Connector secrets mã hóa AES-256-GCM tại application layer; khóa mã hóa lấy từ cấu hình bảo mật; tuyệt đối không trả/lưu plaintext trong log, API response hay workflow definition. |
-| NFR-04 | Authorization | Endpoint riêng tư yêu cầu JWT; mọi truy cập workflow/version/credential/execution phải kiểm tra ownership hoặc role phía server. |
+| NFR-04 | Authorization | Endpoint riêng tư yêu cầu JWT; backend chỉ chấp nhận role `CLIENT` hoặc `ADMIN`, kiểm tra quyền truy cập và ownership với workflow/version/credential/execution. Client không được vượt phạm vi tài nguyên của mình; endpoint quản trị yêu cầu role `ADMIN`. |
 | NFR-05 | An toàn expression | Bộ resolve chỉ parse đường dẫn dữ liệu, không thực thi code người dùng. |
 | NFR-06 | Độ tin cậy | Lỗi node/provider phải chuyển trạng thái node/execution phù hợp và không làm crash tiến trình backend. Các node sau lỗi không được chạy tiếp trong execution tuyến tính. |
 | NFR-07 | Tính nhất quán | Publish/restore phải bảo toàn version bất biến; các thao tác nhiều bước có khả năng mất dữ liệu phải dùng transaction. Version number không được trùng trong cùng workflow. |

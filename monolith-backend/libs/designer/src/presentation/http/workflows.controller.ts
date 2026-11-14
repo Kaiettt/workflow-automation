@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { WorkflowOwnershipGuard } from '../../infrastructure/workflow-ownership.guard';
 import {
   ApiTags,
   ApiOperation,
@@ -49,6 +50,7 @@ import { RestoreVersionDto } from './dtos/restore-version.dto';
 
 @ApiTags('workflows')
 @Controller('api/workflows')
+@UseGuards(JwtAuthGuard, WorkflowOwnershipGuard)
 export class WorkflowsController {
   constructor(
     private readonly commandBus: CommandBus,
@@ -212,7 +214,11 @@ export class WorkflowsController {
     @Body() body: CreateWorkflowDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const ownerId = body.ownerId || user.id;
+    if (body.ownerId && body.ownerId !== user.id)
+      throw new BadRequestException(
+        'Cannot create a workflow for another account',
+      );
+    const ownerId = user.id;
     const command = new CreateWorkflowCommand(body.name, ownerId);
     const result: unknown = await this.commandBus.execute(command);
     const workflowId = result as string;

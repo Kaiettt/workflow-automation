@@ -10,6 +10,7 @@ export interface UserProps {
   isActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+  sessionVersion?: number;
 }
 
 export class User {
@@ -21,13 +22,15 @@ export class User {
   private _isActive: boolean;
   private readonly _createdAt?: Date;
   private _updatedAt?: Date;
+  readonly sessionVersion: number;
 
   private constructor(props: UserProps) {
     this._id = props.id;
     this._email = props.email.toLowerCase().trim();
     this._passwordHash = props.passwordHash;
     this._name = props.name.trim();
-    this._role = props.role ?? UserRole.DEVELOPER;
+    this._role = props.role ?? UserRole.CLIENT;
+    this.sessionVersion = props.sessionVersion ?? 0;
     this._isActive = props.isActive ?? true;
     this._createdAt = props.createdAt;
     this._updatedAt = props.updatedAt;

@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useWorkflowMutations } from '../hooks/useWorkflowMutations';
 import { Button } from '@/components/ui/button';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { FlowPilotBrand } from '@/components/layout/FlowPilotBrand';
 import {
   Card,
   CardContent,
@@ -93,7 +95,7 @@ export const WorkflowListPage: React.FC = () => {
       },
       onError: (err) => {
         console.error('Failed to create workflow', err);
-        setActionError('Không thể tạo quy trình mới. Vui lòng thử lại!');
+        setActionError('Could not create a workflow. Please try again.');
       },
     });
   };
@@ -101,49 +103,39 @@ export const WorkflowListPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Top Navbar */}
-      <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
+      <AppHeader>
           <div className="flex items-center gap-4">
-            <Link
-              to="/"
-              className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground transition-opacity hover:opacity-80"
-            >
-              <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground font-mono text-xs shadow-sm">
-                FP
-              </div>
-              <span className="hidden sm:inline font-bold">FlowPilot</span>
-            </Link>
+            <FlowPilotBrand />
 
-            <span className="text-muted-foreground/40 text-sm">/</span>
+            <span className="hidden text-muted-foreground/40 text-sm sm:inline">/</span>
 
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+            <div className="hidden items-center gap-1.5 text-xs text-muted-foreground font-medium sm:flex">
               <Layers className="size-3.5" />
               <span>Workflows</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Link to="/">
-              <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
+              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" aria-label="Back to home" nativeButton={false} render={<Link to="/" />}>
                 <Home className="size-3.5" />
-                <span className="hidden sm:inline">Trang chủ</span>
+                <span className="hidden sm:inline">Home</span>
               </Button>
-            </Link>
             <Button
               onClick={handleCreateNew}
               disabled={creating}
               size="sm"
-              className="gap-1.5 text-xs shadow-sm"
+              aria-label={creating ? 'Creating…' : 'New workflow'}
+              className="h-8 gap-1.5 text-xs shadow-sm"
             >
               <Plus className="size-3.5" />
-              <span>{creating ? 'Đang tạo...' : 'Tạo Workflow mới'}</span>
+              <span className="hidden sm:inline">{creating ? 'Creating…' : 'New workflow'}</span>
+              <span className="sm:hidden">{creating ? 'Creating…' : 'New'}</span>
             </Button>
           </div>
-        </div>
-      </header>
+      </AppHeader>
 
       {/* Main Container */}
-      <main className="flex-1 container mx-auto max-w-7xl px-4 sm:px-6 py-8">
+      <main className="flex-1 container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Hero Banner */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -152,10 +144,10 @@ export const WorkflowListPage: React.FC = () => {
               <span>Orchestration Dashboard</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              Danh sách Quy trình (Workflows)
+              My workflows
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Quản lý các quy trình tự động hóa, mở bản thiết kế hoặc xem các phiên bản đã xuất bản để khởi chạy.
+              Manage your workflows, edit drafts, and run published versions.
             </p>
           </div>
 
@@ -173,7 +165,7 @@ export const WorkflowListPage: React.FC = () => {
               className="w-fit gap-1.5 text-xs"
             >
               <Plus className="size-4" />
-              <span>{creating ? 'Đang tạo...' : 'Tạo Workflow mới'}</span>
+              <span>{creating ? 'Creating…' : 'New workflow'}</span>
             </Button>
           </div>
         </div>
@@ -182,21 +174,21 @@ export const WorkflowListPage: React.FC = () => {
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="mt-3 text-sm text-muted-foreground">Đang tải danh sách quy trình...</p>
+            <p className="mt-3 text-sm text-muted-foreground">Loading workflows…</p>
           </div>
         )}
 
         {isError && (
           <Card className="border-destructive/30 bg-destructive/5">
             <CardHeader>
-              <CardTitle className="text-destructive text-base">Không thể tải danh sách quy trình</CardTitle>
+              <CardTitle className="text-destructive text-base">Could not load workflows</CardTitle>
               <CardDescription>
-                Vui lòng kiểm tra xem backend API đã được khởi động và kết nối ổn định hay chưa.
+                Check your connection and try again.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button variant="outline" size="sm" onClick={() => refetch()}>
-                Thử lại
+                Try again
               </Button>
             </CardContent>
           </Card>
@@ -209,14 +201,14 @@ export const WorkflowListPage: React.FC = () => {
                 <WorkflowIcon className="size-6" />
               </div>
               <div className="max-w-md">
-                <h3 className="text-base font-semibold">Chưa có quy trình nào</h3>
+                <h3 className="text-base font-semibold">No workflows yet</h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Bắt đầu tạo quy trình tự động hóa đầu tiên của bạn bằng cách nhấn nút &quot;Tạo Workflow mới&quot; bên dưới.
+                  Create your first automated workflow to get started.
                 </p>
               </div>
               <Button onClick={handleCreateNew} disabled={creating} size="sm" className="mt-2 text-xs gap-1.5">
                 <Plus className="size-3.5" />
-                <span>Tạo Workflow đầu tiên</span>
+                <span>Create your first workflow</span>
               </Button>
             </CardContent>
           </Card>

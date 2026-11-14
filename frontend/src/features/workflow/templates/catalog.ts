@@ -40,7 +40,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     nodes: [
       node('manual', 'trigger.manual', 'Manual Trigger', 0, 120),
       node('sheets', 'integration.google_sheet.readRows', 'Read Google Sheet Rows', 300, 120, { spreadsheet_id: '', sheet_name: 'Sheet1' }),
-      node('gmail', 'integration.gmail.send', 'Send Gmail', 600, 120, { to: '{{$json.Email}}', subject: 'Notification: {{$json["Họ và tên"]}}', body: 'Hello {{$json["Họ và tên"]}},\n\nThis is an automated notification.' }),
+      node('gmail', 'integration.gmail.send', 'Send Gmail', 600, 120, { to: '{{$json.Email}}', subject: 'Notification: {{$json["Full name"]}}', body: 'Hello {{$json["Full name"]}},\n\nThis is an automated notification.' }),
     ],
     edges: [edge('manual', 'sheets', 'e1'), edge('sheets', 'gmail', 'e2')],
   },

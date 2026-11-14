@@ -12,6 +12,7 @@ export class RefreshTokenCommand {
 interface JwtRefreshPayload {
   sub: string;
   type?: string;
+  sessionVersion?: number;
 }
 
 @CommandHandler(RefreshTokenCommand)
@@ -53,7 +54,11 @@ export class RefreshTokenHandler implements ICommandHandler<
     }
 
     const user = await this.userRepository.findById(userId);
-    if (!user || !user.isActive) {
+    if (
+      !user ||
+      !user.isActive ||
+      payload.sessionVersion !== user.sessionVersion
+    ) {
       throw new UnauthorizedException('User account is invalid or deactivated');
     }
 
@@ -63,12 +68,13 @@ export class RefreshTokenHandler implements ICommandHandler<
         sub: user.id,
         email: user.email,
         role: user.role,
+        sessionVersion: user.sessionVersion,
       },
       { expiresIn: '15m' },
     );
 
     const newRefreshToken = this.jwtService.sign(
-      { sub: user.id, type: 'refresh' },
+      { sub: user.id, type: 'refresh', sessionVersion: user.sessionVersion },
       { expiresIn: '7d' },
     );
 

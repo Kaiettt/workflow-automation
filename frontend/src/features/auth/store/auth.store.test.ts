@@ -7,7 +7,7 @@ describe('useAuthStore', () => {
     id: 'user-1',
     email: 'user@example.com',
     name: 'Test User',
-    role: 'DEVELOPER',
+    role: 'CLIENT',
   };
 
   beforeEach(() => {

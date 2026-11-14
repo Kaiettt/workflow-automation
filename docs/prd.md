@@ -56,21 +56,23 @@ Cách tiếp cận này dẫn đến nhiều hạn chế:
 
 # 2. Đối tượng sử dụng
 
-FlowPilot hướng đến ba nhóm người dùng chính: **Workflow Developer**, **Business User** và **Administrator**.
+FlowPilot có hai vai trò người dùng: **Client** và **Admin**.
 
 ---
 
-## 2.1. Workflow Developer
+## 2.1. Client
 
 ### Mô tả
 
-Người có nền tảng kỹ thuật, chịu trách nhiệm thiết kế các workflow phức tạp, quy mô lớn, thường liên quan đến nhiều hệ thống và nhiều nhánh xử lý.
+Người sử dụng FlowPilot để tự động hóa công việc cá nhân hoặc quy trình nghiệp vụ của tổ chức. Client có thể là nhân sự vận hành, kinh doanh, marketing, kế toán hoặc người có nền tảng kỹ thuật; tất cả sử dụng cùng một vai trò tài khoản để thiết kế và vận hành workflow.
 
 ### Nhu cầu
 
-- Xây dựng các quy trình nhiều bước, nhiều điều kiện và nhiều nhánh xử lý.
+- Tự tạo workflow bằng giao diện kéo thả dễ hiểu, từ quy trình đơn giản đến nhiều bước, nhiều điều kiện và nhiều nhánh xử lý.
 - Tích hợp với nhiều hệ thống và dịch vụ khác nhau.
+- Quản lý các tài khoản kết nối của mình để sử dụng trong workflow.
 - Quản lý, cập nhật và mở rộng workflow theo thời gian.
+- Chạy workflow, theo dõi trạng thái và nhận cảnh báo khi có lỗi.
 - Điều tra và xử lý sự cố dựa trên lịch sử chạy.
 - Kiểm soát thay đổi thông qua cơ chế phiên bản.
 - Khôi phục workflow về phiên bản ổn định khi cần.
@@ -84,22 +86,7 @@ Thiết kế quy trình xử lý đơn hàng đi qua nhiều hệ thống:
 3. Gửi thông báo cho các bên liên quan.
 4. Đồng bộ dữ liệu sang hệ thống quản lý kho và CRM.
 
----
-
-## 2.2. Business User
-
-### Mô tả
-
-Nhân sự nghiệp vụ như vận hành, kinh doanh, marketing hoặc kế toán, có ít hoặc không có nền tảng kỹ thuật nhưng muốn tự động hóa công việc hằng ngày.
-
-### Nhu cầu
-
-- Tự tạo workflow đơn giản mà không cần hỗ trợ từ đội kỹ thuật.
-- Sử dụng giao diện dễ hiểu và ít thao tác.
-- Theo dõi được trạng thái hoạt động của workflow.
-- Nhận cảnh báo khi workflow gặp lỗi.
-
-### Ví dụ
+Các workflow phục vụ công việc hằng ngày:
 
 - Tự động gửi thông báo Slack khi có dòng mới trong Google Sheets.
 - Tự động lưu tệp đính kèm từ email vào Google Drive.
@@ -107,7 +94,7 @@ Nhân sự nghiệp vụ như vận hành, kinh doanh, marketing hoặc kế to�
 
 ---
 
-## 2.3. Administrator
+## 2.2. Admin
 
 ### Mô tả
 
@@ -124,8 +111,15 @@ Người quản trị hệ thống, chịu trách nhiệm vận hành nền tả
 ### Ví dụ
 
 - Thêm kết nối Google Workspace hoặc Microsoft 365 cho tổ chức.
-- Cấp quyền tạo workflow cho nhóm vận hành.
+- Quản lý tài khoản Client và trạng thái hoạt động của tài khoản.
 - Thu hồi quyền truy cập của người dùng đã nghỉ việc.
+
+## 2.3. Quy tắc phân quyền
+
+- Tài khoản tự đăng ký được cấp vai trò **Client**; người đăng ký không tự chọn vai trò Admin.
+- Client có quyền tạo, chỉnh sửa, publish, chạy và quản lý phiên bản, lịch sử thực thi cùng các kết nối thuộc quyền của mình.
+- Admin quản lý tài khoản, cấp hoặc thu hồi quyền và quản lý kết nối dịch vụ của nền tảng. Quyền Admin được cấp qua quy trình quản trị.
+- Quyền truy cập phải được kiểm tra ở backend; Client không được truy cập tài nguyên của người dùng khác hoặc chức năng quản trị.
 
 # 3. Phạm vi dự án
 
@@ -139,8 +133,9 @@ Người quản trị hệ thống, chịu trách nhiệm vận hành nền tả
 | **Vận hành workflow** | Workflow Execution Engine thực thi workflow theo đúng luồng đã thiết kế và hỗ trợ cơ chế tự động thử lại (retry) khi gặp lỗi tạm thời. |
 | **Theo dõi và giám sát** | Execution Monitor hiển thị trạng thái các lần chạy; Workflow Logs lưu lịch sử thực thi để phục vụ tra cứu và xử lý sự cố. |
 | **Quản lý phiên bản** | Lưu phiên bản workflow, so sánh sự khác biệt giữa các phiên bản và khôi phục về phiên bản trước đó. |
-| **Quản lý người dùng** | Hỗ trợ đăng nhập, quản lý tài khoản và phân quyền theo vai trò: Administrator, Workflow Developer và Business User. |
-| **Quản lý kết nối** | Administrator có thể cấu hình, lưu trữ và quản lý các tài khoản kết nối tới các dịch vụ bên ngoài. |
+| **Quản lý người dùng** | Hỗ trợ đăng ký, đăng nhập, quản lý tài khoản và phân quyền với hai vai trò Client và Admin; tài khoản tự đăng ký mặc định là Client. |
+| **Quản lý kết nối** | Client quản lý các tài khoản kết nối của mình; Admin cấu hình và quản lý các kết nối dịch vụ của nền tảng theo quyền quản trị. |
+| **Quản trị nền tảng** | Admin quản lý trạng thái tài khoản và role, xem dashboard, tra cứu metadata execution, kiểm soát việc tạo kết nối mới và theo dõi nhật ký quản trị. |
 
 ---
 
@@ -249,6 +244,18 @@ Quản lý phiên bản workflow.
 - Save Version
 - Compare Version
 - Rollback
+
+## 4.8 Quản trị nền tảng
+
+Khu vực dành cho Admin để quản lý và theo dõi toàn nền tảng:
+
+- Tra cứu tài khoản, khóa/mở khóa và chuyển vai trò Client ↔ Admin theo chính sách quản trị.
+- Dashboard thống kê tài khoản, workflow, lượt chạy và xu hướng lỗi.
+- Cho phép hoặc chặn tạo kết nối dịch vụ mới, bảo toàn credential hiện có.
+- Tra cứu metadata execution và trạng thái node; quyền Admin không tự cho phép đọc nội dung workflow, input/output hoặc secret của Client.
+- Nhật ký ghi nhận các thay đổi quản trị tài khoản và chính sách connector.
+
+Phạm vi, quy tắc tác động và tiêu chí nghiệm thu được đề xuất trong [Admin spec](../specs/admin-management/spec.md).
 
 ---
 

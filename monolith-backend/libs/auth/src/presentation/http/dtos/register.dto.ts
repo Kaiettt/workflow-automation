@@ -4,11 +4,11 @@ import {
   IsOptional,
   IsString,
   Matches,
-  IsEnum,
+  IsIn,
+  ValidateIf,
   Length,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserRole } from '../../../domain/enums/user-role.enum';
 
 export class RegisterDto {
   @ApiProperty({ example: 'dev@flowpilot.local' })
@@ -31,12 +31,9 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Name cannot be empty' })
   name: string;
 
-  @ApiPropertyOptional({ enum: UserRole, default: UserRole.DEVELOPER })
-  @IsOptional()
-  @IsEnum(UserRole, {
-    message: 'Role must be ADMIN, DEVELOPER, or BUSINESS_USER',
-  })
-  role?: UserRole;
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsIn([], { message: 'Role cannot be selected during registration' })
+  role?: never;
 
   @ApiPropertyOptional({ example: '123456', minLength: 6, maxLength: 6 })
   @IsOptional()

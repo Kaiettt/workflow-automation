@@ -34,7 +34,7 @@ describe('ExecutionNodeLogTable', () => {
   it('renders table headers and node logs', () => {
     render(<ExecutionNodeLogTable nodeLogs={mockLogs} />);
 
-    expect(screen.getByText('Nhật ký thực thi từng bước (Node Logs)')).toBeTruthy();
+    expect(screen.getByText('Node execution logs')).toBeTruthy();
     expect(screen.getByText('webhook-node')).toBeTruthy();
     expect(screen.getByText('filter-node')).toBeTruthy();
     expect(screen.getByText('trigger.webhook')).toBeTruthy();
@@ -59,7 +59,7 @@ describe('ExecutionNodeLogTable', () => {
 
   it('displays empty state message when no node logs exist', () => {
     render(<ExecutionNodeLogTable nodeLogs={[]} />);
-    expect(screen.getByText('Không có nhật ký node nào được ghi nhận.')).toBeTruthy();
+    expect(screen.getByText('No node logs were recorded.')).toBeTruthy();
   });
 });
 

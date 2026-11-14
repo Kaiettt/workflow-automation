@@ -42,7 +42,7 @@ export function ExecutionHistoryList({
                         dateTime={timestamp}
                         className="text-[11px] text-muted-foreground"
                       >
-                        {new Date(timestamp).toLocaleString()}
+                        {new Date(timestamp).toLocaleString('en-US')}
                       </time>
                     )}
                   </span>

@@ -1,4 +1,10 @@
 import { useState } from 'react';
+import { AdminGuard } from './features/admin/components/AdminGuard';
+import { AdminLayout } from './features/admin/components/AdminLayout';
+import { AuthCacheBoundary } from './features/admin/components/AuthCacheBoundary';
+import { UsersPage } from './features/admin/pages/UsersPage';
+import { UserDetailPage } from './features/admin/pages/UserDetailPage';
+import { DashboardPage } from './features/admin/pages/DashboardPage';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { HomePage } from './features/home/pages/HomePage';
 import { DesignerPage } from './features/workflow/pages/DesignerPage';
@@ -51,7 +57,15 @@ function LegacyWorkflowRedirect() {
 function App() {
   return (
     <BrowserRouter>
+      <AuthCacheBoundary />
       <Routes>
+        <Route element={<AdminGuard />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="users/:id" element={<UserDetailPage />} />
+          </Route>
+        </Route>
         <Route path="/" element={<LegacyWorkflowRedirect />} />
         <Route path="/workflows" element={<WorkflowListPage />} />
         <Route path="/workflows/:workflowId" element={<DesignerPage />} />

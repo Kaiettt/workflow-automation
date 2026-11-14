@@ -62,10 +62,16 @@ export interface NodeLogRecord {
   nodeId: string;
   nodeKey: string;
   // SKIPPED: no incoming edge was activated, so the node did not run.
-  status: Exclude<ExecutionStatus, ExecutionStatus.QUEUED> | 'SKIPPED';
+  status:
+    | Exclude<
+        ExecutionStatus,
+        ExecutionStatus.QUEUED | ExecutionStatus.CANCELLED
+      >
+    | 'SKIPPED';
   input: unknown;
   output: unknown;
   errorMessage?: string;
+  errorCode?: string;
   startedAt: Date;
   finishedAt: Date | null;
 }

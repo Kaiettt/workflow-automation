@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdminModule } from '../../../libs/admin/src/admin.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DesignerModule } from '@app/designer';
@@ -12,6 +13,7 @@ import { TriggersModule } from '@app/triggers';
 
 @Module({
   imports: [
+    AdminModule,
     DesignerModule,
     PrismaModule,
     AuthModule,

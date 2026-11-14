@@ -41,20 +41,20 @@ export const RestoreConflictDialog: React.FC<RestoreConflictDialogProps> = ({
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle className="text-lg font-semibold">
-              Khôi phục Phiên bản v{targetVersionNumber}
+              Restore version v{targetVersionNumber}
             </DialogTitle>
-            <Badge variant="outline">Cảnh báo</Badge>
+            <Badge variant="outline">Warning</Badge>
           </div>
           <DialogDescription>
-            Bản nháp hiện tại của bạn đang có những thay đổi chưa được xuất bản.
+            Your current draft has unpublished changes.
           </DialogDescription>
         </DialogHeader>
 
         <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200">
           <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
-          <AlertTitle className="font-medium">Phát hiện bản nháp chưa xuất bản</AlertTitle>
+          <AlertTitle className="font-medium">Unpublished draft changes</AlertTitle>
           <AlertDescription className="text-xs">
-            Việc khôi phục phiên bản <strong>v{targetVersionNumber}</strong> sẽ ghi đè lên bản nháp đang chỉnh sửa. Vui lòng chọn cách xử lý bên dưới để tránh mất dữ liệu:
+            Restoring version <strong>v{targetVersionNumber}</strong> will overwrite your current draft. Choose how to handle your unpublished changes:
           </AlertDescription>
         </Alert>
 
@@ -74,13 +74,13 @@ export const RestoreConflictDialog: React.FC<RestoreConflictDialogProps> = ({
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">Xuất bản bản nháp trước</span>
+                  <span className="text-sm font-medium">Publish the draft first</span>
                   <Badge variant="secondary" className="text-[10px]">
-                    Khuyến nghị - An toàn nhất
+                    Recommended
                   </Badge>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Lưu các thay đổi dở dang thành một phiên bản snapshot mới trong lịch sử, sau đó nạp phiên bản v{targetVersionNumber} vào bản nháp. Bạn có thể quay lại bất cứ lúc nào.
+                  Save your current draft as a new version, then restore version v{targetVersionNumber} into the draft. You can return to the saved version later.
                 </p>
               </div>
             </div>
@@ -100,9 +100,9 @@ export const RestoreConflictDialog: React.FC<RestoreConflictDialogProps> = ({
                 <Copy className="size-4" />
               </div>
               <div className="flex-1">
-                <span className="text-sm font-medium">Tách thành Workflow mới (Backup)</span>
+                <span className="text-sm font-medium">Create a backup workflow</span>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Tạo một workflow bản sao độc lập để lưu giữ ý tưởng đang làm dở, sau đó khôi phục v{targetVersionNumber} tại workflow này.
+                  Create a separate workflow to preserve your current draft, then restore v{targetVersionNumber} into this workflow.
                 </p>
               </div>
             </div>
@@ -122,9 +122,9 @@ export const RestoreConflictDialog: React.FC<RestoreConflictDialogProps> = ({
                 <Trash2 className="size-4" />
               </div>
               <div className="flex-1">
-                <span className="text-sm font-medium text-destructive">Hủy bỏ thay đổi & Ghi đè trực tiếp</span>
+                <span className="text-sm font-medium text-destructive">Discard changes and restore</span>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Xóa bỏ toàn bộ các thay đổi chưa xuất bản và nạp trực tiếp v{targetVersionNumber}. <em>Không thể hoàn tác sau khi ghi đè.</em>
+                  Discard all unpublished changes and restore v{targetVersionNumber}. <em>This cannot be undone after overwriting.</em>
                 </p>
               </div>
             </div>
@@ -138,7 +138,7 @@ export const RestoreConflictDialog: React.FC<RestoreConflictDialogProps> = ({
             onClick={() => onOpenChange(false)}
             disabled={loading}
           >
-            Hủy bỏ
+            Cancel
           </Button>
           <Button
             type="button"
@@ -146,7 +146,7 @@ export const RestoreConflictDialog: React.FC<RestoreConflictDialogProps> = ({
             onClick={handleConfirm}
             disabled={loading}
           >
-            {loading ? 'Đang khôi phục...' : 'Xác nhận khôi phục'}
+            {loading ? 'Restoring…' : 'Confirm restore'}
           </Button>
         </DialogFooter>
       </DialogContent>

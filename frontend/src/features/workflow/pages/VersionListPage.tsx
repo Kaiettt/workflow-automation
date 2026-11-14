@@ -46,14 +46,14 @@ export const VersionListPage: React.FC = () => {
               className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium transition-colors"
             >
               <ChevronLeft className="size-4" />
-              <span>Danh sách Workflows</span>
+              <span>Workflows</span>
             </Link>
             <span className="text-muted-foreground/40">/</span>
             <span className="font-mono text-muted-foreground truncate max-w-[120px] sm:max-w-[200px]">
               {workflowId}
             </span>
             <span className="text-muted-foreground/40">/</span>
-            <span className="font-semibold text-foreground">Phiên bản</span>
+            <span className="font-semibold text-foreground">Version</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -64,7 +64,7 @@ export const VersionListPage: React.FC = () => {
               className="gap-1.5 text-xs"
             >
               <PenTool className="size-3.5" />
-              <span>Mở Designer</span>
+              <span>Open designer</span>
             </Button>
           </div>
         </div>
@@ -79,10 +79,10 @@ export const VersionListPage: React.FC = () => {
               <span>Version Management</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              Danh sách Phiên bản đã xuất bản
+              Published versions
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Chọn một phiên bản bất kỳ để xem cấu trúc và khởi chạy trực tiếp với Execution Engine (Run UI).
+              Choose a version to review its structure and run an execution.
             </p>
           </div>
 
@@ -93,7 +93,7 @@ export const VersionListPage: React.FC = () => {
             className="w-fit gap-1.5 text-xs shadow-sm"
           >
             <PenTool className="size-3.5" />
-            <span>Chỉnh sửa bản nháp trong Designer</span>
+            <span>Edit draft in designer</span>
           </Button>
         </div>
 
@@ -101,21 +101,21 @@ export const VersionListPage: React.FC = () => {
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="mt-3 text-sm text-muted-foreground">Đang nạp danh sách phiên bản...</p>
+            <p className="mt-3 text-sm text-muted-foreground">Loading versions…</p>
           </div>
         )}
 
         {isError && (
           <Card className="border-destructive/30 bg-destructive/5">
             <CardHeader>
-              <CardTitle className="text-destructive text-base">Không thể nạp danh sách phiên bản</CardTitle>
+              <CardTitle className="text-destructive text-base">Could not load versions</CardTitle>
               <CardDescription>
-                Không tìm thấy quy trình hoặc đã xảy ra lỗi kết nối với máy chủ.
+                The workflow could not be found, or the connection failed.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button variant="outline" size="sm" onClick={() => refetch()}>
-                Thử lại
+                Try again
               </Button>
             </CardContent>
           </Card>
@@ -128,9 +128,9 @@ export const VersionListPage: React.FC = () => {
                 <GitBranch className="size-6" />
               </div>
               <div className="max-w-md">
-                <h3 className="text-base font-semibold">Chưa có phiên bản nào được xuất bản</h3>
+                <h3 className="text-base font-semibold">No published versions yet</h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Quy trình này hiện đang ở trạng thái bản nháp. Hãy mở Designer và nhấn nút "Xuất bản (Publish)" để tạo phiên bản v1.
+                  This workflow is a draft. Open the designer and select Publish to create version v1.
                 </p>
               </div>
               <Button
@@ -138,7 +138,7 @@ export const VersionListPage: React.FC = () => {
                 size="sm"
                 className="mt-2 text-xs gap-1.5"
               >
-                <span>Mở Designer để Xuất bản</span>
+                <span>Open designer to publish</span>
                 <ArrowRight className="size-3.5" />
               </Button>
             </CardContent>
@@ -150,11 +150,11 @@ export const VersionListPage: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="w-[180px]">Phiên bản</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead className="hidden sm:table-cell">Thời gian xuất bản</TableHead>
-                  <TableHead className="hidden md:table-cell">Mã định danh (Version ID)</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
+                  <TableHead className="w-[180px]">Version</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden sm:table-cell">Published</TableHead>
+                  <TableHead className="hidden md:table-cell">Version ID</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -168,7 +168,7 @@ export const VersionListPage: React.FC = () => {
                             v{ver.versionNumber}
                           </div>
                           <span className="font-semibold text-sm">
-                            Phiên bản {ver.versionNumber}
+                            Version {ver.versionNumber}
                           </span>
                         </div>
                       </TableCell>
@@ -176,11 +176,11 @@ export const VersionListPage: React.FC = () => {
                       <TableCell>
                         {isActive ? (
                           <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-medium text-xs">
-                            Đang hoạt động (Active)
+                            Active
                           </Badge>
                         ) : (
                           <Badge variant="secondary" className="text-muted-foreground text-xs">
-                            Lưu trữ
+                            Archived
                           </Badge>
                         )}
                       </TableCell>
@@ -189,7 +189,7 @@ export const VersionListPage: React.FC = () => {
                         <div className="flex items-center gap-1.5">
                           <Clock className="size-3.5" />
                           <span>
-                            {new Date(ver.publishedAt).toLocaleString('vi-VN')}
+                            {new Date(ver.publishedAt).toLocaleString('en-US')}
                           </span>
                         </div>
                       </TableCell>
@@ -205,7 +205,7 @@ export const VersionListPage: React.FC = () => {
                           onClick={() => navigate(`/workflows/${workflowId}/versions/${ver.id}`)}
                         >
                           <Play className="size-3 fill-current" />
-                          <span>Chi tiết & Chạy (Run UI)</span>
+                          <span>View and run</span>
                         </Button>
                       </TableCell>
                     </TableRow>

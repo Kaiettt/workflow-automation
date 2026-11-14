@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { authApi } from '../api/auth.api';
 import { useAuthStore } from '../store/auth.store';
-import type { UserRole } from '../types/auth.types';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { getPasswordValidation } from '../utils/password.utils';
 import {
@@ -11,7 +10,6 @@ import {
   Lock,
   User,
   AlertCircle,
-  Shield,
   CheckCircle2,
   KeyRound,
   ArrowLeft,
@@ -28,7 +26,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchT
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('DEVELOPER');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -81,7 +78,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchT
         name,
         email,
         password,
-        role,
         otp: otp.trim(),
       });
       login(response.data.accessToken, response.data.refreshToken, response.data.user);
@@ -190,22 +186,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchT
             </div>
           </div>
 
-          {/* Role */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-foreground">Role</label>
-            <div className="relative">
-              <Shield className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="DEVELOPER">Developer</option>
-                <option value="BUSINESS_USER">Business User</option>
-                <option value="ADMIN">Administrator</option>
-              </select>
-            </div>
-          </div>
 
           <Button
             type="submit"

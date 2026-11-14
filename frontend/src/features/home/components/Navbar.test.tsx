@@ -44,7 +44,7 @@ describe('Navbar', () => {
       id: 'user-1',
       name: 'Developer Bob',
       email: 'bob@example.com',
-      role: 'DEVELOPER',
+      role: 'CLIENT',
     });
 
     render(
@@ -76,6 +76,11 @@ describe('Navbar', () => {
     );
     expect(screen.getByText('Creating...')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Creating...' }).hasAttribute('disabled')).toBe(true);
+  });
+  it('shows a direct Admin navigation link for Admin accounts', () => {
+    useAuthStore.getState().login('token', 'refresh', { id: 'admin', name: 'Admin', email: 'admin@flowpilot.local', role: 'ADMIN', isActive: true });
+    render(<MemoryRouter><Navbar onCreateWorkflow={vi.fn()} onOpenAuthModal={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: 'Admin' }).getAttribute('href')).toBe('/admin');
   });
 });
 

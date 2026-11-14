@@ -10,6 +10,8 @@ export interface JwtPayload {
   role: UserRole;
   iat?: number;
   exp?: number;
+  sessionVersion?: number;
+  type?: string;
 }
 
 @Injectable()
@@ -26,7 +28,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: JwtPayload) {
     const user = await this.userRepository.findById(payload.sub);
-    if (!user || !user.isActive) {
+    if (
+      payload.type === 'refresh' ||
+      !user ||
+      !user.isActive ||
+      payload.sessionVersion !== user.sessionVersion
+    ) {
       throw new UnauthorizedException('User no longer active or valid');
     }
     return {
@@ -34,6 +41,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       name: user.name,
       role: user.role,
+      sessionVersion: user.sessionVersion,
     };
   }
 }

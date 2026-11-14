@@ -18,7 +18,7 @@ export const NodeLogDetailAccordion: React.FC<NodeLogDetailAccordionProps> = ({
       {errorMessage && (
         <Alert variant="destructive" className="py-2.5">
           <AlertCircle className="size-4" />
-          <AlertTitle className="text-xs font-bold">Lỗi thực thi</AlertTitle>
+          <AlertTitle className="text-xs font-bold">Execution error</AlertTitle>
           <AlertDescription className="text-xs font-mono break-all mt-1">
             {errorMessage}
           </AlertDescription>

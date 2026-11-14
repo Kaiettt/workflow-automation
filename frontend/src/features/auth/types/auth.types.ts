@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'DEVELOPER' | 'BUSINESS_USER';
+export type UserRole = 'ADMIN' | 'CLIENT';
 
 export interface User {
   id: string;
@@ -18,7 +18,6 @@ export interface RegisterData {
   email: string;
   password: string;
   otp?: string;
-  role?: UserRole;
 }
 
 export interface SendRegisterOtpRequest {

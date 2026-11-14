@@ -60,4 +60,32 @@ export class RedisRefreshTokenRepository
     const key = this.getKey(userId);
     await this.redis.del(key);
   }
+
+  async revokeBefore(userId: string, sessionVersion: number): Promise<void> {
+    const key = this.getKey(userId);
+    const token = await this.redis.get(key);
+    if (!token) return;
+    let version = -1;
+    try {
+      const payload: unknown = JSON.parse(
+        Buffer.from(token.split('.')[1], 'base64url').toString(),
+      );
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'sessionVersion' in payload &&
+        typeof payload.sessionVersion === 'number'
+      )
+        version = payload.sessionVersion;
+    } catch {
+      /* Legacy/malformed stored tokens are revoked. */
+    }
+    if (version >= sessionVersion) return;
+    await this.redis.eval(
+      "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+      1,
+      key,
+      token,
+    );
+  }
 }

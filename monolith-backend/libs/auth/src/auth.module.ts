@@ -1,4 +1,10 @@
 import { Module } from '@nestjs/common';
+import { AccountAdministrationPort } from './application/ports/account-administration.port';
+import { PrismaAccountAdministration } from './infrastructure/persistence/prisma-account-administration';
+import { ManageAccountHandler } from './application/commands/manage-account.command';
+import { SessionAccessService } from './application/session-access.service';
+import { SessionAccessPort } from './application/session-access.port';
+import { SessionRevocationWorker } from './infrastructure/session-revocation.worker';
 import { CqrsModule } from '@nestjs/cqrs';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -54,6 +60,14 @@ const QueryHandlers = [GetCurrentUserHandler];
   controllers: [AuthController],
   providers: [
     {
+      provide: AccountAdministrationPort,
+      useClass: PrismaAccountAdministration,
+    },
+    ManageAccountHandler,
+    SessionAccessService,
+    { provide: SessionAccessPort, useExisting: SessionAccessService },
+    SessionRevocationWorker,
+    {
       provide: UserRepository,
       useClass: PrismaUserRepository,
     },
@@ -76,6 +90,9 @@ const QueryHandlers = [GetCurrentUserHandler];
     ...QueryHandlers,
   ],
   exports: [
+    AccountAdministrationPort,
+    SessionAccessService,
+    SessionAccessPort,
     UserRepository,
     OtpRepository,
     RefreshTokenRepository,

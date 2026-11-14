@@ -59,12 +59,15 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      originalRequest._retry = true;
+
       // If already refreshing, queue this request until refresh completes
       if (isRefreshing) {
         return new Promise<string>((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
           .then((token) => {
+            if (originalRequest.signal?.aborted) throw new axios.CanceledError();
             if (originalRequest.headers) {
               originalRequest.headers.Authorization = `Bearer ${token}`;
             }
@@ -73,7 +76,6 @@ apiClient.interceptors.response.use(
           .catch((err: unknown) => Promise.reject(err));
       }
 
-      originalRequest._retry = true;
       isRefreshing = true;
 
       const refreshToken = useAuthStore.getState().refreshToken;
@@ -94,6 +96,13 @@ apiClient.interceptors.response.use(
         const { accessToken, refreshToken: newRefreshToken } =
           refreshResponse.data.data;
 
+        // A late refresh must not restore a session after logout/account switch.
+        if (useAuthStore.getState().refreshToken !== refreshToken) {
+          const cancelled = new axios.CanceledError('Session changed during refresh');
+          processQueue(cancelled);
+          return Promise.reject(cancelled);
+        }
+
         useAuthStore.getState().setTokens(accessToken, newRefreshToken);
 
         if (originalRequest.headers) {
@@ -104,7 +113,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError: unknown) {
         processQueue(refreshError, null);
-        useAuthStore.getState().logout();
+        if (useAuthStore.getState().refreshToken === refreshToken) useAuthStore.getState().logout();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

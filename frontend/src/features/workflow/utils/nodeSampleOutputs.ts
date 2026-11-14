@@ -13,18 +13,18 @@ export interface NodeOutputSample {
 
 export const NODE_SAMPLE_OUTPUTS: Record<string, NodeOutputSample> = {
   'trigger.manual': {
-    description: 'Manual Trigger khởi tạo một item rỗng để bắt đầu luồng dữ liệu.',
+    description: 'Manual Trigger creates an empty item to start the data flow.',
     data: {},
     shortcuts: [],
   },
 
   'webhook.trigger': {
-    description: 'Dữ liệu nhận được từ HTTP POST Webhook của hệ thống bên ngoài.',
+    description: 'Data received from an external system through an HTTP POST webhook.',
     data: {
       body: {
         order_id: 'ORD-9988',
-        customer_name: 'Nguyễn Văn A',
-        customer_email: 'nguyenvana@gmail.com',
+        customer_name: 'John Doe',
+        customer_email: 'john.doe@example.com',
         total_amount: 1250000,
         items_count: 2,
       },
@@ -34,40 +34,40 @@ export const NODE_SAMPLE_OUTPUTS: Record<string, NodeOutputSample> = {
       query: {},
     },
     shortcuts: [
-      { label: 'Mã đơn hàng', field: 'body.order_id', description: 'Mã đơn từ webhook', example: 'ORD-9988' },
-      { label: 'Email khách hàng', field: 'body.customer_email', description: 'Email của khách', example: 'nguyenvana@gmail.com' },
-      { label: 'Tên khách hàng', field: 'body.customer_name', description: 'Họ tên khách hàng', example: 'Nguyễn Văn A' },
-      { label: 'Tổng tiền', field: 'body.total_amount', description: 'Số tiền thanh toán', example: '1250000' },
+      { label: 'Order ID', field: 'body.order_id', description: 'Order ID from the webhook', example: 'ORD-9988' },
+      { label: 'Customer email', field: 'body.customer_email', description: 'Customer email address', example: 'john.doe@example.com' },
+      { label: 'Customer name', field: 'body.customer_name', description: 'Customer full name', example: 'John Doe' },
+      { label: 'Total amount', field: 'body.total_amount', description: 'Payment amount', example: '1250000' },
     ],
   },
 
   'messenger.trigger': {
-    description: 'Dữ liệu tin nhắn hoặc sự kiện bấm nút từ khách hàng trên Facebook Messenger.',
+    description: 'A customer message or button event received through Facebook Messenger.',
     data: {
       type: 'message',
       message_id: 'mid.1794031200:a8f9c1b2',
       sender_id: '8492019481029481',
       page_id: '100294819201948',
-      text: 'Shop ơi cho mình hỏi giá bàn phím cơ bên bạn?',
+      text: 'How much is your mechanical keyboard?',
       payload: null,
       timestamp: '2026-11-07T08:30:00.000Z',
     },
     shortcuts: [
-      { label: 'ID Khách (Sender ID)', field: 'sender_id', description: 'Bắt buộc cho Recipient ID của node gửi tin', example: '8492019481029481' },
-      { label: 'Nội dung tin nhắn', field: 'text', description: 'Nội dung khách nhắn, đưa vào Prompt AI', example: 'Shop ơi cho mình hỏi giá...' },
-      { label: 'ID Fanpage', field: 'page_id', description: 'ID Page nhận tin', example: '100294819201948' },
-      { label: 'Payload nút bấm', field: 'payload', description: 'Giá trị trả về khi khách bấm Quick Reply/Button', example: 'PRICE_INQUIRY' },
+      { label: 'Customer ID (sender ID)', field: 'sender_id', description: 'Required as the recipient ID when sending a message', example: '8492019481029481' },
+      { label: 'Message text', field: 'text', description: 'Customer message to include in the AI prompt', example: 'How much is your keyboard?' },
+      { label: 'Page ID', field: 'page_id', description: 'ID of the page receiving the message', example: '100294819201948' },
+      { label: 'Button payload', field: 'payload', description: 'Value received when a customer selects a quick reply or button', example: 'PRICE_INQUIRY' },
     ],
   },
 
   'logic.if': {
-    description: 'Chuyển tiếp item nguyên vẹn sang cổng True (thỏa mãn) hoặc False (không thỏa mãn).',
+    description: 'Passes the unchanged item to the True or False output according to the condition.',
     data: {
-      text: 'Shop ơi cho mình hỏi giá...',
+      text: 'How much is your keyboard?',
       sender_id: '8492019481029481',
     },
     shortcuts: [
-      { label: 'Dữ liệu nhánh True/False', field: 'text', description: 'Kế thừa toàn bộ trường của node trước', example: '...' },
+      { label: 'True/False branch data', field: 'text', description: 'Includes all fields from the previous node', example: '...' },
     ],
   },
 
@@ -75,7 +75,7 @@ export const NODE_SAMPLE_OUTPUTS: Record<string, NodeOutputSample> = {
     description: 'Passes the input item unchanged through the matching rule output or fallback.',
     data: {
       text: 'Product price inquiry',
-      matched_rule: 'Hỏi giá',
+      matched_rule: 'Price inquiry',
     },
     shortcuts: [
       { label: 'Routed item data', field: 'text', description: 'Inherits data from the previous node', example: '...' },
@@ -83,63 +83,63 @@ export const NODE_SAMPLE_OUTPUTS: Record<string, NodeOutputSample> = {
   },
 
   'logic.filter': {
-    description: 'Cho phép item thỏa mãn điều kiện đi tiếp; item không thỏa mãn bị loại bỏ hoàn toàn.',
+    description: 'Passes matching items through and removes items that do not match the condition.',
     data: {
       status: 'PENDING',
       order_id: 'ORD-12345',
     },
     shortcuts: [
-      { label: 'Trạng thái', field: 'status', description: 'Trường đã qua bộ lọc', example: 'PENDING' },
+      { label: 'Status', field: 'status', description: 'Field from a matching item', example: 'PENDING' },
     ],
   },
 
   'data.set': {
-    description: 'Dữ liệu sau khi đã gán thêm các trường mới hoặc biến đổi cấu trúc.',
+    description: 'Data after adding new fields or transforming its structure.',
     data: {
-      full_name: 'Nguyễn Văn A',
-      email: 'nguyenvana@gmail.com',
-      greeting: 'Xin chào Nguyễn Văn A!',
+      full_name: 'John Doe',
+      email: 'john.doe@example.com',
+      greeting: 'Hello John Doe!',
     },
     shortcuts: [
-      { label: 'Họ và tên mới', field: 'full_name', description: 'Trường vừa được gán', example: 'Nguyễn Văn A' },
-      { label: 'Lời chào', field: 'greeting', description: 'Chuỗi ghép', example: 'Xin chào Nguyễn Văn A!' },
+      { label: 'Full name', field: 'full_name', description: 'Newly assigned field', example: 'John Doe' },
+      { label: 'Greeting', field: 'greeting', description: 'Combined text', example: 'Hello John Doe!' },
     ],
   },
 
   'data.aggregate': {
-    description: 'Toàn bộ danh sách nhiều item phía trước được gom lại thành 1 mảng duy nhất.',
+    description: 'Combines all incoming items into a single array.',
     data: {
       items: [
-        { id: 1, product: 'Bàn phím cơ AK820', price: 850000 },
-        { id: 2, product: 'Chuột không dây X1', price: 450000 },
+        { id: 1, product: 'AK820 mechanical keyboard', price: 850000 },
+        { id: 2, product: 'X1 wireless mouse', price: 450000 },
       ],
     },
     shortcuts: [
-      { label: 'Toàn bộ mảng items', field: 'items', description: 'Mảng danh sách các dòng đã gom', example: '[{...}, {...}]' },
-      { label: 'Số lượng item', field: 'items.length', description: 'Tổng số dòng dữ liệu gom được', example: '2' },
-      { label: 'Phần tử đầu tiên', field: 'items[0].product', description: 'Sản phẩm đầu tiên trong mảng', example: 'Bàn phím cơ AK820' },
+      { label: 'Items array', field: 'items', description: 'Array containing all collected items', example: '[{...}, {...}]' },
+      { label: 'Item count', field: 'items.length', description: 'Total number of collected items', example: '2' },
+      { label: 'First item', field: 'items[0].product', description: 'First product in the array', example: 'AK820 mechanical keyboard' },
     ],
   },
 
   'memory.chat': {
-    description: 'Lịch sử hội thoại được nạp từ Redis (ở chế độ Load) để đưa vào AI LLM.',
+    description: 'Conversation history loaded from Redis for the AI model.',
     data: {
       history: [
-        { role: 'user', content: 'Shop có bán bàn phím cơ không?' },
-        { role: 'assistant', content: 'Dạ bên mình có nhiều mẫu bàn phím cơ chính hãng ạ!' },
+        { role: 'user', content: 'Do you sell mechanical keyboards?' },
+        { role: 'assistant', content: 'Yes, we offer several mechanical keyboard models.' },
       ],
-      history_text: 'User: Shop có bán bàn phím cơ không?\nAssistant: Dạ bên mình có nhiều mẫu bàn phím cơ chính hãng ạ!',
+      history_text: 'User: Do you sell mechanical keyboards?\nAssistant: Yes, we offer several mechanical keyboard models.',
     },
     shortcuts: [
-      { label: 'Lịch sử hội thoại (History)', field: 'history', description: 'Dán trực tiếp vào ô Conversation history của node LLM', example: '[{role, content}]' },
-      { label: 'Lịch sử dạng văn bản', field: 'history_text', description: 'Chuỗi text nối các lượt thoại', example: 'User: ... Assistant: ...' },
+      { label: 'Conversation history', field: 'history', description: 'Use this value in the AI node conversation history field', example: '[{role, content}]' },
+      { label: 'History text', field: 'history_text', description: 'Conversation turns combined as text', example: 'User: ... Assistant: ...' },
     ],
   },
 
   'ai.llm.generate': {
-    description: 'Kết quả phản hồi được tạo ra từ mô hình AI (OpenAI / Claude / Gemini).',
+    description: 'A response generated by an AI model (OpenAI, Claude, or Gemini).',
     data: {
-      text: 'Dạ mẫu bàn phím cơ AK820 bên em đang có giá ưu đãi là 790.000 VNĐ kèm bảo hành 12 tháng ạ!',
+      text: 'The AK820 mechanical keyboard is on sale for 790,000 VND with a 12-month warranty.',
       model: 'gpt-4o-mini',
       usage: {
         input_tokens: 128,
@@ -147,14 +147,14 @@ export const NODE_SAMPLE_OUTPUTS: Record<string, NodeOutputSample> = {
       },
     },
     shortcuts: [
-      { label: 'Câu trả lời của AI', field: 'text', description: 'Nội dung phản hồi AI, dùng gửi cho khách hoặc ghi chú', example: 'Dạ mẫu bàn phím cơ...' },
-      { label: 'Tên model đã chạy', field: 'model', description: 'Model AI đã xử lý', example: 'gpt-4o-mini' },
-      { label: 'Số token output', field: 'usage.output_tokens', description: 'Số token đã tiêu tốn', example: '42' },
+      { label: 'AI response', field: 'text', description: 'AI response to send to the customer or save as a note', example: 'The mechanical keyboard…' },
+      { label: 'Model', field: 'model', description: 'AI model used for this response', example: 'gpt-4o-mini' },
+      { label: 'Output tokens', field: 'usage.output_tokens', description: 'Number of output tokens used', example: '42' },
     ],
   },
 
   'http.request': {
-    description: 'Dữ liệu phản hồi từ Web API bên ngoài sau khi gọi HTTP Request.',
+    description: 'Response data from an external API after an HTTP request.',
     data: {
       status: 200,
       data: {
@@ -167,44 +167,44 @@ export const NODE_SAMPLE_OUTPUTS: Record<string, NodeOutputSample> = {
       },
     },
     shortcuts: [
-      { label: 'Dữ liệu phản hồi (data)', field: 'data', description: 'Toàn bộ nội dung JSON API trả về', example: '{"success": true, ...}' },
-      { label: 'Mã HTTP Status', field: 'status', description: 'Mã phản hồi HTTP (200, 201, 400...)', example: '200' },
-      { label: 'Mã vận đơn', field: 'data.tracking_code', description: 'Trường lồng nhau từ response API', example: 'VNPOST-9921' },
+      { label: 'Response data', field: 'data', description: 'Complete JSON response returned by the API', example: '{"success": true, ...}' },
+      { label: 'HTTP status code', field: 'status', description: 'HTTP response code (200, 201, 400, etc.)', example: '200' },
+      { label: 'Tracking code', field: 'data.tracking_code', description: 'Nested field in the API response', example: 'VNPOST-9921' },
     ],
   },
 
   'integration.google_sheet.readRows': {
-    description: 'Dữ liệu một dòng đọc từ Google Sheet. Nếu có nhiều dòng, mỗi dòng là một item tương tự.',
+    description: 'A row read from Google Sheets. Each row becomes a separate item.',
     data: {
       row_number: 2,
-      'Họ và tên': 'Nguyễn Văn A',
-      Email: 'nguyenvana@gmail.com',
-      'Số điện thoại': '0912345678',
-      'Trạng thái': 'Chưa xử lý',
+      'Full name': 'John Doe',
+      Email: 'john.doe@example.com',
+      'Phone number': '0912345678',
+      'Status': 'Pending',
     },
     shortcuts: [
-      { label: 'Cột Họ và tên', field: '["Họ và tên"]', description: 'Cột có khoảng trắng hoặc dấu tiếng Việt', example: 'Nguyễn Văn A' },
-      { label: 'Cột Email', field: 'Email', description: 'Cột email người nhận', example: 'nguyenvana@gmail.com' },
-      { label: 'Cột Số điện thoại', field: '["Số điện thoại"]', description: 'Cột SĐT', example: '0912345678' },
-      { label: 'Số thứ tự dòng', field: 'row_number', description: 'Vị trí dòng trong Google Sheet', example: '2' },
+      { label: 'Full name column', field: '["Full name"]', description: 'A column name containing spaces', example: 'John Doe' },
+      { label: 'Email column', field: 'Email', description: 'Recipient email column', example: 'john.doe@example.com' },
+      { label: 'Phone number column', field: '["Phone number"]', description: 'Phone number column', example: '0912345678' },
+      { label: 'Row number', field: 'row_number', description: 'Row position in Google Sheets', example: '2' },
     ],
   },
 
   'integration.gmail.send': {
-    description: 'Kết quả sau khi gửi thư điện tử qua Gmail thành công.',
+    description: 'The result of sending an email successfully through Gmail.',
     data: {
       message_id: '18c2f1a980b192cd',
-      to: 'nguyenvana@gmail.com',
+      to: 'john.doe@example.com',
       sent: true,
     },
     shortcuts: [
-      { label: 'Message ID', field: 'message_id', description: 'Mã định danh email từ Google', example: '18c2f1a9...' },
-      { label: 'Trạng thái gửi', field: 'sent', description: 'true nếu gửi thành công', example: 'true' },
+      { label: 'Message ID', field: 'message_id', description: 'Email message ID returned by Google', example: '18c2f1a9...' },
+      { label: 'Send status', field: 'sent', description: 'True when the message was sent successfully', example: 'true' },
     ],
   },
 
   'messenger.sendMessage': {
-    description: 'Kết quả phản hồi từ Meta Graph API sau khi gửi tin nhắn Messenger.',
+    description: 'The Meta Graph API response after sending a Messenger message.',
     data: {
       page_id: '100294819201948',
       recipient_id: '8492019481029481',
@@ -212,13 +212,13 @@ export const NODE_SAMPLE_OUTPUTS: Record<string, NodeOutputSample> = {
       status: 'sent',
     },
     shortcuts: [
-      { label: 'Message ID', field: 'message_id', description: 'Mã tin nhắn vừa gửi đi', example: 'm_1792837192' },
-      { label: 'Trạng thái gửi', field: 'status', description: 'Trạng thái tin nhắn', example: 'sent' },
+      { label: 'Message ID', field: 'message_id', description: 'ID of the sent message', example: 'm_1792837192' },
+      { label: 'Send status', field: 'status', description: 'Message status', example: 'sent' },
     ],
   },
 
   'messenger.senderAction': {
-    description: 'Kết quả phản hồi sau khi gửi hiệu ứng tương tác (đang soạn tin, đã xem).',
+    description: 'The result of sending a typing indicator or read receipt.',
     data: {
       page_id: '100294819201948',
       recipient_id: '8492019481029481',
@@ -226,8 +226,8 @@ export const NODE_SAMPLE_OUTPUTS: Record<string, NodeOutputSample> = {
       status: 'sent',
     },
     shortcuts: [
-      { label: 'Hành động đã gửi', field: 'action', description: 'typing_on / typing_off / mark_seen', example: 'typing_on' },
-      { label: 'Trạng thái', field: 'status', description: 'Trạng thái gửi', example: 'sent' },
+      { label: 'Sent action', field: 'action', description: 'typing_on / typing_off / mark_seen', example: 'typing_on' },
+      { label: 'Status', field: 'status', description: 'Send status', example: 'sent' },
     ],
   },
 };

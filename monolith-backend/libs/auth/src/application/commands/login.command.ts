@@ -42,11 +42,12 @@ export class LoginHandler implements ICommandHandler<
       sub: user.id,
       email: user.email,
       role: user.role,
+      sessionVersion: user.sessionVersion,
     };
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshToken = this.jwtService.sign(
-      { sub: user.id, type: 'refresh' },
+      { sub: user.id, type: 'refresh', sessionVersion: user.sessionVersion },
       { expiresIn: '7d' },
     );
 

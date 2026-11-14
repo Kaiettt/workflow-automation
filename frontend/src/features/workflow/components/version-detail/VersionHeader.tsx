@@ -28,7 +28,7 @@ export const VersionHeader: React.FC<VersionHeaderProps> = ({
             className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium transition-colors"
           >
             <ChevronLeft className="size-3.5" />
-            <span>Phiên bản</span>
+            <span>Version</span>
           </Link>
           <span className="text-muted-foreground/40">/</span>
           <span className="font-semibold text-foreground">
@@ -40,7 +40,7 @@ export const VersionHeader: React.FC<VersionHeaderProps> = ({
           <Link to={`/workflows/${workflowId}`}>
             <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-8">
               <ExternalLink className="size-3.5" />
-              <span className="hidden sm:inline">Mở Designer</span>
+              <span className="hidden sm:inline">Open designer</span>
             </Button>
           </Link>
         </div>
