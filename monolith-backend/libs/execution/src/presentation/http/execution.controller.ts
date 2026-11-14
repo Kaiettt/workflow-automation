@@ -62,7 +62,11 @@ export class ExecutionController {
     @Param('executionId') executionId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Observable<MessageEvent> {
-    return this.streamService.createStream(executionId, user.id);
+    return this.streamService.createStream(
+      executionId,
+      user.id,
+      user.sessionVersion,
+    );
   }
 
   @Get(':executionId')

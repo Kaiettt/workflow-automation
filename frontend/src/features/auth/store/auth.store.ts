@@ -9,6 +9,7 @@ interface AuthState {
   login: (token: string, refreshToken: string, user: User) => void;
   setTokens: (token: string, refreshToken: string) => void;
   logout: () => void;
+  updateUser: (user: User) => void;
 }
 
 const STORAGE_KEY_TOKEN = 'flowpilot_token';
@@ -46,6 +47,10 @@ const getInitialState = (): {
 
 export const useAuthStore = create<AuthState>((set) => ({
   ...getInitialState(),
+  updateUser: (user: User) => {
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+    set({ user });
+  },
 
   login: (token: string, refreshToken: string, user: User) => {
     localStorage.setItem(STORAGE_KEY_TOKEN, token);

@@ -6,7 +6,9 @@ export type ExecutionEventType =
   | 'node.failed'
   | 'node.skipped'
   | 'execution.completed'
-  | 'execution.failed';
+  | 'execution.failed'
+  | 'execution.cancelled';
+// Cancellation is terminal without calling an executor.
 
 export interface ExecutionEvent {
   event: ExecutionEventType;

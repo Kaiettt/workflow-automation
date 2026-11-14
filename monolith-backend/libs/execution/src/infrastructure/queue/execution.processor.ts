@@ -57,6 +57,22 @@ export class ExecutionProcessor
 
     // Only a QUEUED run starts; anything else already failed or is taken.
     if (!(await this.repository.claimQueuedExecution(executionId, startedAt))) {
+      const current = await this.repository.findExecutionResult(executionId);
+      if (
+        current &&
+        typeof current === 'object' &&
+        'status' in current &&
+        current.status === ExecutionStatus.CANCELLED
+      ) {
+        await publishExecutionEventSafely(this.eventPublisher, {
+          event: 'execution.cancelled',
+          executionId,
+          status: ExecutionStatus.CANCELLED,
+          finishedAt: startedAt.toISOString(),
+          ts: startedAt.toISOString(),
+        });
+        return ExecutionStatus.CANCELLED;
+      }
       this.logger.warn(`Execution ${executionId} is not queued any more`);
       return ExecutionStatus.FAILED;
     }

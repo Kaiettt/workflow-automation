@@ -45,6 +45,7 @@ describe('workflow activation and webhooks', () => {
   let testListen: TestListenService;
   let ingress: ReceiveWebhookHandler;
   let enqueued: EnqueueExecutionCommand[];
+  let ownerActive: boolean;
 
   beforeEach(() => {
     process.env['PUBLIC_BASE_URL'] = BASE;
@@ -73,6 +74,7 @@ describe('workflow activation and webhooks', () => {
       tests,
     );
     enqueued = [];
+    ownerActive = true;
     const commandBus = {
       execute: (command: EnqueueExecutionCommand) => {
         enqueued.push(command);
@@ -86,6 +88,10 @@ describe('workflow activation and webhooks', () => {
       new MemoryDedup(),
       tests,
       commandBus,
+      {
+        isActive: () => Promise.resolve(ownerActive),
+        isCurrent: () => Promise.resolve(true),
+      },
     );
   });
 
@@ -291,6 +297,40 @@ describe('workflow activation and webhooks', () => {
   });
 
   describe('incoming events', () => {
+    it('acknowledges a suspended owner without enqueueing or retaining a test payload, and accepts only new events after unlock', async () => {
+      repository.addWorkflow('wf', definition(webhookTrigger()));
+      await activation.activate('wf', OWNER);
+      const waiting = await testListen.start('wf', 'hook', OWNER);
+      const endpoint = repository.endpointOf('node:wf:hook')!;
+      const call = (marker: string) =>
+        ingress.execute(
+          new ReceiveWebhookCommand(endpoint.id, {
+            method: 'POST',
+            headers: {},
+            query: {},
+            body: { marker },
+          }),
+        );
+      ownerActive = false;
+      expect(await call('dropped')).toMatchObject({
+        outcome: 'handled',
+        status: 202,
+      });
+      expect(enqueued).toHaveLength(0);
+      const pending = await testListen.get(waiting.listenId, OWNER);
+      expect(pending.status).toBe('waiting');
+      expect(pending.event).toBeNull();
+      expect(repository.workflows.get('wf')!.active).toBe(true);
+      ownerActive = true;
+      await call('new-event');
+      expect(enqueued).toHaveLength(1);
+      expect(enqueued[0].triggerItems[0].json).toMatchObject({
+        body: { marker: 'new-event' },
+      });
+      expect(
+        (await testListen.get(waiting.listenId, OWNER)).event,
+      ).toMatchObject({ body: { marker: 'new-event' } });
+    });
     it('answers 404 on a per-node URL nobody listens on', async () => {
       repository.addWorkflow('wf', definition(webhookTrigger()));
       await activation.webhooks('wf', OWNER);

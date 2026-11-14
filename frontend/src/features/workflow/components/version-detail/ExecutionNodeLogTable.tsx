@@ -41,13 +41,13 @@ export const ExecutionNodeLogTable: React.FC<ExecutionNodeLogTableProps> = ({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-base">Nhật ký thực thi từng bước (Node Logs)</CardTitle>
+            <CardTitle className="text-base">Node execution logs</CardTitle>
             <CardDescription>
-              Chi tiết dữ liệu đầu vào (input), đầu ra (output) và thông báo lỗi của từng node trong luồng.
+              Review the input, output, and errors for each node in this execution.
             </CardDescription>
           </div>
           <Badge variant="outline" className="font-mono text-xs">
-            {nodeLogs.length} bước đã chạy
+            {nodeLogs.length} nodes executed
           </Badge>
         </div>
       </CardHeader>
@@ -56,10 +56,10 @@ export const ExecutionNodeLogTable: React.FC<ExecutionNodeLogTableProps> = ({
           <TableHeader>
             <TableRow>
               <TableHead className="w-12"></TableHead>
-              <TableHead>Bước (Node)</TableHead>
-              <TableHead>Loại Node</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead>Thời gian</TableHead>
+              <TableHead>Node</TableHead>
+              <TableHead>Node type</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Duration</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -133,7 +133,7 @@ export const ExecutionNodeLogTable: React.FC<ExecutionNodeLogTableProps> = ({
 
                       <TableCell className="text-xs text-muted-foreground font-mono">
                         {log.startedAt
-                          ? new Date(log.startedAt).toLocaleTimeString('vi-VN')
+                          ? new Date(log.startedAt).toLocaleTimeString('en-US')
                           : '—'}
                       </TableCell>
                     </TableRow>
@@ -156,7 +156,7 @@ export const ExecutionNodeLogTable: React.FC<ExecutionNodeLogTableProps> = ({
             ) : (
               <TableRow>
                 <TableCell colSpan={5} className="py-6 text-center text-muted-foreground text-xs">
-                  Không có nhật ký node nào được ghi nhận.
+                  No node logs were recorded.
                 </TableCell>
               </TableRow>
             )}

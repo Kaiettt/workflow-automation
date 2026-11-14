@@ -4,6 +4,7 @@ export enum ExecutionStatus {
   RUNNING = 'RUNNING',
   SUCCESS = 'SUCCESS',
   FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
 }
 
 const TERMINAL_EXECUTION_STATUSES = new Set<string>([

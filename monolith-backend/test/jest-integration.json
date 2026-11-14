@@ -1,0 +1,11 @@
+{
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": "test/integration/.*\\.integration-spec\\.ts$",
+  "transform": { "^.+\\.(t|j)s$": "ts-jest" },
+  "transformIgnorePatterns": ["node_modules/(?!(@nestjs/jwt|@nestjs/passport)/)"],
+  "moduleNameMapper": {
+    "^@app/(designer|database|auth|execution|shared|connector|node-library|integrations|apps|triggers)(|/.*)$": "<rootDir>/libs/$1/src/$2",
+    "^@test/(.*)$": "<rootDir>/test/$1"
+  }
+}

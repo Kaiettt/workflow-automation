@@ -1,6 +1,7 @@
 import { PrismaClient, UserRole } from '@prisma/client';
 import { seedMvp } from './seed-mvp';
 import { seedAi } from './seed-ai';
+import { seedDevelopmentAdmin } from './seed-development-admin';
 
 const prisma = new PrismaClient();
 
@@ -10,32 +11,28 @@ async function main() {
 
   await prisma.user.upsert({
     where: { id: defaultUserId },
-    update: {
-      passwordHash: '$2b$10$nx.K4i7OWVN03lAln6.f3OYlf/Wg6MdAvmBY9M.1jeYyrYJoyk7FW',
-      isActive: true,
-    },
+    update: {},
     create: {
       id: defaultUserId,
       email: 'system@flowpilot.local',
-      passwordHash: '$2b$10$nx.K4i7OWVN03lAln6.f3OYlf/Wg6MdAvmBY9M.1jeYyrYJoyk7FW',
+      passwordHash:
+        '$2b$10$nx.K4i7OWVN03lAln6.f3OYlf/Wg6MdAvmBY9M.1jeYyrYJoyk7FW',
       name: 'System User',
-      role: UserRole.DEVELOPER,
+      role: UserRole.CLIENT,
       isActive: true,
     },
   });
 
   await prisma.user.upsert({
     where: { id: frontendUserId },
-    update: {
-      passwordHash: '$2b$10$nx.K4i7OWVN03lAln6.f3OYlf/Wg6MdAvmBY9M.1jeYyrYJoyk7FW',
-      isActive: true,
-    },
+    update: {},
     create: {
       id: frontendUserId,
       email: 'dev@flowpilot.local',
-      passwordHash: '$2b$10$nx.K4i7OWVN03lAln6.f3OYlf/Wg6MdAvmBY9M.1jeYyrYJoyk7FW',
+      passwordHash:
+        '$2b$10$nx.K4i7OWVN03lAln6.f3OYlf/Wg6MdAvmBY9M.1jeYyrYJoyk7FW',
       name: 'Frontend Developer',
-      role: UserRole.DEVELOPER,
+      role: UserRole.CLIENT,
       isActive: true,
     },
   });
@@ -45,6 +42,9 @@ async function main() {
   // Run MVP execution data seeding
   await seedMvp(prisma);
   await seedAi(prisma);
+  const admin = await seedDevelopmentAdmin(prisma);
+  if (admin?.role === 'ADMIN' && admin.isActive)
+    console.log(`Local Admin ready: ${admin.email}`);
 }
 
 main()

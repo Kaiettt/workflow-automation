@@ -15,22 +15,21 @@ describe('UserDropdown', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders user name, initials, and role badge when authenticated', () => {
+  it('renders user name and Client role when authenticated', () => {
     useAuthStore.getState().login('token', 'refresh', {
       id: '1',
       name: 'John Doe',
       email: 'john@example.com',
-      role: 'DEVELOPER',
+      role: 'CLIENT',
     });
 
     render(<UserDropdown />);
 
     expect(screen.getByText('John Doe')).toBeTruthy();
-    expect(screen.getByText('JD')).toBeTruthy();
-    expect(screen.getByText('Dev')).toBeTruthy();
+    expect(screen.getByText('Client')).toBeTruthy();
   });
 
-  it('opens dropdown menu and logs out when logout button is clicked', () => {
+  it('opens the Admin menu and logs out', async () => {
     useAuthStore.getState().login('token', 'refresh', {
       id: '1',
       name: 'Alice Admin',
@@ -44,14 +43,14 @@ describe('UserDropdown', () => {
     expect(screen.queryByText('Log out')).toBeNull();
 
     // Click trigger button
-    fireEvent.click(screen.getByRole('button'));
+    fireEvent.keyDown(screen.getByRole('button'), { key: 'ArrowDown' });
 
     // Menu opens
-    expect(screen.getByText('admin@example.com')).toBeTruthy();
-    expect(screen.getByText('Log out')).toBeTruthy();
+    expect(await screen.findByText('admin@example.com')).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Platform administration' })).toBeTruthy();
 
     // Click logout
-    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Log out' }));
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(useAuthStore.getState().user).toBeNull();

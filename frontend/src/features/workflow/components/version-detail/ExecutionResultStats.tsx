@@ -22,13 +22,13 @@ export const ExecutionResultStats: React.FC<ExecutionResultStatsProps> = ({
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Activity className="size-5 text-primary" />
-        <h2 className="text-lg font-bold">Kết quả thực thi (Execution Run Result)</h2>
+        <h2 className="text-lg font-bold">Execution result</h2>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {/* Status Badge Card */}
         <Card className="p-4 flex flex-col justify-between">
-          <span className="text-xs text-muted-foreground font-medium">Trạng thái tổng thể</span>
+          <span className="text-xs text-muted-foreground font-medium">Overall status</span>
           <div className="mt-2 flex items-center gap-2">
             {executionResult.status === 'SUCCESS' ? (
               <>
@@ -57,7 +57,7 @@ export const ExecutionResultStats: React.FC<ExecutionResultStatsProps> = ({
 
         {/* Duration Card */}
         <Card className="p-4 flex flex-col justify-between">
-          <span className="text-xs text-muted-foreground font-medium">Thời gian thực thi</span>
+          <span className="text-xs text-muted-foreground font-medium">Execution duration</span>
           <div className="mt-2 text-xl font-bold font-mono text-foreground">
             {executionResult.durationMs == null
               ? 'In progress'
@@ -67,10 +67,10 @@ export const ExecutionResultStats: React.FC<ExecutionResultStatsProps> = ({
 
         {/* Started At Card */}
         <Card className="p-4 flex flex-col justify-between">
-          <span className="text-xs text-muted-foreground font-medium">Thời gian bắt đầu</span>
+          <span className="text-xs text-muted-foreground font-medium">Started</span>
           <div className="mt-2 text-sm font-semibold font-mono text-foreground">
             {executionResult.startedAt
-              ? new Date(executionResult.startedAt).toLocaleTimeString('vi-VN')
+              ? new Date(executionResult.startedAt).toLocaleTimeString('en-US')
               : 'Waiting in queue'}
           </div>
         </Card>
@@ -85,7 +85,7 @@ export const ExecutionResultStats: React.FC<ExecutionResultStatsProps> = ({
             <button
               onClick={() => copyExecutionId(executionResult.id)}
               className="p-1 hover:text-foreground rounded"
-              title="Sao chép Execution ID"
+              title="Copy execution ID"
             >
               {copiedId ? (
                 <Check className="size-3.5 text-emerald-500" />

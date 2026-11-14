@@ -7,6 +7,7 @@ import { TriggerRepository } from '../../domain/trigger.repository';
 import { Listener, TestListen } from '../../domain/trigger.types';
 import { WebhookDedupPort } from '../ports/webhook-dedup.port';
 import { TestEventStore } from '../ports/test-event.store';
+import { SessionAccessPort } from '@app/auth/application/session-access.port';
 
 const DEDUP_TTL_SECONDS = 24 * 60 * 60;
 
@@ -40,6 +41,7 @@ export class ReceiveWebhookHandler implements ICommandHandler<ReceiveWebhookComm
     private readonly dedup: WebhookDedupPort,
     private readonly tests: TestEventStore,
     private readonly commandBus: CommandBus,
+    private readonly access: SessionAccessPort,
   ) {}
 
   async execute(command: ReceiveWebhookCommand): Promise<ReceiveWebhookResult> {
@@ -137,6 +139,10 @@ export class ReceiveWebhookHandler implements ICommandHandler<ReceiveWebhookComm
     ) => boolean,
   ) {
     for (const listen of [...pending]) {
+      if (!(await this.access.isActive(listen.userId))) {
+        pending.splice(pending.indexOf(listen), 1);
+        continue;
+      }
       if (!accepts(event, listen.parameters)) continue;
       pending.splice(pending.indexOf(listen), 1);
       await this.tests.save({
@@ -150,6 +156,9 @@ export class ReceiveWebhookHandler implements ICommandHandler<ReceiveWebhookComm
   private async run(listeners: Listener[], event: TriggerEvent) {
     const started: string[] = [];
     for (const listener of listeners) {
+      const workflow = await this.repository.findWorkflow(listener.workflowId);
+      if (!workflow || !(await this.access.isActive(workflow.ownerId)))
+        continue;
       try {
         started.push(
           await this.commandBus.execute<EnqueueExecutionCommand, string>(

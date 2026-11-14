@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { WorkflowOwnershipGuard } from './infrastructure/workflow-ownership.guard';
 import { CqrsModule } from '@nestjs/cqrs';
 import { AuthModule } from '@app/auth';
 import { WorkflowDraftsController } from './presentation/http/workflow-drafts.controller';
@@ -56,6 +57,11 @@ const Repositories = [
 @Module({
   imports: [CqrsModule, AuthModule, NodeLibraryModule],
   controllers: [WorkflowDraftsController, WorkflowsController],
-  providers: [...CommandHandlers, ...QueryHandlers, ...Repositories],
+  providers: [
+    WorkflowOwnershipGuard,
+    ...CommandHandlers,
+    ...QueryHandlers,
+    ...Repositories,
+  ],
 })
 export class DesignerModule {}

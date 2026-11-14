@@ -30,7 +30,7 @@ describe('EventTriggerInfo', () => {
       />,
     );
 
-    expect(screen.getByText(/Đang tải/i)).toBeTruthy();
+    expect(screen.getByText(/Loading/i)).toBeTruthy();
   });
 
   it('displays inactive message when workflow is not active', () => {
@@ -48,7 +48,7 @@ describe('EventTriggerInfo', () => {
       />,
     );
 
-    expect(screen.getByText(/Workflow đang tắt/i)).toBeTruthy();
+    expect(screen.getByText(/This workflow is inactive/i)).toBeTruthy();
   });
 
   it('displays listening message and webhook URLs when version is active', () => {
@@ -74,7 +74,7 @@ describe('EventTriggerInfo', () => {
       />,
     );
 
-    expect(screen.getByText(/Phiên bản này đang lắng nghe/i)).toBeTruthy();
+    expect(screen.getByText(/This version is listening/i)).toBeTruthy();
     expect(screen.getByText('https://api.flowpilot.local/webhook/abc-123')).toBeTruthy();
   });
 });

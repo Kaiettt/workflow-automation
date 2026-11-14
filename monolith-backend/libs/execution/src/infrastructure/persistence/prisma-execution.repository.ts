@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { EncryptionUtil } from '@app/shared/utils/encryption.util';
+import { safeExecutionErrorCode } from '../../application/execution-error-code';
 import { ExecutionRepository } from '../../domain/repositories/execution.repository';
 import {
   ExecutionStatus,
@@ -42,20 +43,30 @@ export class PrismaExecutionRepository implements ExecutionRepository {
   }
 
   async createExecution(input: Omit<ExecutionRecord, 'id'>): Promise<string> {
-    const row = await this.prisma.execution.create({
-      data: {
-        workflowId: input.workflowId,
-        workflowVersionId: input.workflowVersionId,
-        triggerType: input.triggerType,
-        triggeredById: input.triggeredById,
-        idempotencyKey: input.idempotencyKey,
-        status: input.status,
-        queuedAt: input.queuedAt,
-        startedAt: input.startedAt,
-        context:
-          input.context === undefined ? undefined : jsonValue(input.context),
-      },
-      select: { id: true },
+    const row = await this.prisma.$transaction(async (tx) => {
+      const owners = await tx.$queryRaw<
+        { is_active: boolean }[]
+      >`SELECT u.is_active FROM users u JOIN workflows w ON w.owner_id = u.id WHERE w.id = ${input.workflowId}::uuid FOR UPDATE OF u`;
+      if (!owners[0]?.is_active)
+        throw new ForbiddenException({
+          code: 'OWNER_SUSPENDED',
+          message: 'Workflow owner is inactive',
+        });
+      return tx.execution.create({
+        data: {
+          workflowId: input.workflowId,
+          workflowVersionId: input.workflowVersionId,
+          triggerType: input.triggerType,
+          triggeredById: input.triggeredById,
+          idempotencyKey: input.idempotencyKey,
+          status: input.status,
+          queuedAt: input.queuedAt,
+          startedAt: input.startedAt,
+          context:
+            input.context === undefined ? undefined : jsonValue(input.context),
+        },
+        select: { id: true },
+      });
     });
     return row.id;
   }
@@ -121,6 +132,10 @@ export class PrismaExecutionRepository implements ExecutionRepository {
       input: jsonValue(log.input),
       output: jsonValue(log.output),
       errorMessage: log.errorMessage,
+      errorCode:
+        log.status === ExecutionStatus.FAILED
+          ? safeExecutionErrorCode(log.errorCode ?? 'NODE_EXECUTION_FAILED')
+          : null,
       startedAt: log.startedAt,
       finishedAt: log.finishedAt,
       durationMs: log.finishedAt
@@ -162,16 +177,41 @@ export class PrismaExecutionRepository implements ExecutionRepository {
   ): Promise<void> {
     await this.prisma.execution.update({
       where: { id },
-      data: { status: status, finishedAt, durationMs },
+      data: {
+        status: status,
+        finishedAt,
+        durationMs,
+        errorCode:
+          status === ExecutionStatus.FAILED
+            ? 'WORKFLOW_EXECUTION_FAILED'
+            : null,
+      },
     });
   }
 
   async claimQueuedExecution(id: string, startedAt: Date): Promise<boolean> {
-    const { count } = await this.prisma.execution.updateMany({
-      where: { id, status: ExecutionStatus.QUEUED },
-      data: { status: ExecutionStatus.RUNNING, startedAt },
+    return this.prisma.$transaction(async (tx) => {
+      const owners = await tx.$queryRaw<
+        { is_active: boolean }[]
+      >`SELECT u.is_active FROM users u JOIN workflows w ON w.owner_id = u.id JOIN executions e ON e.workflow_id = w.id WHERE e.id = ${id}::uuid FOR UPDATE OF u`;
+      if (!owners[0]) return false;
+      if (!owners[0].is_active) {
+        await tx.execution.updateMany({
+          where: { id, status: ExecutionStatus.QUEUED },
+          data: {
+            status: ExecutionStatus.CANCELLED,
+            cancellationReason: 'OWNER_SUSPENDED',
+            finishedAt: startedAt,
+          },
+        });
+        return false;
+      }
+      const { count } = await tx.execution.updateMany({
+        where: { id, status: ExecutionStatus.QUEUED },
+        data: { status: ExecutionStatus.RUNNING, startedAt },
+      });
+      return count === 1;
     });
-    return count === 1;
   }
 
   async failUnfinishedExecution(id: string, finishedAt: Date): Promise<void> {
@@ -180,7 +220,11 @@ export class PrismaExecutionRepository implements ExecutionRepository {
         id,
         status: { in: [ExecutionStatus.QUEUED, ExecutionStatus.RUNNING] },
       },
-      data: { status: ExecutionStatus.FAILED, finishedAt },
+      data: {
+        status: ExecutionStatus.FAILED,
+        finishedAt,
+        errorCode: 'EXECUTION_QUEUE_FAILED',
+      },
     });
   }
 
@@ -191,7 +235,11 @@ export class PrismaExecutionRepository implements ExecutionRepository {
         triggerType: TriggerType.MANUAL,
         startedAt: { lt: startedBefore },
       },
-      data: { status: ExecutionStatus.FAILED, finishedAt: new Date() },
+      data: {
+        status: ExecutionStatus.FAILED,
+        finishedAt: new Date(),
+        errorCode: 'EXECUTION_WORKER_INTERRUPTED',
+      },
     });
     return count;
   }

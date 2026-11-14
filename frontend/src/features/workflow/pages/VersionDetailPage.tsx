@@ -169,21 +169,21 @@ export const VersionDetailPage: React.FC = () => {
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="mt-3 text-sm text-muted-foreground">Đang tải chi tiết phiên bản...</p>
+            <p className="mt-3 text-sm text-muted-foreground">Loading version details…</p>
           </div>
         )}
 
         {isError && (
           <Card className="border-destructive/30 bg-destructive/5 mb-8">
             <CardHeader>
-              <CardTitle className="text-destructive text-base">Không tìm thấy phiên bản này</CardTitle>
+              <CardTitle className="text-destructive text-base">Version not found</CardTitle>
               <CardDescription>
-                Phiên bản có thể đã bị xóa hoặc liên kết không hợp lệ.
+                This version may have been deleted, or the link is invalid.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button variant="outline" size="sm" onClick={() => refetch()}>
-                Thử lại
+                Try again
               </Button>
             </CardContent>
           </Card>

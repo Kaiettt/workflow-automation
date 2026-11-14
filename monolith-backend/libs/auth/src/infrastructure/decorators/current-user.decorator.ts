@@ -6,6 +6,7 @@ export class AuthenticatedUser {
   email: string;
   name: string;
   role: string;
+  sessionVersion?: number;
 }
 
 export const CurrentUser = createParamDecorator(

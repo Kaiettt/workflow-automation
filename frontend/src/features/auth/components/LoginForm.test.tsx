@@ -11,6 +11,14 @@ vi.mock('../api/auth.api', () => ({
 }));
 
 import { LoginForm } from './LoginForm';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import type { ComponentProps } from 'react';
+let queryClient: QueryClient;
+function renderLoginForm(props: ComponentProps<typeof LoginForm> = {}) {
+  queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+  return render(<QueryClientProvider client={queryClient}><MemoryRouter><Routes><Route path="/" element={<LoginForm {...props} />} /><Route path="/admin" element={<p>Admin dashboard</p>} /></Routes></MemoryRouter></QueryClientProvider>);
+}
 
 describe('LoginForm', () => {
   beforeEach(() => {
@@ -18,11 +26,11 @@ describe('LoginForm', () => {
     useAuthStore.getState().logout();
   });
 
-  afterEach(cleanup);
+  afterEach(() => { cleanup(); queryClient?.clear(); });
 
   it('renders input fields and submit button', () => {
-    render(<LoginForm />);
-    expect(screen.getByPlaceholderText('developer@flowpilot.local')).toBeTruthy();
+    renderLoginForm();
+    expect(screen.getByPlaceholderText('you@example.com')).toBeTruthy();
     expect(screen.getByPlaceholderText('••••••••')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Sign In' })).toBeTruthy();
   });
@@ -45,9 +53,9 @@ describe('LoginForm', () => {
       },
     });
 
-    render(<LoginForm onSuccess={onSuccess} />);
+    renderLoginForm({ onSuccess });
 
-    fireEvent.change(screen.getByPlaceholderText('developer@flowpilot.local'), {
+    fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
       target: { value: 'admin@flowpilot.local' },
     });
     fireEvent.change(screen.getByPlaceholderText('••••••••'), {
@@ -62,6 +70,7 @@ describe('LoginForm', () => {
         password: 'Password123!',
       });
       expect(onSuccess).toHaveBeenCalled();
+      expect(screen.getByText('Admin dashboard')).toBeTruthy();
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
       expect(useAuthStore.getState().user).toEqual(mockUser);
     });
@@ -70,9 +79,9 @@ describe('LoginForm', () => {
   it('displays error message when login fails', async () => {
     mockAuthApi.login.mockRejectedValue(new Error('Invalid email or password'));
 
-    render(<LoginForm />);
+    renderLoginForm();
 
-    fireEvent.change(screen.getByPlaceholderText('developer@flowpilot.local'), {
+    fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
       target: { value: 'wrong@flowpilot.local' },
     });
     fireEvent.change(screen.getByPlaceholderText('••••••••'), {
@@ -91,12 +100,7 @@ describe('LoginForm', () => {
     const onSwitchToRegister = vi.fn();
     const onForgotPassword = vi.fn();
 
-    render(
-      <LoginForm
-        onSwitchToRegister={onSwitchToRegister}
-        onForgotPassword={onForgotPassword}
-      />,
-    );
+    renderLoginForm({ onSwitchToRegister, onForgotPassword });
 
     fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }));
     expect(onForgotPassword).toHaveBeenCalledTimes(1);
@@ -104,5 +108,16 @@ describe('LoginForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create an account' }));
     expect(onSwitchToRegister).toHaveBeenCalledTimes(1);
   });
+  it('keeps Client login in the workspace instead of opening Admin', async () => {
+    mockAuthApi.login.mockResolvedValue({ success: true, data: { accessToken: 'client-access', refreshToken: 'client-refresh', user: { id: 'client', name: 'Client', email: 'client@example.test', role: 'CLIENT', isActive: true } } });
+    const onSuccess = vi.fn();
+    renderLoginForm({ onSuccess });
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'client@example.test' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Password123!' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(screen.queryByText('Admin dashboard')).toBeNull();
+  });
+
 });
 

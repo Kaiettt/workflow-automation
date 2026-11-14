@@ -80,8 +80,8 @@ export function useExecutionMonitor({
       const message =
         err instanceof Error
           ? err.message
-          : 'Đã xảy ra lỗi trong quá trình thực thi quy trình.';
-      alert(`Lỗi thực thi: ${message}`);
+          : 'An error occurred while executing the workflow.';
+      alert(`Execution error: ${message}`);
     },
   });
 

@@ -54,11 +54,11 @@ export const WorkflowTable: React.FC<WorkflowTableProps> = ({
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
-            <TableHead className="w-[300px]">Tên Workflow</TableHead>
-            <TableHead>Trạng thái</TableHead>
-            <TableHead className="hidden md:table-cell">Ngày tạo</TableHead>
-            <TableHead className="hidden sm:table-cell">Cập nhật gần nhất</TableHead>
-            <TableHead className="text-right">Hành động</TableHead>
+            <TableHead className="w-[300px]">Workflow name</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="hidden md:table-cell">Created</TableHead>
+            <TableHead className="hidden sm:table-cell">Last updated</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -135,7 +135,7 @@ export const WorkflowTable: React.FC<WorkflowTableProps> = ({
                   <Clock className="size-3" />
                   <span>
                     {wf.createdAt
-                      ? new Date(wf.createdAt).toLocaleDateString('vi-VN')
+                      ? new Date(wf.createdAt).toLocaleDateString('en-US')
                       : '—'}
                   </span>
                 </div>
@@ -144,7 +144,7 @@ export const WorkflowTable: React.FC<WorkflowTableProps> = ({
               <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
                 <span>
                   {wf.updatedAt
-                    ? new Date(wf.updatedAt).toLocaleString('vi-VN')
+                    ? new Date(wf.updatedAt).toLocaleString('en-US')
                     : '—'}
                 </span>
               </TableCell>
@@ -158,7 +158,7 @@ export const WorkflowTable: React.FC<WorkflowTableProps> = ({
                     onClick={() => onNavigateVersions(wf.id)}
                   >
                     <GitBranch className="size-3 text-primary" />
-                    <span>Phiên bản (Versions)</span>
+                    <span>Versions</span>
                   </Button>
 
                   <Button
@@ -166,7 +166,7 @@ export const WorkflowTable: React.FC<WorkflowTableProps> = ({
                     className="h-8 gap-1 text-xs"
                     onClick={() => onNavigateWorkflow(wf.id)}
                   >
-                    <span>Mở Designer</span>
+                    <span>Open designer</span>
                     <ArrowRight className="size-3" />
                   </Button>
                   <Button

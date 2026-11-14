@@ -95,7 +95,6 @@ export class AuthController {
       dto.password,
       dto.name,
       dto.otp,
-      dto.role,
     );
     const result = await this.commandBus.execute(command);
     return {

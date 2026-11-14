@@ -32,15 +32,15 @@ export const ExecutionControlBar: React.FC<ExecutionControlBarProps> = ({
       <div className="space-y-2">
         <div className="flex items-center gap-3">
           <Badge variant="default" className="text-sm font-mono px-3 py-1 font-bold">
-            Phiên bản v{versionNumber}
+            Version v{versionNumber}
           </Badge>
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <Clock className="size-3.5" />
-            Xuất bản: {new Date(publishedAt).toLocaleString('vi-VN')}
+            Published: {new Date(publishedAt).toLocaleString('en-US')}
           </span>
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Chi tiết Phiên bản &amp; Kích hoạt Run UI
+          Version details and execution controls
         </h1>
         <p className="text-sm text-muted-foreground">
           Workflow ID: <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{workflowId}</code> • Version ID: <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{versionId}</code>
@@ -86,10 +86,10 @@ export const ExecutionControlBar: React.FC<ExecutionControlBarProps> = ({
             )}
             <span>
               {isPending
-                ? 'Đang gửi yêu cầu...'
+                ? 'Submitting…'
                 : hasSelectedExecution
-                  ? 'Chạy lại phiên bản (Rerun)'
-                  : 'Kích hoạt chạy ngay (Run)'}
+                  ? 'Run again'
+                  : 'Run version'}
             </span>
           </Button>
         )}

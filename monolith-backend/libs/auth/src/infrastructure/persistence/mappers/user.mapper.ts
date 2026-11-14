@@ -11,6 +11,7 @@ export class UserMapper {
       name: raw.name,
       role: raw.role as unknown as UserRole,
       isActive: raw.isActive,
+      sessionVersion: raw.sessionVersion,
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
     });

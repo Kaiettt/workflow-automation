@@ -45,14 +45,14 @@ export const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({
       setConflictDialogOpen(false);
       onOpenChange(false);
       onRestoreSuccess(data.definition);
-      alert(`Khôi phục phiên bản v${data.restoredVersionNumber} thành công!`);
+      alert(`Restored version v${data.restoredVersionNumber} successfully!`);
     },
     onError: (err: unknown) => {
       const message =
         err instanceof Error
           ? err.message
-          : 'Đã xảy ra lỗi khi khôi phục phiên bản';
-      alert(`Lỗi khi khôi phục: ${message}`);
+          : 'Could not restore the version';
+      alert(`Restore failed: ${message}`);
     },
   });
 
@@ -66,7 +66,7 @@ export const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({
       // Seamless restore if draft is clean
       if (
         window.confirm(
-          `Bạn có chắc chắn muốn khôi phục bản nháp về Phiên bản v${version.versionNumber}?`,
+          `Restore the draft to version v${version.versionNumber}?`,
         )
       ) {
         restoreMutation.mutate({
@@ -92,38 +92,38 @@ export const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({
           <DialogHeader>
             <div className="flex items-center gap-2">
               <History className="size-5 text-primary" />
-              <DialogTitle>Lịch sử phiên bản (Version History)</DialogTitle>
+              <DialogTitle>Version history</DialogTitle>
             </div>
             <DialogDescription>
-              Xem các phiên bản đã xuất bản và khôi phục về bản nháp để chỉnh sửa.
+              Review published versions and restore one into the draft for editing.
             </DialogDescription>
           </DialogHeader>
 
           <div className="max-h-[380px] overflow-y-auto py-2 pr-1">
             {isLoading && (
               <div className="py-8 text-center text-sm text-muted-foreground">
-                Đang tải danh sách phiên bản...
+                Loading versions…
               </div>
             )}
 
             {isError && (
               <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
                 <AlertCircle className="size-4 shrink-0" />
-                <span>Không thể tải lịch sử phiên bản.</span>
+                <span>Could not load version history.</span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => refetch()}
                   className="ml-auto"
                 >
-                  Thử lại
+                  Try again
                 </Button>
               </div>
             )}
 
             {!isLoading && (!versions || versions.length === 0) && (
               <div className="py-8 text-center text-sm text-muted-foreground">
-                Chưa có phiên bản nào được xuất bản.
+                No published versions yet.
               </div>
             )}
 
@@ -141,14 +141,14 @@ export const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({
                         </Badge>
                         {draftStatus?.currentPublishedVersion?.id === ver.id && (
                           <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400">
-                            Đang hoạt động
+                            Active
                           </Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Clock className="size-3.5" />
                         <span>
-                          {new Date(ver.publishedAt).toLocaleString('vi-VN')}
+                          {new Date(ver.publishedAt).toLocaleString('en-US')}
                         </span>
                       </div>
                     </div>
@@ -161,7 +161,7 @@ export const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({
                       className="gap-1.5 text-xs"
                     >
                       <RotateCcw className="size-3.5" />
-                      Khôi phục
+                      Restore
                     </Button>
                   </div>
                 ))}

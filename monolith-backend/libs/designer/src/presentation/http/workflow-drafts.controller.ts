@@ -1,4 +1,6 @@
-import { Body, Controller, Param, Put, Get } from '@nestjs/common';
+import { Body, Controller, Param, Put, Get, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
+import { WorkflowOwnershipGuard } from '../../infrastructure/workflow-ownership.guard';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { SaveDraftCommand } from '../../application/commands/save-draft.command';
@@ -7,6 +9,7 @@ import { SaveDraftDto } from './dtos/save-draft.dto';
 
 @ApiTags('workflows')
 @Controller('api/workflows')
+@UseGuards(JwtAuthGuard, WorkflowOwnershipGuard)
 export class WorkflowDraftsController {
   constructor(
     private readonly commandBus: CommandBus,

@@ -6,4 +6,5 @@ export abstract class RefreshTokenRepository {
   ): Promise<void>;
   abstract validate(userId: string, token: string): Promise<boolean>;
   abstract revoke(userId: string): Promise<void>;
+  abstract revokeBefore(userId: string, sessionVersion: number): Promise<void>;
 }

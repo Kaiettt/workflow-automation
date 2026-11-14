@@ -89,7 +89,7 @@ describe('WorkflowListPage', () => {
     renderComponent();
 
     const createButtons = screen.getAllByRole('button', {
-      name: /Tạo Workflow/i,
+      name: /New workflow/i,
     });
     fireEvent.click(createButtons[0]);
 

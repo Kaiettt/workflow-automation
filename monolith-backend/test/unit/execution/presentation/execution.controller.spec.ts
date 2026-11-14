@@ -5,34 +5,38 @@ jest.mock('@app/auth/infrastructure/guards/jwt-auth.guard', () => ({
 import { ExecutionController } from '@app/execution/presentation/http/execution.controller';
 import { ExecutionStreamService } from '@app/execution/application/services/execution-stream.service';
 import { ExecutionEventPublisher } from '@app/execution/application/ports/execution-event-publisher.port';
-import { ExecutionLifecycleEvent } from '@app/execution/application/ports/execution-event-publisher.port';
+import { ExecutionEvent } from '@app/execution/application/ports/execution-event-publisher.port';
+import { UserRole } from '@app/auth/domain/enums/user-role.enum';
 
 describe('ExecutionController SSE lifecycle', () => {
-  const user = { id: 'owner-1', email: 'owner@example.test' };
+  const user = {
+    id: 'owner-1',
+    name: 'Owner',
+    role: UserRole.CLIENT,
+    email: 'owner@example.test',
+    sessionVersion: 0,
+  };
 
   function createController(snapshot: unknown) {
     const queryBusExecute = jest.fn().mockResolvedValue(snapshot);
     const queryBus = {
       execute: queryBusExecute,
     } as unknown as QueryBus;
-    const listeners = new Map<
-      string,
-      (event: ExecutionLifecycleEvent) => void
-    >();
+    const listeners = new Map<string, (event: ExecutionEvent) => void>();
     const unsubscribe = jest.fn();
     const eventPublisher = {
       subscribe: jest.fn(
-        (
-          executionId: string,
-          listener: (event: ExecutionLifecycleEvent) => void,
-        ) => {
+        (executionId: string, listener: (event: ExecutionEvent) => void) => {
           listeners.set(executionId, listener);
           return unsubscribe;
         },
       ),
     } as unknown as ExecutionEventPublisher;
 
-    const streamService = new ExecutionStreamService(queryBus, eventPublisher);
+    const streamService = new ExecutionStreamService(queryBus, eventPublisher, {
+      isActive: () => Promise.resolve(true),
+      isCurrent: () => Promise.resolve(true),
+    });
     const controller = new ExecutionController(
       {} as never,
       queryBus,
@@ -132,6 +136,9 @@ describe('ExecutionController SSE lifecycle', () => {
       status: 'SUCCESS',
       ts: new Date().toISOString(),
     });
+
+    // Events now recheck the current session asynchronously before delivery.
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(emitted).toHaveLength(2);
     expect((emitted[1] as { type: string }).type).toBe('execution.completed');
