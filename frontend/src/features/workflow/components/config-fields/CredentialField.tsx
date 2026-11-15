@@ -10,6 +10,7 @@ import {
 import { useConnector, useCredentials } from '../../hooks/useCredentials';
 import { useOAuth2Popup } from '../../hooks/useOAuth2Popup';
 import { AddCredentialDialog } from '../AddCredentialDialog';
+import { ConnectorDisabledBanner } from '../ConnectorDisabledBanner';
 import { FieldShell } from './FieldShell';
 
 interface CredentialPickerProps {
@@ -81,11 +82,15 @@ export function CredentialPicker({
 
       {connectorKey && (
         <>
+          {connector?.allowNewCredentials === false && (
+            <ConnectorDisabledBanner connectorName={connector.name} />
+          )}
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="w-full"
+            disabled={connector?.allowNewCredentials === false}
             onClick={() => setDialogOpen(true)}
           >
             + Add connection
@@ -117,22 +122,45 @@ export function CredentialPicker({
   );
 }
 
-interface OAuthFieldProps {
+export interface OAuthFieldProps {
   id: string;
   label: string;
+  connectorKey?: string;
   connectorName: string;
   connected: boolean;
   onConnect: () => void;
+  error?: string | null;
 }
 
 // Credentials of OAuth connectors (Google) come from a pop-up sign-in, not a form.
-export function OAuthField({ id, label, connectorName, connected, onConnect }: OAuthFieldProps) {
+export function OAuthField({
+  id,
+  label,
+  connectorKey,
+  connectorName,
+  connected,
+  onConnect,
+  error,
+}: OAuthFieldProps) {
+  const { data: connector } = useConnector(connectorKey ?? connectorName);
+  const isDisabled = connector?.allowNewCredentials === false;
+
   return (
     <FieldShell id={id} label={label}>
-      <Button type="button" variant="outline" className="w-full" onClick={onConnect}>
-        Connect {connectorName}
+      {isDisabled && (
+        <ConnectorDisabledBanner connectorName={connector?.name ?? connectorName} />
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full"
+        disabled={isDisabled}
+        onClick={onConnect}
+      >
+        Connect {connector?.name ?? connectorName}
       </Button>
       {connected && <p className="text-xs text-green-600">✓ Connected</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </FieldShell>
   );
 }

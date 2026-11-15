@@ -1,9 +1,17 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  Optional,
+} from '@nestjs/common';
 import { google } from 'googleapis';
 import { EncryptionUtil } from '@app/shared/utils/encryption.util';
 import { ConnectorCredentialRepository } from '@app/connector/domain/repositories/connector-credential.repository';
 import { ConnectorRepository } from '@app/connector/domain/repositories/connector.repository';
 import { ConnectorCredential } from '@app/connector/domain/entities/connector-credential.entity';
+import { ConnectorPolicyPort } from '@app/connector/application/ports/connector-policy.port';
+import { PrismaService } from '@app/database';
 
 @Injectable()
 export class GoogleOauthService {
@@ -12,6 +20,8 @@ export class GoogleOauthService {
   constructor(
     private credentialRepo: ConnectorCredentialRepository,
     private connectorRepo: ConnectorRepository,
+    @Optional() private policyPort?: ConnectorPolicyPort,
+    @Optional() private prisma?: PrismaService,
   ) {
     this.oauth2Client = new google.auth.OAuth2(
       process.env['google-Client-Id'],
@@ -30,7 +40,12 @@ export class GoogleOauthService {
     return connector.id;
   }
 
-  getAuthUrl(userId: string): string {
+  async getAuthUrl(userId: string): Promise<string> {
+    const connectorId = await this.getGoogleConnectorId();
+    if (this.policyPort) {
+      await this.policyPort.assertCanCreateCredential(connectorId);
+    }
+
     const scopes = [
       'https://www.googleapis.com/auth/spreadsheets.readonly',
       'https://www.googleapis.com/auth/gmail.send',
@@ -86,6 +101,34 @@ export class GoogleOauthService {
       );
 
       const connectorId = await this.getGoogleConnectorId();
+      if (this.policyPort) {
+        await this.policyPort.assertCanCreateCredential(connectorId);
+      }
+
+      if (this.prisma) {
+        const saved = await this.prisma.$transaction(async (tx) => {
+          const policy = await tx.connectorPolicy.findUnique({
+            where: { connectorId },
+          });
+          const isAllowed = policy ? policy.allowNewCredentials : true;
+          if (!isAllowed) {
+            throw new ConflictException({
+              code: 'CONNECTOR_NEW_CREDENTIALS_DISABLED',
+              message:
+                'New credentials for this connector have been disabled by platform administrator',
+            });
+          }
+          return tx.connectorCredential.create({
+            data: {
+              connectorId,
+              ownerId: userId,
+              name: 'google-credential',
+              encryptedSecret,
+            },
+          });
+        });
+        return saved.id;
+      }
 
       const credential = new ConnectorCredential(
         undefined,
@@ -98,7 +141,10 @@ export class GoogleOauthService {
       const savedCredential = await this.credentialRepo.create(credential);
 
       return savedCredential.id!;
-    } catch {
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new BadRequestException(
         'Failed to exchange auth code or save credential',
       );

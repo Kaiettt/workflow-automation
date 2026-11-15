@@ -28,6 +28,30 @@ export class UsersDto extends PageDto {
   @IsOptional() @IsIn(['ADMIN', 'CLIENT']) role?: 'ADMIN' | 'CLIENT';
   @IsOptional() @IsBooleanString() isActive?: string;
 }
+export class ConnectorsDto extends PageDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  q?: string;
+  @IsOptional()
+  @IsIn(['NONE', 'API_KEY', 'OAUTH2', 'BASIC'])
+  authType?: 'NONE' | 'API_KEY' | 'OAUTH2' | 'BASIC';
+  @IsOptional() @IsBooleanString() isActive?: string;
+  @IsOptional() @IsBooleanString() allowNewCredentials?: string;
+}
+export class ChangeConnectorPolicyDto {
+  @IsBoolean() allowNewCredentials!: boolean;
+  @IsInt() @Min(0) expectedRevision!: number;
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @Length(5, 500)
+  reason!: string;
+}
 export class ChangeAccountDto {
   @IsInt() @Min(0) expectedRevision: number;
   @Transform(({ value }: { value: unknown }) =>

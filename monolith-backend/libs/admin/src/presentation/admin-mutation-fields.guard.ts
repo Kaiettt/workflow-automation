@@ -8,8 +8,9 @@ import {
 import { Reflector } from '@nestjs/core';
 
 const BODY_FIELDS = 'admin:body-fields';
-export const AdminBodyFields = (field: 'role' | 'isActive') =>
-  SetMetadata(BODY_FIELDS, ['expectedRevision', 'reason', field]);
+export const AdminBodyFields = (
+  field: 'role' | 'isActive' | 'allowNewCredentials',
+) => SetMetadata(BODY_FIELDS, ['expectedRevision', 'reason', field]);
 
 // Validate raw field names before the global whitelist pipe strips unknown fields.
 @Injectable()

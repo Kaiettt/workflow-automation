@@ -19,6 +19,7 @@ export interface ConnectorSummary {
   name: string;
   authType: 'NONE' | 'API_KEY' | 'OAUTH2' | 'BASIC';
   configSchema: unknown;
+  allowNewCredentials?: boolean;
   // OAuth2 credential types of integration packages: the redirect URL to
   // register in the provider app; the form is followed by a sign-in pop-up.
   oauth2?: { redirectUrl: string } | null;

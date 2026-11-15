@@ -41,6 +41,8 @@
       "@app/apps/*": ["libs/apps/src/*"],
       "@app/triggers": ["libs/triggers/src"],
       "@app/triggers/*": ["libs/triggers/src/*"],
+      "@app/admin": ["libs/admin/src"],
+      "@app/admin/*": ["libs/admin/src/*"],
       "@test/*": ["test/*"]
     },
     "incremental": true,

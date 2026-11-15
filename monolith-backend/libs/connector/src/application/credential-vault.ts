@@ -7,6 +7,7 @@ const UUID_PATTERN =
 
 export interface StoredCredential {
   id: string;
+  connectorId?: string;
   ownerId: string;
   name: string;
   connectorKey: string;
@@ -40,6 +41,7 @@ export class CredentialVault {
     if (!row) return null;
     return {
       id: row.id,
+      connectorId: row.connectorId,
       ownerId: row.ownerId,
       name: row.name,
       connectorKey: row.connector.key,

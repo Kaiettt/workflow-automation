@@ -47,10 +47,12 @@ export function PropertiesPanel({
     return (selectedNode?.data?.config as Record<string, unknown>) || {};
   });
   const [prevNodeId, setPrevNodeId] = useState<string | null>(selectedNodeId);
+  const [oauthError, setOauthError] = useState<string | null>(null);
 
   if (selectedNodeId !== prevNodeId) {
     setPrevNodeId(selectedNodeId);
     setLocalConfig((selectedNode?.data?.config as Record<string, unknown>) || {});
+    setOauthError(null);
   }
 
   // `undefined` removes the key. Fields that depend on this one (a credential
@@ -101,12 +103,19 @@ export function PropertiesPanel({
   const nameIsDuplicate = isDuplicateNodeName(nodes, selectedNode.id, nodeName);
 
   const handleConnect = async () => {
+    setOauthError(null);
     try {
       const res = await apiClient.get('/api/integrations/google/auth');
       if (res.data.url) {
         window.open(res.data.url, 'OAuth', 'width=500,height=600');
       }
-    } catch (e) {
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } }; message?: string };
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to initiate OAuth connection';
+      setOauthError(message);
       console.error('Failed to initiate OAuth', e);
     }
   };
@@ -173,6 +182,7 @@ export function PropertiesPanel({
               needsCredential={needsCredential}
               onChange={handleConfigChange}
               onConnectOAuth={() => void handleConnect()}
+              oauthError={oauthError}
             />
           ))
         )}

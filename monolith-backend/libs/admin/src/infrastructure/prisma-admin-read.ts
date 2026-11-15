@@ -4,6 +4,7 @@ import { PrismaService } from '@app/database';
 import { safeExecutionErrorCode } from '@app/execution/application/execution-error-code';
 import { AdminReadPort } from '../application/admin-read.port';
 import type {
+  ConnectorFilter,
   DashboardFilter,
   UserFilter,
 } from '../application/admin-read.port';
@@ -179,5 +180,196 @@ export class PrismaAdminRead extends AdminReadPort {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
+  }
+
+  async connectors(filter: ConnectorFilter) {
+    const where: Prisma.ConnectorWhereInput = {
+      ...(filter.authType ? { authType: filter.authType } : {}),
+      ...(filter.isActive !== undefined ? { isActive: filter.isActive } : {}),
+      ...(filter.allowNewCredentials !== undefined
+        ? filter.allowNewCredentials === false
+          ? { policy: { allowNewCredentials: false } }
+          : {
+              OR: [{ policy: null }, { policy: { allowNewCredentials: true } }],
+            }
+        : {}),
+      ...(filter.q
+        ? {
+            OR: [
+              { name: { contains: filter.q, mode: 'insensitive' } },
+              { key: { contains: filter.q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [connectors, total] = await this.prisma.$transaction([
+      this.prisma.connector.findMany({
+        where,
+        include: {
+          policy: true,
+          _count: { select: { credentials: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (filter.page - 1) * filter.pageSize,
+        take: filter.pageSize,
+      }),
+      this.prisma.connector.count({ where }),
+    ]);
+
+    const publishedWorkflows = await this.prisma.workflow.findMany({
+      where: { status: 'PUBLISHED', currentVersionId: { not: null } },
+      select: {
+        id: true,
+        currentVersion: { select: { definition: true } },
+      },
+    });
+
+    const nodeTypes = await this.prisma.nodeTypeDefinition.findMany({
+      where: { connectorId: { not: null } },
+      select: { key: true, connectorId: true },
+    });
+    const connectorByNodeKey = new Map<string, string>();
+    for (const nt of nodeTypes) {
+      if (nt.connectorId) connectorByNodeKey.set(nt.key, nt.connectorId);
+    }
+
+    const credentials = await this.prisma.connectorCredential.findMany({
+      select: { id: true, connectorId: true },
+    });
+    const connectorByCredId = new Map<string, string>();
+    for (const c of credentials) {
+      connectorByCredId.set(c.id, c.connectorId);
+    }
+
+    const workflowIdsByConnector = new Map<string, Set<string>>();
+    for (const wf of publishedWorkflows) {
+      const def = wf.currentVersion?.definition as {
+        nodes?: Array<{
+          type?: string;
+          data?: {
+            nodeType?: string;
+            nodeKey?: string;
+            credentialId?: string;
+          };
+        }>;
+      } | null;
+      if (!def?.nodes || !Array.isArray(def.nodes)) continue;
+
+      for (const n of def.nodes) {
+        const key = n.data?.nodeType || n.data?.nodeKey || n.type;
+        const connIdFromNode = key ? connectorByNodeKey.get(key) : undefined;
+        if (connIdFromNode) {
+          if (!workflowIdsByConnector.has(connIdFromNode)) {
+            workflowIdsByConnector.set(connIdFromNode, new Set());
+          }
+          workflowIdsByConnector.get(connIdFromNode)!.add(wf.id);
+        }
+
+        const credId = n.data?.credentialId;
+        const connIdFromCred = credId
+          ? connectorByCredId.get(credId)
+          : undefined;
+        if (connIdFromCred) {
+          if (!workflowIdsByConnector.has(connIdFromCred)) {
+            workflowIdsByConnector.set(connIdFromCred, new Set());
+          }
+          workflowIdsByConnector.get(connIdFromCred)!.add(wf.id);
+        }
+      }
+    }
+
+    const items = connectors.map((c) => ({
+      id: c.id,
+      key: c.key,
+      name: c.name,
+      authType: c.authType,
+      isActive: c.isActive,
+      allowNewCredentials: c.policy?.allowNewCredentials ?? true,
+      revision: c.policy?.revision ?? 0,
+      credentialCount: c._count.credentials,
+      workflowCount: workflowIdsByConnector.get(c.id)?.size ?? 0,
+      createdAt: c.createdAt,
+      updatedAt: c.policy?.updatedAt ?? c.createdAt,
+    }));
+
+    return { items, total, page: filter.page, pageSize: filter.pageSize };
+  }
+
+  async connector(id: string) {
+    const connector = await this.prisma.connector.findUnique({
+      where: { id },
+      include: {
+        policy: true,
+        nodeTypes: {
+          select: {
+            id: true,
+            key: true,
+            displayName: true,
+            category: true,
+            isActive: true,
+          },
+        },
+        _count: { select: { credentials: true } },
+      },
+    });
+    if (!connector) throw new NotFoundException('Connector not found');
+
+    const publishedWorkflows = await this.prisma.workflow.findMany({
+      where: { status: 'PUBLISHED', currentVersionId: { not: null } },
+      select: {
+        id: true,
+        currentVersion: { select: { definition: true } },
+      },
+    });
+
+    const nodeTypeKeys = new Set(connector.nodeTypes.map((nt) => nt.key));
+    const credIds = new Set(
+      (
+        await this.prisma.connectorCredential.findMany({
+          where: { connectorId: id },
+          select: { id: true },
+        })
+      ).map((c) => c.id),
+    );
+
+    const distinctWorkflows = new Set<string>();
+    for (const wf of publishedWorkflows) {
+      const def = wf.currentVersion?.definition as {
+        nodes?: Array<{
+          type?: string;
+          data?: {
+            nodeType?: string;
+            nodeKey?: string;
+            credentialId?: string;
+          };
+        }>;
+      } | null;
+      if (!def?.nodes || !Array.isArray(def.nodes)) continue;
+      for (const n of def.nodes) {
+        const key = n.data?.nodeType || n.data?.nodeKey || n.type;
+        if (key && nodeTypeKeys.has(key)) {
+          distinctWorkflows.add(wf.id);
+        }
+        if (n.data?.credentialId && credIds.has(n.data.credentialId)) {
+          distinctWorkflows.add(wf.id);
+        }
+      }
+    }
+
+    return {
+      id: connector.id,
+      key: connector.key,
+      name: connector.name,
+      authType: connector.authType,
+      isActive: connector.isActive,
+      allowNewCredentials: connector.policy?.allowNewCredentials ?? true,
+      revision: connector.policy?.revision ?? 0,
+      credentialCount: connector._count.credentials,
+      workflowCount: distinctWorkflows.size,
+      nodeTypes: connector.nodeTypes,
+      createdAt: connector.createdAt,
+      updatedAt: connector.policy?.updatedAt ?? connector.createdAt,
+    };
   }
 }

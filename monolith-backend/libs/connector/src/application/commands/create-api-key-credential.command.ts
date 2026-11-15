@@ -6,6 +6,7 @@ import { ConnectorCredentialRepository } from '../../domain/repositories/connect
 import { ConnectorCredential } from '../../domain/entities/connector-credential.entity';
 import { ConnectorAuthType } from '../../domain/enums/connector-auth-type.enum';
 import { CredentialSummary } from '../dtos/credential-summary.dto';
+import { ConnectorPolicyPort } from '../ports/connector-policy.port';
 
 export class CreateApiKeyCredentialCommand {
   constructor(
@@ -23,6 +24,7 @@ export class CreateApiKeyCredentialHandler implements ICommandHandler<CreateApiK
   constructor(
     private readonly connectorRepo: ConnectorRepository,
     private readonly credentialRepo: ConnectorCredentialRepository,
+    private readonly policyPort?: ConnectorPolicyPort,
   ) {}
 
   async execute(
@@ -33,6 +35,9 @@ export class CreateApiKeyCredentialHandler implements ICommandHandler<CreateApiK
       throw new NotFoundException(
         `Connector "${command.connectorKey}" was not found`,
       );
+    }
+    if (this.policyPort) {
+      await this.policyPort.assertCanCreateCredential(connector.id);
     }
     // OAuth2 credential types of integration packages start from a form too
     // (App ID / App Secret); their tokens are added by the OAuth2 callback.

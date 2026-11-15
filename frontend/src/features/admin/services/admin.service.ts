@@ -1,5 +1,16 @@
 import { apiClient } from '@/shared/api/http-client';
-import type { Account, Dashboard, DashboardFilter, Page, UserFilter, WorkflowSummary } from '../types/admin.types';
+import type {
+  Account,
+  ChangeConnectorPolicyPayload,
+  ConnectorAdminDetail,
+  ConnectorAdminItem,
+  ConnectorFilter,
+  Dashboard,
+  DashboardFilter,
+  Page,
+  UserFilter,
+  WorkflowSummary,
+} from '../types/admin.types';
 
 interface Envelope<T> { success: boolean; data: T; }
 export const adminService = {
@@ -10,5 +21,14 @@ export const adminService = {
   async change(account: Account, change: { isActive: boolean } | { role: 'ADMIN' | 'CLIENT' }, reason: string) {
     const kind = 'role' in change ? 'role' : 'active';
     return (await apiClient.patch<Envelope<Account>>(`/api/admin/users/${account.id}/${kind}`, { ...change, reason, expectedRevision: account.revision })).data.data;
+  },
+  async connectors(filter: ConnectorFilter, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<Page<ConnectorAdminItem>>>('/api/admin/connectors', { params: filter, signal })).data.data;
+  },
+  async connector(id: string, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<ConnectorAdminDetail>>(`/api/admin/connectors/${id}`, { signal })).data.data;
+  },
+  async changeConnectorPolicy(id: string, payload: ChangeConnectorPolicyPayload) {
+    return (await apiClient.patch<Envelope<ConnectorAdminItem>>(`/api/admin/connectors/${id}/credential-policy`, payload)).data.data;
   },
 };

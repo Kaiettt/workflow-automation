@@ -17,6 +17,14 @@ export function useCredentials(connectorKey: string | undefined) {
 }
 
 // The catalog rarely changes: fetched once per session.
+export function useConnectors() {
+  return useQuery<ConnectorSummary[], Error>({
+    queryKey: credentialKeys.connectors,
+    queryFn: () => credentialService.listConnectors(),
+    staleTime: Infinity,
+  });
+}
+
 export function useConnector(connectorKey: string | undefined) {
   return useQuery<ConnectorSummary[], Error, ConnectorSummary | undefined>({
     queryKey: credentialKeys.connectors,

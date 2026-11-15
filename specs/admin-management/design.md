@@ -1,72 +1,459 @@
-# Thiết kế Admin P0
+# Thiết kế Kiến trúc Khu vực Admin (Admin Management Architecture)
 
-Phạm vi đã triển khai: FR-AD-01 đến FR-AD-07 và phần ghi nhật ký tài khoản của FR-AD-11. Connector policy, màn hình execution toàn nền tảng và tra cứu nhật ký thuộc P1.
+Status: ready-for-agent
 
-## Ranh giới module
+Tài liệu này đặc tả kiến trúc toàn diện của module Quản trị (Admin), bao gồm:
+1. **Phần đã triển khai (PR #39 - P0)**: FR-AD-01 đến FR-AD-07, Ghi nhật ký tài khoản FR-AD-11.
+2. **Phần mở rộng đặc tả (P1)**: 
+   - G4: Quản lý Connector & Chính sách Credential (`allowNewCredentials`)
+   - G5: Quản lý Loại Node (`isCatalogVisible` & `isExecutionAllowed`)
+   - G6: Giám sát Execution & Bảng Node Logs an toàn
+   - G7: Trình tra cứu Nhật ký Quản trị (Audit Log Viewer)
 
-`AdminController` gọi CQRS, không gọi Prisma trực tiếp. `libs/admin` giữ query/projection; Auth giữ use case thay đổi tài khoản qua `AccountAdministrationPort`, `ManageAccountCommand` và `SessionAccessPort`. Execution giữ enqueue/claim; Triggers giữ ingress webhook. Hạ tầng PostgreSQL thực hiện transaction và lock.
+---
 
-Frontend dùng `features/admin`, service HTTP và TanStack Query. Admin đăng nhập thành công mở dashboard; workspace có nút Quản trị và Admin có nút Về workspace. Route/menu chỉ hỗ trợ điều hướng; JWT và role hiện tại từ database quyết định quyền phía server. shadcn/ui cung cấp form, table, dialog, button, menu và chart.
+## 1. Ranh giới Module và Phân tầng Kiến trúc (Clean Architecture & CQRS)
 
-## Contract và whitelist
+```
+                                  ┌────────────────────────┐
+                                  │      HTTP Request      │
+                                  └───────────┬────────────┘
+                                              │
+                                              ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ Presentation Layer (libs/admin/src/presentation)                                      │
+│                                                                                        │
+│   JwtAuthGuard ──► RolesGuard(ADMIN) ──► AdminMutationFieldsGuard                      │
+│                                │                                                       │
+│                                ▼                                                       │
+│                         AdminController                                                │
+│                          │            │                                                │
+│         (Commands)       │            │       (Queries)                                │
+│                          ▼            ▼                                                │
+│                      CommandBus    QueryBus                                            │
+└──────────────────────────┼────────────┼────────────────────────────────────────────────┘
+                           │            │
+            ┌──────────────┘            └──────────────┐
+            ▼                                          ▼
+┌───────────────────────────────────┐      ┌─────────────────────────────────────────────┐
+│ Domain / Application Ports        │      │ Admin Projection Layer                      │
+│                                   │      │ (libs/admin/src/application/ports)          │
+│ • libs/auth:                      │      │                                             │
+│   - ManageAccountCommand          │      │ • AdminReadPort                             │
+│   - AccountAdministrationPort     │      │   - users(), user(), workflows()            │
+│ • libs/connector:                 │      │   - dashboard()                             │
+│   - ChangeConnectorPolicyCommand  │      │   - connectors(), connector() [G4]          │
+│   - ConnectorPolicyPort           │      │   - nodeTypes(), nodeType() [G5]            │
+│ • libs/node-library:              │      │   - executions(), execution() [G6]          │
+│   - ChangeNodeTypeStatusCommand   │      │   - auditEvents(), auditEvent() [G7]        │
+│   - NodeTypePolicyPort            │      │                                             │
+│ • libs/database:                  │      │ Implementation:                             │
+│   - TransactionAuditWriter        │      │ • PrismaAdminRead                           │
+└──────────────────┬────────────────┘      └──────────────────────┬──────────────────────┘
+                   │                                              │
+                   ▼                                              ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ Infrastructure / Persistence (PostgreSQL & Redis)                                      │
+│                                                                                        │
+│  • users (revision, session_version)                                                   │
+│  • admin_audit_events (immutable audit log)                                            │
+│  • session_revocations (outbox for Redis invalidation)                                 │
+│  • connector_policies (allow_new_credentials, revision) [G4]                           │
+│  • node_type_policies (is_catalog_visible, is_execution_allowed, revision) [G5]         │
+│  • executions, execution_node_logs (safe metadata indexing) [G6]                       │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
-| API | Projection hoặc input |
-| --- | --- |
-| `GET /api/admin/users` | `id`, `name`, `email`, `role`, `isActive`, `revision`, `createdAt`, `updatedAt`; pagination/search/filter phía server |
-| `GET /api/admin/users/:id` | Metadata trên và `counts.workflows/credentials/executions`; execution đếm theo owner workflow |
-| `GET /api/admin/users/:id/workflows` | `id`, `name`, `status`, `active`, `updatedAt`; pagination |
-| `PATCH .../active` | `isActive`, `reason`, `expectedRevision` |
-| `PATCH .../role` | `role`, `reason`, `expectedRevision` |
-| Mutation response | Metadata cập nhật, revision và `auditEventId`; no-op trả ID null |
-| `GET /api/admin/dashboard` | Snapshot account/workflow; aggregate execution, success rate, trend, error groups; thời điểm cập nhật và khoảng truy vấn |
+### Nguyên tắc ranh giới:
+1. `AdminController` chỉ đóng vai trò Presentation: Nhận DTO, xác thực bảo mật, đẩy qua `CommandBus` hoặc `QueryBus`. Không tiêm trực tiếp `PrismaService` vào controller.
+2. **Commands**: Các nghiệp vụ tác động dữ liệu (mutations) thuộc về các domain tương ứng (`Auth` cho tài khoản, `Connector` cho chính sách kết nối, `NodeLibrary` cho trạng thái node type). Mọi mutation đều nhận `expectedRevision`, lấy advisory lock, thực hiện atomic transaction và phát sinh audit event.
+3. **Queries**: Được định nghĩa trong `AdminReadPort` và triển khai tại `PrismaAdminRead`. Query sử dụng các lệnh SELECT projection an toàn tuyệt đối, phân trang server-side và tuyệt đối không bao giờ truy vấn các cột nhạy cảm (`input`, `output`, `encrypted_secret`, `error_stack`, `error_message`).
 
-`AdminMutationFieldsGuard` kiểm tra field của raw body trước global whitelist pipe, để field như `actorId` không bị âm thầm bỏ qua. DTO kiểm tra kiểu, enum, reason trim 5–500 ký tự và revision không âm. Actor lấy từ phiên. ID/query/range không hợp lệ trả 400; chưa xác thực trả 401; Client trả 403 trước khi đọc tài nguyên.
+---
 
-Các lỗi nghiệp vụ 409: `SELF_ADMIN_CHANGE_FORBIDDEN`, `LAST_ACTIVE_ADMIN`, `TARGET_USER_INACTIVE`, `STALE_REVISION`. Không trả password, session version, refresh token, credential, workflow definition hoặc payload Client trong projection Admin.
+## 2. Mô hình Dữ liệu và Schema Database
 
-## Schema và transaction
+### 2.1. Các bảng hiện có (Được bảo toàn nguyên vẹn từ PR #39)
+- `users`: Bổ sung `revision` (Int, default 0), `session_version` (Int, default 0).
+- `admin_audit_events`: Lưu vết kiểm toán bất biến (`id`, `actor_type`, `actor_id`, `action`, `target_id`, `target_type`, `reason`, `before`, `after`, `created_at`).
+- `session_revocations`: Hàng đợi outbox dọn dẹp token trong Redis (`id`, `user_id`, `session_version`, `created_at`, `completed_at`).
+- `executions`: Bổ sung cột chuẩn hóa `error_code`, `cancellation_reason`.
+- `execution_node_logs`: Bổ sung cột chuẩn hóa `error_code`.
+- `connectors`: Catalog kỹ thuật (`id`, `key`, `name`, `auth_type`, `config_schema`, `is_active`).
+- `node_type_definitions`: Catalog node kỹ thuật (`id`, `key`, `display_name`, `category`, `config_schema`, `is_active`).
 
-Migration `20261114000000_admin_p0` chuyển `DEVELOPER`/`BUSINESS_USER` thành `CLIENT`, giữ `ADMIN`, đổi default và thêm:
+### 2.2. Các bảng mới cho P1 (Migration `20261116000000_admin_p1`)
 
-- `users.revision`, `users.session_version`: integer mặc định 0.
-- `admin_audit_events`: actor type/ID, action, target type/ID, reason, before/after JSON theo whitelist, UTC timestamp; index theo thời điểm và target.
-- `session_revocations`: user ID, session version, thời điểm tạo/hoàn tất; index các sự kiện chưa hoàn tất.
-- `executions.error_code`, `executions.cancellation_reason`, `execution_node_logs.error_code`.
+```prisma
+// ----------------------------------------------------------------------------
+// Admin Connector Policies (G4)
+// Tách biệt chính sách quản trị khỏi bảng kỹ thuật connectors
+// để PackageCatalogSync không ghi đè chính sách khi server khởi động lại.
+// ----------------------------------------------------------------------------
+model ConnectorPolicy {
+  connectorId         String   @id @map("connector_id") @db.Uuid
+  connector           Connector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  allowNewCredentials Boolean  @default(true) @map("allow_new_credentials")
+  revision            Int      @default(0)
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-Không sửa các migration đã áp dụng hoặc xóa quan hệ/dữ liệu. Seed chỉ tạo user còn thiếu, giữ nguyên role, active, password và phiên của user đã tồn tại.
+  @@map("connector_policies")
+}
 
-Mỗi account mutation lấy advisory transaction lock `7261101`, khóa actor/target theo thứ tự ID rồi kiểm tra lại actor, revision, invariant Admin và no-op. Thay đổi tăng revision/session version, ghi audit và outbox trong cùng transaction. Audit lỗi rollback toàn bộ. Hai Admin thay đổi đồng thời vẫn còn Admin active; retry revision cũ trả 409.
+// ----------------------------------------------------------------------------
+// Admin Node Type Policies (G5)
+// Tách biệt trạng thái hiển thị Palette và quyền thực thi khỏi bảng kỹ thuật
+// ----------------------------------------------------------------------------
+model NodeTypePolicy {
+  nodeTypeKey        String             @id @map("node_type_key") @db.VarChar(150)
+  nodeType           NodeTypeDefinition @relation(fields: [nodeTypeKey], references: [key], onDelete: Cascade)
+  isCatalogVisible   Boolean            @default(true) @map("is_catalog_visible")
+  isExecutionAllowed Boolean            @default(true) @map("is_execution_allowed")
+  revision           Int                @default(0)
+  updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-Bootstrap dùng cùng advisory lock, chỉ hoạt động khi chưa có Admin active và tài khoản đích đã đăng ký, active. Bootstrap tăng revision/session version và ghi `ADMIN_BOOTSTRAPPED` với actor SYSTEM/null. Không có public endpoint cấp Admin. Local seed có thể tạo Admin mẫu đầu tiên bằng transaction với cùng advisory lock và SYSTEM audit, chỉ trên database localhost khi NODE_ENV unset/development; account hiện có không bị reset. Quy trình đăng ký hiện tại xác minh email bằng OTP trước khi tạo user; schema hiện tại không có cờ email verification riêng.
+  @@map("node_type_policies")
+}
+```
 
-## Phiên và runtime
+*Lưu ý kiến trúc*: Nếu một connector hoặc node type chưa có bản ghi trong bảng policy tương ứng, hệ thống ngầm định giá trị mặc định là `allowNewCredentials = true`, `isCatalogVisible = true`, `isExecutionAllowed = true`, `revision = 0`. Điều này đảm bảo tính tương thích ngược hoàn hảo (Zero downtime migration).
 
-Access/refresh JWT mang session version. JWT strategy đọc active/role/version hiện tại và từ chối token thiếu/sai version; refresh token không được dùng làm bearer access token. Mở khóa tăng version, không khôi phục phiên cũ.
+---
 
-Outbox worker retry mỗi 10 giây. Redis cleanup chỉ xóa token có version cũ, dùng compare-and-delete để giữ phiên mới đăng nhập. Database vẫn chặn token cũ trong thời gian Redis lỗi. Frontend hủy request/xóa cache khi logout hoặc đổi account; refresh trả về muộn không khôi phục account cũ.
+## 3. Chi tiết Hợp đồng API và DTO Whitelist (API Contracts)
 
-Execution enqueue và claim lấy lock owner row cùng transaction với tạo execution/chuyển trạng thái. Claim của owner inactive chuyển `QUEUED` thành `CANCELLED`/`OWNER_SUSPENDED`, không gọi executor. Failure/stale hooks không ghi đè CANCELLED. Lượt đã RUNNING vẫn hoàn tất; workflow active/version giữ nguyên. Webhook vẫn acknowledge provider, bỏ sự kiện của owner inactive khỏi execution và test-event store. Mở khóa chỉ nhận sự kiện mới.
+### 3.1. Nhóm Quản lý Connector (G4)
 
-Stream execution kiểm tra phiên khi mở, sau khi lấy snapshot, trước khi phát event và mỗi heartbeat 15 giây; đóng và cleanup khi phiên không còn hợp lệ. Test-listen hiện tại dùng HTTP polling, mỗi request qua JWT guard; repo chưa có scheduler runtime riêng.
+#### `GET /api/admin/connectors`
+- **Query Params**: `page` (int, default 1), `pageSize` (int, default 20), `q` (string, optional), `authType` (enum, optional), `isActive` (boolean, optional), `allowNewCredentials` (boolean, optional).
+- **Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "c8b417c8-043e-4731-8c4d-9488a03f443b",
+        "key": "google-sheets",
+        "name": "Google Sheets",
+        "authType": "OAUTH2",
+        "isActive": true,
+        "allowNewCredentials": false,
+        "revision": 2,
+        "credentialCount": 15,
+        "workflowCount": 8,
+        "createdAt": "2026-11-01T00:00:00.000Z",
+        "updatedAt": "2026-11-15T10:00:00.000Z"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "pageSize": 20
+  }
+}
+```
 
-## Dashboard
+#### `GET /api/admin/connectors/:id`
+- Trả về thông tin chi tiết của connector, danh sách các `nodeTypes` trực thuộc (`key`, `displayName`, `category`), thống kê sử dụng và chính sách hiện tại.
 
-PostgreSQL aggregate chạy trong transaction Repeatable Read. Account/workflow là snapshot hiện tại; execution dùng `queuedAt` trong `[from,to)`, UTC, tối đa 90 ngày. SQL nhóm ngày bằng timezone truy vấn; UI hiển thị giờ theo trình duyệt. Chọn nhanh 24 giờ/7 ngày/30 ngày và custom range; rolling range tiến theo thời gian ở mỗi lần tải lại.
+#### `PATCH /api/admin/connectors/:id/credential-policy`
+- **Guarded Fields**: `@AdminBodyFields('allowNewCredentials')`
+- **Request Body**:
+```json
+{
+  "allowNewCredentials": false,
+  "reason": "Dịch vụ Google Sheets API đang bảo trì chính sách xác thực OAuth mới",
+  "expectedRevision": 2
+}
+```
+- **Response**: Trả về connector metadata đã cập nhật, `revision: 3`, và `auditEventId`.
 
-Success rate là `SUCCESS / (SUCCESS + FAILED) × 100`; mẫu số 0 trả null. Cancelled đếm theo trạng thái, không vào nhóm lỗi. Mã lỗi được kiểm tra whitelist tại writer/projection; mã lịch sử/không nhận diện dùng `UNCLASSIFIED_ERROR`, không trả raw message. Nhóm fallback cùng mã được cộng lại.
+---
 
-Query keys chứa bộ lọc. Polling mỗi 30 giây chỉ khi trang đang hiển thị. Các trang có loading/empty/error và retry. Dialog account lưu snapshot/revision đã review khi mở; refetch không đảo tác động đang chờ xác nhận. Xung đột tải lại thông tin, không tự gửi lại mutation.
+### 3.2. Nhóm Quản lý Loại Node - Node Types (G5)
 
-## Traceability
+#### `GET /api/admin/node-types`
+- **Query Params**: `page`, `pageSize`, `q`, `category`, `connectorId`, `isCatalogVisible`, `isExecutionAllowed`.
+- **Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "e2a1b3c4-...",
+        "key": "integration.slack.postMessage",
+        "displayName": "Send Slack Message",
+        "icon": "slack",
+        "color": "#4A154B",
+        "category": "INTEGRATION",
+        "connectorKey": "slack",
+        "connectorName": "Slack",
+        "isCatalogVisible": true,
+        "isExecutionAllowed": true,
+        "revision": 1,
+        "publishedWorkflowCount": 24,
+        "draftWorkflowCount": 5,
+        "createdAt": "2026-11-01T00:00:00.000Z",
+        "updatedAt": "2026-11-15T09:00:00.000Z"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "pageSize": 20
+  }
+}
+```
 
-| Yêu cầu/AC | Kiểm chứng |
-| --- | --- |
-| FR-AD-01; AC-01/02/03/13 | HTTP authorization/registration; migration dữ liệu role cũ; ownership draft/version; AdminGuard và UserDropdown tests |
-| FR-AD-02/03; AC-12/15 | Account metadata/search/pagination, automatic execution counts, projection không payload |
-| FR-AD-04/05; AC-04/05/06/07/08 | Lock/unlock/demotion, concurrent mutations/enqueue/claim, worker cancellation, suspended webhook và no replay |
-| FR-AD-06; AC-04/08 | Access/refresh version, Redis outbox retry, stream heartbeat; HTTP client late-refresh tests |
-| FR-AD-11 phần tài khoản; AC-09 | Bootstrap SYSTEM audit, mutation audit rollback, revision/no-op |
-| FR-AD-07; AC-12/14/15/16/17 | Aggregate fixtures 75%/null, UTC boundary/timezone, safe error fallback, UI empty/retry/range và visible polling |
-| FR-AD-08/09/10, phần tra cứu FR-AD-11; AC-10/11 | P1, giữ theo plan; chưa triển khai trong P0 |
+#### `GET /api/admin/node-types/:key`
+- Trả về metadata chi tiết, `configSchema`, `inputSchema`, `outputSchema`, danh sách top workflows sử dụng (chỉ gồm `id`, `name`, `ownerEmail`, `status`).
 
-Kết quả kiểm tra thực tế và hạn chế xem [validation.md](validation.md); cách chạy/deploy xem [operations.md](operations.md).
+#### `PATCH /api/admin/node-types/:key/status`
+- **Guarded Fields**: `@AdminBodyFields('isCatalogVisible', 'isExecutionAllowed')`
+- **Request Body**:
+```json
+{
+  "isCatalogVisible": false,
+  "isExecutionAllowed": true,
+  "reason": "Tạm ẩn node gửi tin nhắn Slack khỏi Designer để nâng cấp schema v2",
+  "expectedRevision": 1
+}
+```
+- **Response**: Bản ghi cập nhật, `revision: 2`, và `auditEventId`.
+
+---
+
+### 3.3. Nhóm Giám sát Execution (G6)
+
+#### `GET /api/admin/executions`
+- **Query Params**: `page`, `pageSize`, `ownerId`, `workflowId`, `executionId`, `status`, `triggerType`, `from`, `to`.
+- **Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "a90184b2-...",
+        "workflowId": "w123-...",
+        "workflowName": "Order Processing Sync",
+        "ownerId": "u456-...",
+        "ownerName": "Nguyen Van A",
+        "ownerEmail": "vana@example.com",
+        "versionId": "v789-...",
+        "versionNumber": 3,
+        "triggerType": "WEBHOOK",
+        "status": "FAILED",
+        "queuedAt": "2026-11-15T08:30:00.000Z",
+        "startedAt": "2026-11-15T08:30:01.000Z",
+        "finishedAt": "2026-11-15T08:30:05.000Z",
+        "durationMs": 4000,
+        "errorCode": "CONNECTOR_TIMEOUT",
+        "cancellationReason": null
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "pageSize": 20
+  }
+}
+```
+
+#### `GET /api/admin/executions/:id`
+- **Response**: Trả về metadata execution (như trên) và mảng `nodeLogs`:
+```json
+{
+  "success": true,
+  "data": {
+    "id": "a90184b2-...",
+    "workflowId": "w123-...",
+    "workflowName": "Order Processing Sync",
+    "ownerId": "u456-...",
+    "ownerName": "Nguyen Van A",
+    "ownerEmail": "vana@example.com",
+    "versionNumber": 3,
+    "triggerType": "WEBHOOK",
+    "status": "FAILED",
+    "queuedAt": "2026-11-15T08:30:00.000Z",
+    "startedAt": "2026-11-15T08:30:01.000Z",
+    "finishedAt": "2026-11-15T08:30:05.000Z",
+    "durationMs": 4000,
+    "errorCode": "CONNECTOR_TIMEOUT",
+    "cancellationReason": null,
+    "nodeLogs": [
+      {
+        "nodeId": "webhook-trigger",
+        "nodeKey": "trigger.webhook",
+        "status": "SUCCESS",
+        "startedAt": "2026-11-15T08:30:01.000Z",
+        "finishedAt": "2026-11-15T08:30:01.100Z",
+        "durationMs": 100,
+        "retryCount": 0,
+        "errorCode": null
+      },
+      {
+        "nodeId": "slack-post-1",
+        "nodeKey": "integration.slack.postMessage",
+        "status": "FAILED",
+        "startedAt": "2026-11-15T08:30:01.200Z",
+        "finishedAt": "2026-11-15T08:30:05.000Z",
+        "durationMs": 3800,
+        "retryCount": 3,
+        "errorCode": "CONNECTOR_TIMEOUT"
+      }
+    ]
+  }
+}
+```
+
+#### Bảng Kiểm soát Rò rỉ Dữ liệu Nhạy cảm (Privacy & Security Projection Matrix)
+
+| Thuộc tính nguồn | Có trong Admin Projection? | Lý do kỹ thuật & bảo mật |
+| --- | --- | --- |
+| `Execution.id`, `workflowId`, `status`, `triggerType` | **CÓ** | Metadata vận hành bắt buộc |
+| `Execution.queuedAt`, `startedAt`, `finishedAt`, `durationMs` | **CÓ** | Chỉ số hiệu năng (timing) |
+| `Execution.errorCode`, `cancellationReason` | **CÓ** | Mã lỗi chuẩn hóa an toàn |
+| `Execution.context` | **KHÔNG** | Chứa biến môi trường và dữ liệu chạy workflow của Client |
+| `Execution.input`, `Execution.output` | **KHÔNG** | Chứa dữ liệu nghiệp vụ nhạy cảm của Client |
+| `ExecutionNodeLog.input`, `output` | **KHÔNG** | Chứa payload/token/tin nhắn gửi nhận của Client |
+| `ExecutionNodeLog.errorMessage` | **KHÔNG** | Chuỗi lỗi thô của third-party có thể in kèm header/token/query param |
+| `ExecutionNodeLog.errorStack` | **KHÔNG** | Stack trace nội bộ có thể làm lộ cấu trúc hệ thống hoặc secret |
+| `WorkflowNode.name` (Custom Label) | **KHÔNG** | Người dùng có thể đặt tên node nhạy cảm ("Gửi API key cho đối tác") |
+
+---
+
+### 3.4. Nhóm Nhật ký Quản trị - Audit Logs (G7)
+
+#### `GET /api/admin/audit-events`
+- **Query Params**: `page`, `pageSize`, `actorId`, `actorType` (`ADMIN`, `SYSTEM`), `action`, `targetType` (`USER`, `CONNECTOR`, `NODE_TYPE`), `targetId`, `from`, `to`.
+- **Response**: Danh sách sự kiện tóm tắt, sắp xếp `createdAt desc`, `id desc`.
+
+#### `GET /api/admin/audit-events/:id`
+- **Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": "f51234a1-...",
+    "actorType": "ADMIN",
+    "actorId": "u001-...",
+    "actorName": "Le Admin",
+    "actorEmail": "admin@flowpilot.local",
+    "action": "CONNECTOR_POLICY_CHANGED",
+    "targetType": "CONNECTOR",
+    "targetId": "c8b417c8-043e-4731-8c4d-9488a03f443b",
+    "targetName": "Google Sheets",
+    "reason": "Dịch vụ Google Sheets API đang bảo trì chính sách xác thực OAuth mới",
+    "before": { "allowNewCredentials": true, "revision": 2 },
+    "after": { "allowNewCredentials": false, "revision": 3 },
+    "createdAt": "2026-11-15T10:00:00.000Z"
+  }
+}
+```
+
+---
+
+## 4. Xử lý Đồng thời, Chống Race Condition và Giao dịch Database
+
+### 4.1. Hệ thống Khóa Quản trị (PostgreSQL Advisory Locks)
+Để chống race condition giữa nhiều Admin hoặc giữa Admin và Client, hệ thống sử dụng các Transaction Advisory Lock riêng biệt:
+- **Tài khoản người dùng**: `SELECT pg_advisory_xact_lock(7261101)`
+- **Chính sách Connector**: `SELECT pg_advisory_xact_lock(7261102)`
+- **Chính sách Node Type**: `SELECT pg_advisory_xact_lock(7261103)`
+
+### 4.2. Xử lý Race Condition tại luồng tạo Credential (G4)
+Khi người dùng bấm "Connect with Google":
+1. Bắt đầu OAuth (`/api/integrations/google/auth`): Kiểm tra `allowNewCredentials`. Nếu `false`, từ chối ngay.
+2. Hoàn tất OAuth (`/api/integrations/google/callback`):
+   - Mở database transaction.
+   - Lấy advisory lock hoặc row-lock `SELECT ... FROM connector_policies WHERE connector_id = $1 FOR UPDATE`.
+   - Kiểm tra lại `allowNewCredentials`.
+   - Nếu `false`: Rollback transaction, hủy lưu trữ credential, trả về lỗi `409 Conflict` (mã `CONNECTOR_NEW_CREDENTIALS_DISABLED`).
+   - Nếu `true`: Lưu `ConnectorCredential`, commit transaction.
+   *Cơ chế này áp dụng tương tự cho API Key credential và Package OAuth2.*
+
+### 4.3. Xử lý Tính tương thích và Chặn Runtime ở Node Type (G5)
+1. **Designer Palette Filtering**: `NodeTypesController.getNodeTypes()` truy vấn kết hợp bảng `node_type_definitions` và `node_type_policies`:
+   - Lọc bỏ các node có `isCatalogVisible === false`.
+2. **Runtime Execution Enforcement (`NodeRunner`)**:
+   - Khi engine nạp node để thực thi: `NodeRunner` kiểm tra cờ `isExecutionAllowed` của `nodeKey`.
+   - Nếu `isExecutionAllowed === false`: 
+     - Không gọi `executor.execute()`.
+     - Ghi nhận `ExecutionNodeLog` với status `FAILED`, `errorCode = 'NODE_TYPE_DISABLED'`.
+     - Ném `NodeTypeDisabledException` để workflow engine xử lý theo kịch bản lỗi chuẩn hóa.
+
+---
+
+## 5. Thiết kế Giao diện Frontend (UI Architecture)
+
+Tổ chức trong `frontend/src/features/admin`:
+
+```
+frontend/src/features/admin/
+├── components/
+│   ├── AdminLayout.tsx            # Cập nhật menu tabs: Overview, Users, Connectors, Node Types, Executions, Audit Logs
+│   ├── AdminGuard.tsx             # Route guard bảo vệ phân quyền
+│   ├── accounts/                  # Components quản lý tài khoản (P0)
+│   ├── dashboard/                 # Components dashboard & biểu đồ (P0)
+│   ├── connectors/                # [G4 Mới]
+│   │   ├── ConnectorTable.tsx     # Bảng danh mục connector, badges authType, counts
+│   │   ├── ConnectorPolicyDialog.tsx # Dialog xác nhận đổi allowNewCredentials kèm reason
+│   │   └── ConnectorUsageCard.tsx # Thống kê số lượng workflow/credentials liên kết
+│   ├── node-types/                # [G5 Mới]
+│   │   ├── NodeTypeTable.tsx      # Bảng danh mục node, icon, category badges
+│   │   ├── NodeTypeStatusDialog.tsx  # Dialog bật/tắt isCatalogVisible & isExecutionAllowed
+│   │   └── NodeTypeDetailCard.tsx # Xem schemas và danh sách workflow sử dụng
+│   ├── executions/                # [G6 Mới]
+│   │   ├── ExecutionFilterBar.tsx # Bộ lọc đa chiều (owner, workflow, status, trigger, time)
+│   │   ├── ExecutionTable.tsx     # Bảng danh sách execution an toàn
+│   │   └── NodeLogsTimeline.tsx   # Bảng trạng thái các node log (timing, status, safe errorCode)
+│   └── audit/                     # [G7 Mới]
+│       ├── AuditEventFilterBar.tsx# Bộ lọc actor, action, target, time
+│       ├── AuditEventTable.tsx    # Bảng danh sách kiểm toán, badges hành động
+│       └── AuditDiffDialog.tsx    # Dialog hiển thị trực quan Before vs After diff
+├── hooks/
+│   ├── useAdmin.ts                # TanStack Query hooks cho users, dashboard
+│   ├── useAdminConnectors.ts      # [G4 Mới] hooks cho connector list/detail/mutation
+│   ├── useAdminNodeTypes.ts       # [G5 Mới] hooks cho node types list/detail/mutation
+│   ├── useAdminExecutions.ts      # [G6 Mới] hooks cho execution monitoring (visible polling)
+│   └── useAdminAudit.ts           # [G7 Mới] hooks cho audit logs
+├── pages/
+│   ├── DashboardPage.tsx          # P0
+│   ├── UsersPage.tsx              # P0
+│   ├── UserDetailPage.tsx         # P0
+│   ├── ConnectorsPage.tsx         # [G4 Mới]
+│   ├── NodeTypesPage.tsx          # [G5 Mới]
+│   ├── ExecutionsPage.tsx         # [G6 Mới]
+│   ├── ExecutionDetailPage.tsx    # [G6 Mới]
+│   └── AuditEventsPage.tsx        # [G7 Mới]
+├── services/
+│   └── admin.service.ts           # API client mở rộng đầy đủ các endpoints
+└── types/
+    └── admin.types.ts             # TypeScript interfaces cho toàn bộ DTOs
+```
+
+### Quy tắc Polling kiểm soát (Visible-only Polling):
+Áp dụng cho `DashboardPage`, `ExecutionsPage`, `ExecutionDetailPage`:
+```typescript
+const isVisible = useDocumentVisibility() === 'visible';
+const { data, refetch } = useQuery({
+  queryKey: ['admin', 'executions', filters],
+  queryFn: () => adminService.executions(filters),
+  refetchInterval: isVisible ? 30000 : false,
+});
+```
+
+---
+
+## 6. Ma trận Truy vết Yêu cầu (Traceability Matrix)
+
+| Yêu cầu (Spec) | Tiêu chí nghiệm thu (AC) | Thiết kế thành phần phụ trách | Phương pháp kiểm chứng |
+| --- | --- | --- | --- |
+| FR-AD-01 (Auth) | AC-01, AC-02, AC-03 | `JwtAuthGuard`, `RolesGuard(ADMIN)`, register DTO pipe | HTTP Test, Auth Integration Suite |
+| FR-AD-02..05 (Users) | AC-04..AC-08 | `AdminController`, `ManageAccountCommand`, Advisory Lock `7261101` | Concurrency Test, Postgres Real Transaction |
+| FR-AD-06 (Tokens) | AC-04, AC-08 | `users.session_version`, Redis Outbox cleanup | Token Revocation Test, SSE Heartbeat Test |
+| FR-AD-07 (Dashboard) | AC-14, AC-16, AC-17 | `PrismaAdminRead.dashboard()`, `DashboardPage` | Aggregate Test, Timezone Boundary Test |
+| FR-AD-08..09 (Connectors) | AC-10, AC-11, AC-18, AC-19 | `connector_policies`, `ChangeConnectorPolicyCommand`, OAuth gates | Callback Race Condition Test, Sync Recheck Test |
+| FR-AD-10..11 (Node Types) | AC-20, AC-21, AC-22, AC-23 | `node_type_policies`, `ChangeNodeTypeStatusCommand`, `NodeRunner` gate | Palette Filter Test, Runtime Disabled Node Test |
+| FR-AD-12 (Executions) | AC-12, AC-24, AC-25, AC-26 | `PrismaAdminRead.executions()`, Safe Projection Whitelist | Whitelist Leakage Test (Secrets/Payloads), Read-only Test |
+| FR-AD-13 (Audit Logs) | AC-09, AC-27, AC-28 | `AdminAuditEvent`, Transaction Audit Writer, `AuditEventsPage` | Atomic Rollback Test, Audit Diff Query Test |

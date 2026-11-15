@@ -3,6 +3,8 @@ import { Handle, Position, useUpdateNodeInternals } from '@xyflow/react';
 import { AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDesignerStore } from '../../store/designer.store';
+import { useConnectors } from '../../hooks/useCredentials';
+import { isNodeConnectorDisabled } from '../../utils/connector-status.util';
 import { hasNamedOutputs, outputHandleId, resolveOutputs } from '../../utils/node-outputs';
 import { NodeIcon } from './NodeIcon';
 
@@ -48,7 +50,9 @@ interface BaseNodeProps extends WorkflowNodeProps {
 export function BaseNode({ id, selected, data, trigger = false }: BaseNodeProps) {
   const nodeTypes = useDesignerStore((state) => state.nodeTypes);
   const validationIssues = useDesignerStore((state) => state.validationIssues);
+  const { data: connectors = [] } = useConnectors();
   const nodeType = nodeTypes.find((t) => t.key === data.key);
+  const isConnectorDisabled = isNodeConnectorDisabled(nodeType, connectors);
   const color = nodeType?.color || (trigger ? '#6b7280' : '#3b82f6');
   const errorCount = id ? validationIssues.filter((i) => i.nodeId === id).length : 0;
   const outputs = resolveOutputs(nodeType?.configSchema, data.config);
@@ -101,7 +105,17 @@ export function BaseNode({ id, selected, data, trigger = false }: BaseNodeProps)
           <p className="line-clamp-2 text-sm leading-snug font-semibold break-words text-gray-800" title={data.name}>
             {data.name}
           </p>
-          <p className="truncate text-[11px] text-gray-500">{kind}</p>
+          <div className="flex items-center gap-1.5 truncate">
+            <p className="truncate text-[11px] text-gray-500">{kind}</p>
+            {isConnectorDisabled && (
+              <span
+                className="inline-flex items-center rounded-sm bg-amber-50 px-1 py-0.5 text-[9px] font-medium text-amber-700 border border-amber-200"
+                title="New credentials disabled by platform administrator"
+              >
+                Disabled
+              </span>
+            )}
+          </div>
         </div>
         {errorCount > 0 && <AlertCircle className="size-4 shrink-0 text-rose-500" />}
       </div>

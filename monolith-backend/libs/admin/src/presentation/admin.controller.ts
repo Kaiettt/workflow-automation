@@ -21,6 +21,7 @@ import {
   AuthenticatedUser,
 } from '@app/auth/infrastructure/decorators/current-user.decorator';
 import { ManageAccountCommand } from '@app/auth/application/commands/manage-account.command';
+import { ChangeConnectorPolicyCommand } from '@app/connector/application/commands/change-connector-policy.command';
 import {
   AdminBodyFields,
   AdminMutationFieldsGuard,
@@ -28,6 +29,8 @@ import {
 import { AdminReadQuery } from '../application/admin-read.query';
 import {
   ActiveDto,
+  ChangeConnectorPolicyDto,
+  ConnectorsDto,
   DashboardDto,
   PageDto,
   RoleDto,
@@ -131,6 +134,60 @@ export class AdminController {
         new AdminReadQuery({
           kind: 'dashboard',
           filter: { from, to, timezone: query.timezone },
+        }),
+      ),
+    };
+  }
+
+  @Get('connectors')
+  async connectors(@Query() query: ConnectorsDto) {
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, unknown>(
+        new AdminReadQuery({
+          kind: 'connectors',
+          filter: {
+            ...query,
+            isActive:
+              query.isActive === undefined
+                ? undefined
+                : query.isActive === 'true',
+            allowNewCredentials:
+              query.allowNewCredentials === undefined
+                ? undefined
+                : query.allowNewCredentials === 'true',
+          },
+        }),
+      ),
+    };
+  }
+
+  @Get('connectors/:id')
+  async connector(@Param('id', ParseUUIDPipe) id: string) {
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, unknown>(
+        new AdminReadQuery({ kind: 'connector', id }),
+      ),
+    };
+  }
+
+  @AdminBodyFields('allowNewCredentials')
+  @Patch('connectors/:id/credential-policy')
+  async credentialPolicy(
+    @Param('id', ParseUUIDPipe) targetId: string,
+    @Body() change: ChangeConnectorPolicyDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return {
+      success: true,
+      data: await this.commands.execute<ChangeConnectorPolicyCommand, unknown>(
+        new ChangeConnectorPolicyCommand({
+          connectorId: targetId,
+          allowNewCredentials: change.allowNewCredentials,
+          reason: change.reason,
+          expectedRevision: change.expectedRevision,
+          adminId: user.id,
         }),
       ),
     };

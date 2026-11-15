@@ -19,6 +19,7 @@ interface ConfigFieldProps {
   needsCredential?: boolean;
   onChange: (key: string, value: unknown) => void;
   onConnectOAuth: () => void;
+  oauthError?: string | null;
 }
 
 // Picks the control for one config field from its JSON Schema and x-* hints.
@@ -31,6 +32,7 @@ export function ConfigField({
   needsCredential = false,
   onChange,
   onConnectOAuth,
+  oauthError,
 }: ConfigFieldProps) {
   const id = `${idPrefix}field-${fieldKey}`;
   const label = propertyTitle(fieldKey, schema);
@@ -74,9 +76,11 @@ export function ConfigField({
       <OAuthField
         id={id}
         label={label}
+        connectorKey={String(schema['x-connectorKey'])}
         connectorName={String(schema['x-connectorKey'])}
         connected={!!value}
         onConnect={onConnectOAuth}
+        error={oauthError}
       />
     );
   }

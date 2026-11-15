@@ -10,9 +10,19 @@ export interface DashboardFilter {
   to: Date;
   timezone: string;
 }
+export interface ConnectorFilter {
+  page: number;
+  pageSize: number;
+  q?: string;
+  authType?: 'NONE' | 'API_KEY' | 'OAUTH2' | 'BASIC';
+  isActive?: boolean;
+  allowNewCredentials?: boolean;
+}
 export abstract class AdminReadPort {
   abstract users(filter: UserFilter): Promise<unknown>;
   abstract user(id: string): Promise<unknown>;
   abstract workflows(id: string, filter: UserFilter): Promise<unknown>;
   abstract dashboard(filter: DashboardFilter): Promise<unknown>;
+  abstract connectors(filter: ConnectorFilter): Promise<unknown>;
+  abstract connector(id: string): Promise<unknown>;
 }
