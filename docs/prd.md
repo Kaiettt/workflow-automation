@@ -46,9 +46,9 @@ Cách tiếp cận này dẫn đến nhiều hạn chế:
 
 | Mục tiêu | Tiêu chí thành công (MVP) |
 |-----------|---------------------------|
-| Giúp mọi người dễ dàng tạo workflow | Người dùng mới có thể tạo và xuất bản một workflow đơn giản trong vòng 10 phút |
+| Giúp mọi người dễ dàng tạo workflow | Người dùng mới có thể tạo và xuất bản một workflow đơn giản |
 | Đáp ứng cả nhu cầu đơn giản lẫn phức tạp | Cùng một nền tảng phục vụ được workflow vài bước và workflow nhiều nhánh, quy mô lớn |
-| Kết nối các dịch vụ phổ biến | Hỗ trợ 8 connector trong giai đoạn MVP và dễ dàng mở rộng thêm connector mới |
+| Kết nối các dịch vụ phổ biến | Hỗ trợ các connector thông dụng  trong giai đoạn MVP và dễ dàng mở rộng thêm connector mới |
 | Vận hành ổn định, dễ theo dõi | Mọi lần chạy đều hiển thị trạng thái rõ ràng và được lưu lịch sử |
 | Dễ bảo trì theo thời gian | Người dùng có thể lưu, so sánh và khôi phục các phiên bản workflow trước đó |
 

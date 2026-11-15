@@ -1,9 +1,9 @@
 # AI Session Log
 
 - **Conversation ID**: `c17b5822-51f1-4aa2-8d1d-c8ade6c8c282`
-- **Last Updated**: 13:38:24 11/11/2026
+- **Last Updated**: 16:30:26 15/11/2026
 - **Model**: gemini-3.8-flash-medium
-- **Total Turns**: 27
+- **Total Turns**: 32
 
 ---
 
@@ -929,6 +929,376 @@ hello
 Hello! How can I help you today? 
 
 I see you have [node-config-resolver.ts](file:///c:/project/tlcn/workflow-automation/monolith-backend/libs/execution/src/application/services/node-config-resolver.ts) and [node-runner.ts](file:///c:/project/tlcn/workflow-automation/monolith-backend/libs/execution/src/application/services/node-runner.ts) open — let me know if you'd like to review, modify, or debug anything there or elsewhere in the project.
+
+---
+
+## Turn 28
+
+### 👤 Prompt:
+
+# Task: Complete Admin Management Specifications
+
+Repository: `Kaiettt/workflow-automation`
+
+Read all existing documents in `specs/admin-management/` and inspect the current implementation before making changes.
+
+**Goal: Complete the missing specifications before implementation. Do not modify application source code.**
+
+## 1. Existing completed features (PR #39)
+
+Preserve existing specifications and acceptance criteria for:
+
+- Admin authentication, authorization and roles.
+- Session/token invalidation.
+- User management (list, detail, suspend, reactivate, role changes).
+- Admin dashboard and execution metrics.
+- Audit event writing.
+- Admin layout, navigation and UI.
+- Preventing new executions from suspended workflow owners.
+
+Do not recreate completed tasks.
+
+## 2. Add missing features
+
+### G4 – Connector Management
+- Connector list, detail and usage statistics.
+- Enable/disable creation of new credentials.
+- Support API Key, Google OAuth and package OAuth2.
+- Audit policy changes.
+- Preserve existing credentials and workflows when new credential creation is disabled.
+- Distinguish `Connector.isActive` from `allowNewCredentials`.
+- Handle OAuth and credential-creation race conditions.
+
+### G5 – Node Type Management
+- Node type catalog, details and search/filter.
+- Enable/disable node types.
+- Category and version metadata.
+- Workflow usage statistics.
+- Define compatibility behavior for existing workflows.
+- Distinguish catalog visibility from runtime execution availability.
+- Reuse the existing node registry architecture.
+
+### G6 – Execution Monitoring
+- Admin execution list and detail pages.
+- Filter by owner, workflow, execution ID, status, trigger and time.
+- Display safe execution and node metadata.
+- Pagination and visible-page-only polling.
+- Never expose credentials, secrets, raw payloads, prompts or stack traces.
+- Read-only: no execute, retry or cancel actions.
+
+### G7 – Audit Log Viewer
+- Audit event list and detail.
+- Filter by actor, action, resource and time.
+- Pagination and newest-first ordering.
+- Display whitelisted before/after values.
+- Read-only interface.
+- Preserve atomic audit writes for mutations.
+
+## 3. Update specification documents
+
+Update these files consistently:
+
+- `spec.md`: Functional requirements, business rules and acceptance criteria.
+- `design.md`: Architecture, API contracts, DTOs, data model and UI design.
+- `plan.md`: Implementation phases and dependencies.
+- `task.md`: Small, actionable backend/frontend/database/testing tasks.
+- `validation.md`: Unit, integration, API, concurrency, security and E2E test scenarios.
+- `analysis.md`: Existing implementation, gaps, decisions and risks.
+- `operations.md`: Deployment, migration, rollback and operational procedures.
+
+## 4. Rules
+
+- Inspect actual code before defining requirements.
+- Distinguish implemented, partially implemented and missing features.
+- Reuse existing architecture; avoid unnecessary abstractions.
+- Define API endpoints, DTOs, authorization, validation and error handling.
+- Every requirement must have testable acceptance criteria.
+- Keep requirement IDs and task dependencies consistent.
+- Do not invent test results.
+- Document unresolved decisions as open questions.
+- Do not implement features or modify application code.
+
+## 5. Final report
+
+After completing the specification, report:
+
+1. Modified documents.
+2. New requirements.
+3. Implementation tasks and dependencies.
+4. Important design decisions.
+5. Open questions and risks.
+6. Confirmation that no application source code was modified.
+@[specs/admin-management]
+
+### 🤖 AI Output:
+
+# Báo cáo Hoàn thành Đặc tả Quản trị Nền tảng (Admin Management Specifications)
+
+Toàn bộ 7 tài liệu đặc tả trong thư mục [specs/admin-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management) đã được cập nhật đồng bộ, chính xác và toàn diện. Tất cả các tính năng đã hoàn thành trong giai đoạn P0 (PR #39) được giữ nguyên vẹn; các tính năng còn thiếu thuộc giai đoạn P1 (**G4: Quản lý Connector**, **G5: Quản lý Loại Node**, **G6: Giám sát Execution**, **G7: Trình tra cứu Audit Logs**) đã được hoàn thiện đặc tả chi tiết từ tầng nghiệp vụ, kiến trúc, API contract, DTO whitelist, cơ sở dữ liệu, cho đến kịch bản kiểm thử và sổ tay vận hành.
+
+---
+
+## 1. Danh sách các tài liệu đã cập nhật (Modified Documents)
+
+1. [analysis.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/analysis.md): Cập nhật phân tích nghiệp vụ, ranh giới quyền riêng tư dữ liệu Client, phân tích quyết định kiến trúc cho G4–G7, phân tích rủi ro & giải pháp giảm thiểu, và các câu hỏi mở.
+2. [spec.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/spec.md): Cập nhật yêu cầu chức năng (FR-AD-08 đến FR-AD-13), ma trận phân quyền, hợp đồng API toàn diện, và mở rộng bộ tiêu chí nghiệm thu từ **AC-01 đến AC-28**.
+3. [design.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/design.md): Đặc tả kiến trúc Clean Architecture & CQRS cho `libs/admin`, schema database (`connector_policies`, `node_type_policies`), DTO whitelist, ma trận kiểm soát rò rỉ dữ liệu an toàn (Privacy Whitelist Matrix), xử lý race condition OAuth, advisory locks, và kiến trúc giao diện frontend.
+4. [plan.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/plan.md): Cập nhật lộ trình triển khai chi tiết cho các mốc G4 (Connector), G5 (Node Type), G6 (Execution), G7 (Audit Viewer) và G8 (Nghiệm thu tổng thể & Rollout), bao gồm các ranh giới phụ thuộc và phân công công việc.
+5. [task.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/task.md): Checklist công việc chi tiết; bảo toàn trạng thái `[x]` của P0 (G0–G3) và tạo mới các nhiệm vụ khả thi, rõ ràng cho G4, G5, G6, G7, G8.
+6. [validation.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/validation.md): Lưu giữ kết quả nghiệm thu thực tế của P0 (538 unit tests, 19 integration tests, 150 frontend tests); bổ sung chi tiết chiến lược kiểm thử, ma trận kiểm thử 28 tiêu chí AC và các kịch bản kiểm thử chuyên biệt (OAuth race condition, node compatibility, execution privacy assertion, audit rollback).
+7. [operations.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/operations.md): Sổ tay vận hành hướng dẫn chạy migration P1 (`20261116000000_admin_p1`), vận hành bảo trì connector, ẩn/chặn node type, hỗ trợ khách hàng qua execution metadata an toàn, kiểm toán và quy trình rollback.
+
+---
+
+## 2. Các yêu cầu mới được bổ sung (New Requirements)
+
+### G4 – Quản lý Connector (FR-AD-08, FR-AD-09, AC-10, AC-11, AC-18, AC-19)
+- **Danh mục & Thống kê sử dụng**: Tra cứu catalog connector, auth type (`NONE`, `API_KEY`, `OAUTH2`, `BASIC`), tổng số credentials đã lưu và số workflow phân biệt (`distinct published workflows`) đang sử dụng.
+- **Chính sách `allowNewCredentials`**: Admin có thể bật/tắt quyền tạo mới credential.
+- **Bảo toàn dữ liệu cũ**: Khi cấm tạo mới (`allowNewCredentials = false`), toàn bộ credential cũ và workflow đang chạy **vẫn hoạt động bình thường 100%**, token tiếp tục được refresh định kỳ bình thường.
+- **Hỗ trợ đầy đủ các phương thức xác thực**: Áp dụng gate kiểm tra cho API Key / Form credential, Google OAuth và Package OAuth2.
+- **Xử lý Race Condition**: Gắn kiểm tra bắt buộc với database lock tại thời điểm ghi nhận credential (OAuth callback / complete). Nếu chính sách đã bị tắt trong lúc người dùng đang ở màn hình xác thực bên thứ ba, giao dịch bị từ chối với lỗi `409 Conflict` (`CONNECTOR_NEW_CREDENTIALS_DISABLED`).
+- **Chống ghi đè khi khởi động lại**: Chính sách được lưu trong bảng riêng `connector_policies`; tiến trình `PackageCatalogSync` và seed không bao giờ ghi đè cờ quản trị.
+
+### G5 – Quản lý Loại Node - Node Types (FR-AD-10, FR-AD-11, AC-20 đến AC-23)
+- **Danh mục & Thống kê**: Tra cứu catalog node, schemas, lọc category, thống kê số workflow đã publish (`publishedWorkflowCount`) và workflow nháp (`draftWorkflowCount`) đang sử dụng.
+- **Phân tách 2 cấp độ kiểm soát**:
+  1. **Hiển thị Catalog (`isCatalogVisible`)**: Khi tắt, node bị ẩn khỏi Palette Designer (người dùng không thể kéo thả thêm), nhưng workflow cũ có chứa node vẫn chạy bình thường.
+  2. **Cho phép Thực thi Runtime (`isExecutionAllowed`)**: Khi tắt, nếu workflow engine chạy gặp node này, `NodeRunner` sẽ dừng node an toàn, ghi nhận log `FAILED` với mã lỗi chuẩn `NODE_TYPE_DISABLED`, không gây crash engine.
+- **Bảo toàn chính sách qua restart**: Lưu trong bảng riêng `node_type_policies`; không bị `PackageCatalogSync` ghi đè khi khởi động lại.
+
+### G6 – Giám sát Execution Toàn Nền Tảng (FR-AD-12, AC-12, AC-24 đến AC-26)
+- **Danh sách & Chi tiết an toàn**: Lọc đa chiều theo owner, workflow, execution ID, status, trigger type và khoảng thời gian `[from, to)` (tối đa 90 ngày).
+- **Nguyên tắc Bảo mật và Riêng tư Tuyệt đối (Strict Whitelist)**: Tuyệt đối không bao giờ trả về input/output JSON, execution context, AI prompt, webhook payload thô, token, secret, custom node name, hay stack trace lỗi. Lỗi chưa phân loại trả về `UNCLASSIFIED_ERROR`.
+- **Giao diện Chỉ Đọc (Read-only)**: Không có nút Run, Retry, Cancel hay link mở canvas của Client trong khu vực Admin.
+- **Visible-only Polling**: Tự động cập nhật mỗi 30 giây khi tab hiển thị; dừng ngay khi tab bị ẩn (`document.visibilityState === 'hidden'`).
+
+### G7 – Trình tra cứu Nhật ký Quản trị - Audit Log Viewer (FR-AD-13, AC-09, AC-27, AC-28)
+- **Danh sách & Chi tiết Audit**: Tra cứu toàn bộ sự kiện kiểm toán (`USER_*`, `CONNECTOR_POLICY_CHANGED`, `NODE_TYPE_STATUS_CHANGED`, `ADMIN_BOOTSTRAPPED`).
+- **Bộ lọc đa tiêu chí**: Lọc theo actor, action, resource (target), và thời gian; hiển thị trực quan bảng đối chiếu diff Before vs After các trường whitelist.
+- **Tính Bất biến & Atomic**: Bảng audit hoàn toàn chỉ đọc (không có API sửa/xóa); mutation nghiệp vụ và bản ghi audit luôn được commit cùng một database transaction (audit thất bại thì mutation rollback).
+
+---
+
+## 3. Phân chia Nhiệm vụ và Quan hệ Phụ thuộc (Tasks & Dependencies)
+
+```mermaid
+flowchart TD
+    G1["G1: Nền tảng Admin & Auth (Đã xong)"] --> G4["G4: Quản lý Connector"]
+    G1 --> G5["G5: Quản lý Loại Node"]
+    G1 --> G6["G6: Giám sát Execution"]
+    G3["G3: Dashboard (Đã xong)"] --> G6
+    G4 --> G7["G7: Audit Log Viewer"]
+    G5 --> G7
+    G2["G2: Quản lý User (Đã xong)"] --> G7
+    G4 --> G8["G8: Nghiệm thu & Rollout"]
+    G5 --> G8
+    G6 --> G8
+    G7 --> G8
+```
+
+- **G4 (Connector)** và **G5 (Node Type)** hoàn toàn độc lập và có thể triển khai song song.
+- **G6 (Execution)** tận dụng model `Execution` và `ExecutionNodeLog` sẵn có để xây dựng projection an toàn và UI giám sát.
+- **G7 (Audit Viewer)** cung cấp giao diện hiển thị các sự kiện đã được ghi nhận từ G1, G2, G4, G5.
+- **G8 (Acceptance & Rollout)** là giai đoạn kiểm thử tự động toàn bộ 28 Acceptance Criteria, rehearsal migration và đóng gói bàn giao.
+
+---
+
+## 4. Các Quyết định Thiết kế Quan trọng (Important Design Decisions)
+
+1. **Tách bảng Chính sách (`connector_policies` & `node_type_policies`)**:
+   - Thay vì thêm cờ trực tiếp vào bảng `connectors` hoặc `node_type_definitions`, việc tách thành bảng policy riêng có khóa ngoại `connector_id` và `node_type_key` giải quyết triệt để vấn đề: `PackageCatalogSync` upsert catalog khi khởi động server sẽ **không bao giờ đè mất cấu hình của Admin**. Nếu chưa có dòng policy, hệ thống fallback về giá trị mặc định (`true`).
+2. **Khóa Transaction Advisory Lock theo từng miền**:
+   - `7261101` cho tài khoản người dùng (`User`).
+   - `7261102` cho chính sách kết nối (`ConnectorPolicy`).
+   - `7261103` cho trạng thái khối chức năng (`NodeTypePolicy`).
+   - Kết hợp kiểm tra `expectedRevision` để ngăn chặn hoàn toàn race condition và lost updates giữa nhiều Admin thao tác đồng thời.
+3. **Phân tách `isCatalogVisible` và `isExecutionAllowed` ở Node Type**:
+   - Giúp Admin có thể ngừng cung cấp một node lỗi thời trên palette thiết kế mà không làm gãy các workflow của khách hàng đã xuất bản trước đó.
+4. **Quyền riêng tư Tuyệt đối ở Execution Monitoring**:
+   - Triển khai riêng `AdminReadPort` với các câu lệnh SQL/Prisma `SELECT` tĩnh theo whitelist; không dùng chung DTO Client rồi mới lọc field trên frontend.
+
+---
+
+## 5. Câu hỏi Mở và Quản trị Rủi ro (Open Questions & Risks)
+
+- **Rủi ro rò rỉ dữ liệu qua Execution Viewer**:
+  - *Giải pháp*: Được phòng ngừa bằng DTO whitelist nghiêm ngặt ở backend và bộ test tự động [validation.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/validation.md) (AC-25) kiểm tra dữ liệu giả lập chứa token, prompt, email để đảm bảo response không bao giờ chứa chuỗi nhạy cảm.
+- **Rủi ro suy giảm hiệu năng khi đếm số workflow sử dụng Connector/Node Type**:
+  - *Giải pháp*: Truy vấn đếm được tối ưu hóa chỉ tính toán trên các phiên bản đã phát hành (`WorkflowVersion` published); bổ sung composite index cho `executions` và `admin_audit_events`.
+- **Câu hỏi mở về đếm workflow nháp (`DRAFT`)**:
+  - *Thống nhất*: Tách riêng 2 số liệu trên giao diện: `publishedWorkflowCount` (đo lường rủi ro vận hành runtime) và `draftWorkflowCount` (đo lường mức độ ảnh hưởng tới người dùng đang thiết kế).
+
+---
+
+## 6. Xác nhận Thay đổi Mã nguồn (Confirmation)
+
+> [!IMPORTANT]
+> **Xác nhận**: Trong toàn bộ quá trình thực hiện nhiệm vụ này, **tuyệt đối không có bất kỳ dòng mã nguồn ứng dụng nào (trong `monolith-backend/`, `frontend/`, v.v.) bị chỉnh sửa hay thay đổi**. Mọi thay đổi chỉ nằm trong các tài liệu đặc tả markdown tại thư mục [specs/admin-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management). Hệ thống đã sẵn sàng 100% cho bước triển khai mã nguồn tiếp theo.
+
+---
+
+## Turn 29
+
+### 👤 Prompt:
+
+chia lại thành nhiều specs đi mỗi spec bao gồm: spec,plan,desing,md
+mỗi cái là 1 folder bên trong @admin-management
+
+### 🤖 AI Output:
+
+*(Lượt này chưa có output hoặc bị gián đoạn)*
+
+---
+
+## Turn 30
+
+### 👤 Prompt:
+
+chia lại thành nhiều specs đi mỗi spec bao gồm: spec,plan,desing,task
+mỗi cái là 1 folder bên trong @admin-management
+
+### 🤖 AI Output:
+
+*(Lượt này chưa có output hoặc bị gián đoạn)*
+
+---
+
+## Turn 31
+
+### 👤 Prompt:
+
+chia lại thành nhiều specs đi mỗi spec bao gồm: spec,plan,desing,task(cái nào làm rồi thì đánh dấu trong task.md)
+
+mỗi cái là 1 folder bên trong @admin-management
+
+### 🤖 AI Output:
+
+Đã hoàn thành việc chia nhỏ và cấu trúc lại toàn bộ đặc tả quản trị nền tảng thành các thư mục tính năng độc lập bên trong [specs/admin-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management).
+
+Mỗi thư mục tính năng đều chứa đầy đủ 4 tài liệu tiêu chuẩn: **`spec.md`**, **`design.md`**, **`plan.md`**, và **`task.md`**. Trong đó:
+- Các tính năng đã làm xong ở giai đoạn **P0 (PR #39)** được giữ nguyên và đánh dấu hoàn thành **`[x]`** trong `task.md`.
+- Các tính năng mới thuộc giai đoạn **P1** được đặc tả chi tiết và đánh dấu sẵn sàng **`[ ]`** trong `task.md`.
+
+---
+
+## 1. Cấu trúc Thư mục và Các Tài liệu Mới Tạo
+
+```
+specs/admin-management/
+├── README.md                          # Mục lục tổng quan và điều hướng toàn bộ specs
+├── spec.md, design.md, plan.md, ...   # Bộ tài liệu tổng hợp và vận hành toàn hệ thống
+│
+├── admin-foundation/                  # G1: Nền tảng truy cập, 2 role CLIENT/ADMIN, quản lý phiên & bootstrap (P0 - Đã xong)
+│   ├── spec.md
+│   ├── design.md
+│   ├── plan.md
+│   └── task.md                        # Toàn bộ task đánh dấu [x]
+│
+├── user-management/                   # G2: Quản lý tài khoản, khóa/mở khóa, đổi role, runtime owner gate (P0 - Đã xong)
+│   ├── spec.md
+│   ├── design.md
+│   ├── plan.md
+│   └── task.md                        # Toàn bộ task đánh dấu [x]
+│
+├── dashboard/                         # G3: Dashboard vận hành, aggregate số liệu, trend, safe error groups (P0 - Đã xong)
+│   ├── spec.md
+│   ├── design.md
+│   ├── plan.md
+│   └── task.md                        # Toàn bộ task đánh dấu [x]
+│
+├── connector-management/              # G4: Quản lý Connector & Chính sách allowNewCredentials (P1 - Mới)
+│   ├── spec.md
+│   ├── design.md
+│   ├── plan.md
+│   └── task.md                        # Tasks đánh dấu [ ]
+│
+├── node-type-management/              # G5: Quản lý Node Types, palette visibility vs execution availability (P1 - Mới)
+│   ├── spec.md
+│   ├── design.md
+│   ├── plan.md
+│   └── task.md                        # Tasks đánh dấu [ ]
+│
+├── execution-monitoring/              # G6: Giám sát Execution toàn nền tảng, privacy whitelist, read-only (P1 - Mới)
+│   ├── spec.md
+│   ├── design.md
+│   ├── plan.md
+│   └── task.md                        # Tasks đánh dấu [ ]
+│
+└── audit-log-viewer/                  # G7: Trình tra cứu Audit Logs, diff Before/After, tính bất biến (P1 - Mới)
+    ├── spec.md
+    ├── design.md
+    ├── plan.md
+    └── task.md                        # Task ghi audit P0 [x], task API/UI P1 [ ]
+```
+
+---
+
+## 2. Chi tiết Từng Module Đặc tả Thành phần
+
+### 1. [admin-foundation/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/admin-foundation/) (P0 - Đã hoàn thành)
+- **Nội dung**: Mô hình 2 role (`CLIENT`, `ADMIN`), bảo vệ cổng truy cập `/admin/*`, xác thực JWT claim `sessionVersion`, thu hồi phiên tức thì qua Redis outbox, script CLI bootstrap Admin đầu tiên có kiểm toán (`npm run admin:bootstrap`), layout và route guard Admin.
+- **Trạng thái checklist ([task.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/admin-foundation/task.md))**: Toàn bộ **9/9 tasks đã hoàn thành `[x]`**.
+
+### 2. [user-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/user-management/) (P0 - Đã hoàn thành)
+- **Nội dung**: API danh sách và chi tiết tài khoản, thống kê tài nguyên, lệnh khóa/mở khóa (`isActive`), đổi role Client ↔ Admin, bảo vệ tính bất biến bằng transaction advisory lock `7261101` (chặn tự khóa, chặn hạ Admin cuối), và tác động runtime (loại bỏ webhook của owner bị khóa, worker claim job queued chuyển `CANCELLED`/`OWNER_SUSPENDED`, chạy tiếp lượt running).
+- **Trạng thái checklist ([task.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/user-management/task.md))**: Toàn bộ **12/12 tasks đã hoàn thành `[x]`**.
+
+### 3. [dashboard/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/dashboard/) (P0 - Đã hoàn thành)
+- **Nội dung**: Dashboard tổng quan số liệu snapshot tài khoản/workflow, aggregate execution 90 ngày trong transaction Repeatable Read, công thức tính tỷ lệ thành công (75% mẫu chuẩn), biểu đồ xu hướng theo ngày và múi giờ, phân nhóm lỗi an toàn qua hàm `safeExecutionErrorCode()` (fallback `UNCLASSIFIED_ERROR`), và cơ chế visible-only polling 30 giây.
+- **Trạng thái checklist ([task.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/dashboard/task.md))**: Toàn bộ **11/11 tasks đã hoàn thành `[x]`**.
+
+### 4. [connector-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/connector-management/) (G4 – P1 Mới)
+- **Nội dung**: Quản lý catalog connector, thống kê số credentials và số workflow liên kết; chính sách `allowNewCredentials` (bảo toàn 100% credential cũ và workflow đang chạy); hỗ trợ API Key, Google OAuth và Package OAuth2; xử lý race condition tại bước OAuth callback bằng lock transaction; tách bảng riêng `connector_policies` để `PackageCatalogSync` không ghi đè khi khởi động lại server.
+- **Trạng thái checklist ([task.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/connector-management/task.md))**: **8/8 tasks đã được lên kế hoạch `[ ]`**.
+
+### 5. [node-type-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/node-type-management/) (G5 – P1 Mới)
+- **Nội dung**: Quản lý catalog khối chức năng, thống kê workflow sử dụng; phân tách 2 cấp độ kiểm soát: Ẩn khỏi palette Designer (`isCatalogVisible`) và Chặn thực thi runtime (`isExecutionAllowed`); xử lý an toàn tại `NodeRunner` khi node bị cấm chạy (báo `NODE_TYPE_DISABLED`, không sập engine); tách bảng riêng `node_type_policies` chống ghi đè khi restart/sync catalog.
+- **Trạng thái checklist ([task.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/node-type-management/task.md))**: **8/8 tasks đã được lên kế hoạch `[ ]`**.
+
+### 6. [execution-monitoring/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/execution-monitoring/) (G6 – P1 Mới)
+- **Nội dung**: Giám sát thực thi toàn hệ thống; bộ lọc đa chiều (owner, workflow, execution ID, status, trigger, time range); ma trận chiếu dữ liệu an toàn (Privacy Whitelist: tuyệt đối không chọn/trả về input/output, context, prompt, secret, stack trace); bảng tiến trình node logs an toàn; giao diện 100% Read-only (không có nút Run/Retry/Cancel); visible-only polling 30 giây.
+- **Trạng thái checklist ([task.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/execution-monitoring/task.md))**: **8/8 tasks đã được lên kế hoạch `[ ]`**.
+
+### 7. [audit-log-viewer/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/audit-log-viewer/) (G7 – P1 Mới)
+- **Nội dung**: Màn hình tra cứu nhật ký kiểm toán; bộ lọc actor, action, resource, thời gian; bảng đối chiếu trực quan Diff Before vs After các trường whitelist; tính bất biến 100% (không có API sửa/xóa); ghi nhận audit atomic cùng transaction với mutation.
+- **Trạng thái checklist ([task.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/audit-log-viewer/task.md))**: **G7.1 & G7.2 (hạ tầng và ghi audit tài khoản P0) đã hoàn thành `[x]`**; **G7.3 đến G7.9 (API truy vấn và UI viewer P1) đánh dấu `[ ]`**.
+
+---
+
+## 3. Xác nhận Ranh giới Thực hiện (Confirmation)
+
+> [!IMPORTANT]
+> **Xác nhận**: Trong toàn bộ quá trình thực hiện tái cấu trúc và phân rã đặc tả, **tuyệt đối không có bất kỳ dòng mã nguồn ứng dụng nào (trong `monolith-backend/`, `frontend/`, v.v.) bị chỉnh sửa**. Mọi thay đổi đều nằm trong các file đặc tả markdown tại [specs/admin-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management). Toàn bộ kiến trúc và các task đã sẵn sàng để tiến hành triển khai mã nguồn ở bước tiếp theo.
+
+---
+
+## Turn 32
+
+### 👤 Prompt:
+
+đánh số trên các spec  theo thứ tự thực hiện
+vd. 1.admin-foundation
+
+### 🤖 AI Output:
+
+Đã hoàn thành việc đánh số thứ tự thực hiện cho tất cả các thư mục đặc tả bên trong [specs/admin-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management).
+
+---
+
+### Danh sách các Thư mục Đặc tả theo Thứ tự Thực hiện
+
+| Thứ tự | Thư mục tính năng | Giai đoạn | Trạng thái tasks | Nội dung chính |
+| :---: | :--- | :---: | :---: | :--- |
+| **1** | [1.admin-foundation/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/1.admin-foundation/) | P0 | **9/9 `[x]` Đã xong** | Mô hình 2 role `CLIENT`/`ADMIN`, bảo vệ route `/admin/*`, thu hồi phiên qua `session_version` & outbox, bootstrap Admin đầu tiên qua CLI. |
+| **2** | [2.user-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/2.user-management/) | P0 | **12/12 `[x]` Đã xong** | Tra cứu, khóa/mở khóa tài khoản, đổi role, advisory lock `7261101` bảo vệ last active admin, runtime cancellation gate (`OWNER_SUSPENDED`). |
+| **3** | [3.dashboard/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/3.dashboard/) | P0 | **11/11 `[x]` Đã xong** | Snapshot tài nguyên, aggregate execution 90 ngày (transaction Repeatable Read), tỷ lệ thành công 75%, xu hướng theo ngày/timezone, nhóm mã lỗi an toàn, visible-only polling 30s. |
+| **4** | [4.connector-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/4.connector-management/) | P1 | **8/8 `[ ]` Sẵn sàng** | Catalog connector, thống kê số credential và workflow, cờ `allowNewCredentials`, chống race condition OAuth, bảng `connector_policies` chống ghi đè khi restart/sync. |
+| **5** | [5.node-type-management/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/5.node-type-management/) | P1 | **8/8 `[ ]` Sẵn sàng** | Phân tách hiển thị palette (`isCatalogVisible`) và quyền chạy runtime (`isExecutionAllowed`), thống kê workflow sử dụng, bảo toàn workflow cũ, bảng `node_type_policies`. |
+| **6** | [6.execution-monitoring/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/6.execution-monitoring/) | P1 | **8/8 `[ ]` Sẵn sàng** | Giám sát execution toàn hệ thống, bộ lọc đa chiều, Privacy Whitelist (tuyệt đối không lộ payload, prompt, secret, stack trace), tiến trình node logs, giao diện 100% Read-only. |
+| **7** | [7.audit-log-viewer/](file:///c:/project/tlcn/workflow-automation/specs/admin-management/7.audit-log-viewer/) | P1 | **G7.1-G7.2 `[x]`, G7.3-G7.9 `[ ]`** | Tra cứu nhật ký kiểm toán, bộ lọc actor/action/resource/time, giao diện đối chiếu Diff Before vs After các trường whitelist, tính bất biến 100% (không có API sửa/xóa). |
+
+Mỗi thư mục con đều bao gồm đầy đủ 4 file: `spec.md`, `design.md`, `plan.md`, `task.md`. File chỉ mục [specs/admin-management/README.md](file:///c:/project/tlcn/workflow-automation/specs/admin-management/README.md) cũng đã được cập nhật đường dẫn chính xác.
 
 ---
 
