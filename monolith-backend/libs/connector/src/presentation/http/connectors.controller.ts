@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Optional,
   Param,
   Post,
   UseGuards,
@@ -18,6 +19,7 @@ import { GetConnectorsQuery } from '../../application/queries/get-connectors.que
 import { ListCredentialsQuery } from '../../application/queries/list-credentials.query';
 import { CreateApiKeyCredentialCommand } from '../../application/commands/create-api-key-credential.command';
 import { CredentialSummary } from '../../application/dtos/credential-summary.dto';
+import { ConnectorPolicyPort } from '../../application/ports/connector-policy.port';
 import { JwtAuthGuard } from '../../../../auth/src/infrastructure/guards/jwt-auth.guard';
 import {
   AuthenticatedUser,
@@ -36,6 +38,7 @@ export class ConnectorsController {
   constructor(
     private readonly queryBus: QueryBus,
     private readonly commandBus: CommandBus,
+    @Optional() private readonly policyPort?: ConnectorPolicyPort,
   ) {}
 
   @Get()
@@ -49,9 +52,20 @@ export class ConnectorsController {
     const result: Connector[] = await this.queryBus.execute(
       new GetConnectorsQuery(),
     );
+    const data = await Promise.all(
+      result.map(async (c) => {
+        const policy = this.policyPort
+          ? await this.policyPort.getPolicy(c.id)
+          : null;
+        return ConnectorResponseDto.fromDomain(
+          c,
+          policy?.allowNewCredentials ?? true,
+        );
+      }),
+    );
     return {
       success: true,
-      data: result.map((c) => ConnectorResponseDto.fromDomain(c)),
+      data,
     };
   }
 

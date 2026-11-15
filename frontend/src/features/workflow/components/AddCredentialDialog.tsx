@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { useConnector, useSaveCredential } from '../hooks/useCredentials';
 import { useOAuth2Popup } from '../hooks/useOAuth2Popup';
 import { credentialService } from '../services/credential.service';
+import { ConnectorDisabledBanner } from './ConnectorDisabledBanner';
 
 interface AddCredentialDialogProps {
   connectorKey: string;
@@ -113,6 +114,10 @@ export function AddCredentialDialog({
             </DialogDescription>
           </DialogHeader>
 
+          {connector?.allowNewCredentials === false && (
+            <ConnectorDisabledBanner connectorName={connector.name} />
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="credential-name">Name</Label>
             <Input
@@ -145,7 +150,8 @@ export function AddCredentialDialog({
 
           {save.isError && (
             <p className="text-xs text-destructive">
-              Could not save. Check the values and try again.
+              {(save.error as { response?: { data?: { message?: string } } })?.response?.data
+                ?.message ?? 'Could not save. Check the values and try again.'}
             </p>
           )}
           {oauth2.error && <p className="text-xs text-destructive">{oauth2.error}</p>}
@@ -154,7 +160,7 @@ export function AddCredentialDialog({
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSave}>
+            <Button type="submit" disabled={!canSave || connector?.allowNewCredentials === false}>
               {submitLabel}
             </Button>
           </DialogFooter>

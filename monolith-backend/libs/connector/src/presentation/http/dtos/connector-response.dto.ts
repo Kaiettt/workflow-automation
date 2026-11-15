@@ -22,6 +22,9 @@ export class ConnectorResponseDto {
   @ApiProperty()
   isActive: boolean;
 
+  @ApiPropertyOptional()
+  allowNewCredentials?: boolean;
+
   @ApiProperty()
   createdAt: Date;
 
@@ -31,7 +34,10 @@ export class ConnectorResponseDto {
   })
   oauth2?: { redirectUrl: string } | null;
 
-  static fromDomain(entity: Connector): ConnectorResponseDto {
+  static fromDomain(
+    entity: Connector,
+    allowNewCredentials = true,
+  ): ConnectorResponseDto {
     const dto = new ConnectorResponseDto();
     dto.id = entity.id;
     dto.key = entity.key;
@@ -39,6 +45,7 @@ export class ConnectorResponseDto {
     dto.authType = entity.authType;
     dto.configSchema = entity.configSchema;
     dto.isActive = entity.isActive;
+    dto.allowNewCredentials = allowNewCredentials;
     dto.createdAt = entity.createdAt as Date;
     const isOAuth2Form =
       (entity.configSchema as { 'x-oauth2'?: unknown } | null)?.['x-oauth2'] ===

@@ -1,4 +1,8 @@
-﻿import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { EncryptionUtil } from '@app/shared/utils/encryption.util';
 import { Connector } from '@app/connector/domain/entities/connector.entity';
@@ -17,6 +21,7 @@ import {
 import { credentialConfigSchema } from '@app/apps';
 import { createMessengerPackage } from '@app/apps/messenger/messenger.package';
 import { FakeMetaGraph } from '@test/support/apps/fake-meta-graph';
+import { InMemoryConnectorPolicyRepository } from '@test/support/connector/in-memory-connector-policy.repository';
 
 // An OAuth2 credential type of an integration package: App ID / App Secret
 // are typed into a form, tokens come later from the OAuth2 callback.
@@ -99,6 +104,7 @@ describe('credential handlers', () => {
   const encryptionKey = randomBytes(32).toString('hex');
   let previousKey: string | undefined;
   let credentials: MemoryCredentialRepository;
+  let policyPort: InMemoryConnectorPolicyRepository;
   let create: CreateApiKeyCredentialHandler;
   let list: ListCredentialsHandler;
 
@@ -106,9 +112,11 @@ describe('credential handlers', () => {
     previousKey = process.env['ENCRYPTION_KEY'];
     process.env['ENCRYPTION_KEY'] = encryptionKey;
     credentials = new MemoryCredentialRepository();
+    policyPort = new InMemoryConnectorPolicyRepository();
     create = new CreateApiKeyCredentialHandler(
       new MemoryConnectorRepository(),
       credentials,
+      policyPort,
     );
     list = new ListCredentialsHandler(
       new MemoryConnectorRepository(),
@@ -215,6 +223,27 @@ describe('credential handlers', () => {
           new CreateApiKeyCredentialCommand('google', 'u1', 'n', 'k'),
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects with ConflictException CONNECTOR_NEW_CREDENTIALS_DISABLED when policy disables new credentials (BDD-CM-05)', async () => {
+      policyPort.setPolicy('c-openai', false, 1);
+
+      await expect(
+        create.execute(
+          new CreateApiKeyCredentialCommand('openai', 'u1', 'Test', 'sk-key'),
+        ),
+      ).rejects.toThrow(ConflictException);
+
+      try {
+        await create.execute(
+          new CreateApiKeyCredentialCommand('openai', 'u1', 'Test', 'sk-key'),
+        );
+      } catch (error) {
+        expect((error as ConflictException).getResponse()).toMatchObject({
+          code: 'CONNECTOR_NEW_CREDENTIALS_DISABLED',
+        });
+      }
+      expect(credentials.rows).toHaveLength(0);
     });
 
     it('rejects a blank name or key', async () => {

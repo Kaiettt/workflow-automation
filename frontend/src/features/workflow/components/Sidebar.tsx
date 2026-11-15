@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useDesignerStore } from '../store/designer.store';
+import { useConnectors } from '../hooks/useCredentials';
+import { isNodeConnectorDisabled } from '../utils/connector-status.util';
 import { NodeIcon } from './nodes/NodeIcon';
 
 const CATEGORY_ORDER = ['TRIGGER', 'LOGIC', 'DATA_PROCESSING', 'INTEGRATION', 'AI'] as const;
@@ -16,6 +19,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export function Sidebar() {
   const nodeTypes = useDesignerStore((state) => state.nodeTypes);
+  const { data: connectors = [] } = useConnectors();
   const [query, setQuery] = useState('');
 
   const onDragStart = (event: React.DragEvent, nodeType: string, nodeName: string, nodeKey: string) => {
@@ -58,24 +62,40 @@ export function Sidebar() {
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
               {CATEGORY_LABELS[category]}
             </h3>
-            {nodes.map((node) => (
-              <div
-                key={node.key}
-                className="p-2.5 border border-gray-200 rounded-lg cursor-grab active:cursor-grabbing hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm transition-all text-sm flex items-center gap-3 bg-white"
-                onDragStart={(event) =>
-                  onDragStart(
-                    event,
-                    node.category === 'TRIGGER' ? 'triggerNode' : 'actionNode',
-                    node.displayName,
-                    node.key,
-                  )
-                }
-                draggable
-              >
-                <NodeIcon icon={node.icon} name={node.displayName} color={node.color || '#6b7280'} />
-                <span className="min-w-0 font-medium leading-tight text-gray-700">{node.displayName}</span>
-              </div>
-            ))}
+            {nodes.map((node) => {
+              const isDisabled = isNodeConnectorDisabled(node, connectors);
+              return (
+                <div
+                  key={node.key}
+                  className="p-2.5 border border-gray-200 rounded-lg cursor-grab active:cursor-grabbing hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm transition-all text-sm flex items-center gap-3 bg-white"
+                  onDragStart={(event) =>
+                    onDragStart(
+                      event,
+                      node.category === 'TRIGGER' ? 'triggerNode' : 'actionNode',
+                      node.displayName,
+                      node.key,
+                    )
+                  }
+                  draggable
+                  title={
+                    isDisabled
+                      ? 'New credentials disabled by platform administrator'
+                      : undefined
+                  }
+                >
+                  <NodeIcon icon={node.icon} name={node.displayName} color={node.color || '#6b7280'} />
+                  <span className="min-w-0 font-medium leading-tight text-gray-700">{node.displayName}</span>
+                  {isDisabled && (
+                    <Badge
+                      variant="outline"
+                      className="ml-auto text-[10px] text-amber-700 bg-amber-50 border-amber-300 font-normal shrink-0"
+                    >
+                      Disabled
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
           </section>
         ))}
       </div>

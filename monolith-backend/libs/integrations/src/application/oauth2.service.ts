@@ -4,9 +4,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PackageRegistry } from '@app/apps';
 import { CredentialVault } from '@app/connector/application/credential-vault';
+import { ConnectorPolicyPort } from '@app/connector/application/ports/connector-policy.port';
+import { ConnectorRepository } from '@app/connector/domain/repositories/connector.repository';
 import { oauth2RedirectUrl } from '@app/shared/utils/public-base-url';
 import { OauthStateStore } from './ports/oauth-state.store';
 
@@ -32,13 +35,34 @@ export class OAuth2Service {
     private readonly registry: PackageRegistry,
     private readonly vault: CredentialVault,
     private readonly states: OauthStateStore,
+    @Optional() private readonly policyPort?: ConnectorPolicyPort,
+    @Optional() private readonly connectorRepo?: ConnectorRepository,
   ) {}
+
+  private async assertPolicyAllowed(
+    connectorId?: string,
+    connectorKey?: string,
+  ): Promise<void> {
+    if (!this.policyPort) return;
+    let targetId = connectorId;
+    if (!targetId && connectorKey && this.connectorRepo) {
+      const conn = await this.connectorRepo.findByKey(connectorKey);
+      targetId = conn?.id;
+    }
+    if (targetId) {
+      await this.policyPort.assertCanCreateCredential(targetId);
+    }
+  }
 
   async authorizationUrl(
     credentialId: string,
     userId: string,
   ): Promise<{ url: string; state: string }> {
     const { credential, oauth2 } = await this.load(credentialId, userId);
+    await this.assertPolicyAllowed(
+      credential.connectorId,
+      credential.connectorKey,
+    );
     const clientId = credential.secret.client_id;
     if (typeof clientId !== 'string' || !clientId) {
       throw new BadRequestException('Enter the client (App) ID first');
@@ -74,6 +98,10 @@ export class OAuth2Service {
     const { credential, oauth2 } = await this.load(
       payload.credentialId,
       payload.userId,
+    );
+    await this.assertPolicyAllowed(
+      credential.connectorId,
+      credential.connectorKey,
     );
     let tokens: Record<string, unknown>;
     try {

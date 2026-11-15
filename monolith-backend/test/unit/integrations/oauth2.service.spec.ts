@@ -1,8 +1,11 @@
+import { ConflictException } from '@nestjs/common';
 import { OAuth2Service } from '@app/integrations/application/oauth2.service';
 import { OauthStateStore } from '@app/integrations/application/ports/oauth-state.store';
+import { ConnectorRepository } from '@app/connector/domain/repositories/connector.repository';
 import { CheckPublishTriggersHandler } from '@app/triggers/application/queries/check-publish-triggers.handler';
 import { CheckPublishTriggersQuery } from '@app/designer/application/queries/check-publish-triggers.query';
 import { FakeMetaGraph } from '@test/support/apps/fake-meta-graph';
+import { InMemoryConnectorPolicyRepository } from '@test/support/connector/in-memory-connector-policy.repository';
 import {
   definition,
   LLM_CREDENTIAL_ID,
@@ -113,6 +116,50 @@ describe('OAuth2 credentials', () => {
     await expect(
       service.authorizationUrl(LLM_CREDENTIAL_ID, OWNER),
     ).rejects.toThrow('does not use OAuth2');
+  });
+
+  it('rejects authorizationUrl with ConflictException CONNECTOR_NEW_CREDENTIALS_DISABLED when policy disables new credentials (BDD-CM-06)', async () => {
+    const policyPort = new InMemoryConnectorPolicyRepository();
+    policyPort.setPolicy('conn-msg-1', false, 1);
+    const connRepo = {
+      findByKey: jest.fn().mockResolvedValue({ id: 'conn-msg-1' }),
+    } as unknown as ConnectorRepository;
+    const restrictedService = new OAuth2Service(
+      testRegistry(graph),
+      vault.asVault(),
+      states,
+      policyPort,
+      connRepo,
+    );
+
+    await expect(
+      restrictedService.authorizationUrl(MESSENGER_CREDENTIAL_ID, OWNER),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('rejects complete with ConflictException CONNECTOR_NEW_CREDENTIALS_DISABLED when policy is turned off during auth flow (BDD-CM-08)', async () => {
+    const policyPort = new InMemoryConnectorPolicyRepository();
+    const connRepo = {
+      findByKey: jest.fn().mockResolvedValue({ id: 'conn-msg-1' }),
+    } as unknown as ConnectorRepository;
+    const restrictedService = new OAuth2Service(
+      testRegistry(graph),
+      vault.asVault(),
+      states,
+      policyPort,
+      connRepo,
+    );
+
+    const { state } = await restrictedService.authorizationUrl(
+      MESSENGER_CREDENTIAL_ID,
+      OWNER,
+    );
+
+    policyPort.setPolicy('conn-msg-1', false, 1);
+
+    await expect(
+      restrictedService.complete('code-1', state, OWNER),
+    ).rejects.toThrow(ConflictException);
   });
 });
 

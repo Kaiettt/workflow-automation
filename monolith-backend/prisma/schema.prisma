@@ -198,8 +198,19 @@ model Connector {
 
   nodeTypes   NodeTypeDefinition[]
   credentials ConnectorCredential[]
+  policy      ConnectorPolicy?
 
   @@map("connectors")
+}
+
+model ConnectorPolicy {
+  connectorId         String    @id @map("connector_id") @db.Uuid
+  connector           Connector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  allowNewCredentials Boolean   @default(true) @map("allow_new_credentials")
+  revision            Int       @default(0)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("connector_policies")
 }
 
 model ConnectorCredential {

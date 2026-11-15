@@ -19,3 +19,46 @@ export interface Dashboard {
   trend: { day: string; status: string; count: number }[];
   errors: { code: string; count: number }[];
 }
+
+export type ConnectorAuthType = 'NONE' | 'API_KEY' | 'OAUTH2' | 'BASIC';
+
+export interface ConnectorAdminItem {
+  id: string;
+  key: string;
+  name: string;
+  authType: ConnectorAuthType;
+  isActive: boolean;
+  allowNewCredentials: boolean;
+  revision: number;
+  credentialCount: number;
+  workflowCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConnectorNodeType {
+  id: string;
+  key: string;
+  displayName: string;
+  category: string;
+  isActive: boolean;
+}
+
+export interface ConnectorAdminDetail extends ConnectorAdminItem {
+  nodeTypes: ConnectorNodeType[];
+}
+
+export interface ConnectorFilter {
+  page: number;
+  pageSize: number;
+  q?: string;
+  authType?: ConnectorAuthType;
+  isActive?: boolean;
+  allowNewCredentials?: boolean;
+}
+
+export interface ChangeConnectorPolicyPayload {
+  allowNewCredentials: boolean;
+  reason: string;
+  expectedRevision: number;
+}

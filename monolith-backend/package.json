@@ -101,6 +101,9 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(@nestjs/jwt|@nestjs/passport)/)"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
@@ -117,6 +120,7 @@
       "^@app/integrations(|/.*)$": "<rootDir>/libs/integrations/src/$1",
       "^@app/apps(|/.*)$": "<rootDir>/libs/apps/src/$1",
       "^@app/triggers(|/.*)$": "<rootDir>/libs/triggers/src/$1",
+      "^@app/admin(|/.*)$": "<rootDir>/libs/admin/src/$1",
       "^@test/(.*)$": "<rootDir>/test/$1"
     },
     "testPathIgnorePatterns": [
