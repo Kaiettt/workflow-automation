@@ -1,20 +1,77 @@
-## Agent skills
 
-### Issue tracker
+# AGENTS.md
 
-Local markdown (issues live under `.scratch/<feature>/`). See `docs/agents/issue-tracker.md`.
+## Project Overview
 
-### Triage labels
+Workflow Automation Platform.
 
-Keep default labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+- Frontend: React, TypeScript, Vite.
+- Backend: NestJS, TypeScript, Modular Monolith.
+- Database: PostgreSQL, Prisma.
+- Queue and cache: Redis, BullMQ.
+- Architecture: Clean Architecture, CQRS.
 
-### Domain docs
+## Instructions Before Coding
 
-Single-context repo layout. See `docs/agents/domain.md`.
+1. Inspect the existing implementation before making changes.
+2. Understand the relevant modules and their dependencies.
+3. Read the applicable coding standard:
+   - Frontend: `docs/frontend/coding.standard.md`
+   - Backend: `docs/backend/coding.standard.md`
+4. Check related tests and existing patterns.
+5. Prefer extending existing abstractions over introducing new ones.
 
-### Frontend UI & Components
+## Architecture Rules
 
-- **UI Library**: Always use **shadcn/ui** (`@/components/ui/*`) with Tailwind CSS v4.
-- **No custom primitives**: Never create custom HTML buttons, dialogs, dropdowns, modals, or form inputs from scratch if `shadcn/ui` provides them.
-- **Adding components**: If a component is missing in `frontend/src/components/ui`, add it via `npx shadcn@latest add <component-name>`.
-- Detailed standard: See [coding.standard.md](file:///d:/New%20folder/workflow-automation/docs/frontend/coding.standard.md).
+- Preserve the Modular Monolith architecture.
+- Keep module boundaries explicit.
+- Keep business logic independent of framework-specific concerns.
+- Do not introduce unnecessary abstractions or dependencies.
+- Avoid unrelated refactoring.
+- Do not duplicate existing functionality.
+
+## Implementation Rules
+
+- Follow the relevant coding standard.
+- Use strict TypeScript types. Avoid `any`.
+- Handle errors and asynchronous operations explicitly.
+- Validate external input.
+- Consider transaction boundaries and data consistency.
+- Add tests for new or changed behavior.
+- Never silently change existing API contracts.
+
+## Before Completing a Task
+
+Run applicable checks:
+
+1. Lint.
+2. Type checking.
+3. Relevant unit and integration tests.
+4. Build.
+
+If a check cannot run, explain why.
+
+## Final Response
+
+Summarize:
+
+- What changed.
+- Important implementation decisions.
+- Tests and validation performed.
+- Known limitations or remaining work.
+
+Do not claim that a test, build, or validation passed unless it was actually executed.
+
+
+## Feature Development Workflow
+
+For new features, enhancements, and significant refactoring,
+follow `docs/workflow-coding.md`.
+
+Create and maintain:
+- `spec.md`
+- `design.md`
+- `plan.md`
+- `task.md`
+
+Use TDD for behavior-changing implementation.
