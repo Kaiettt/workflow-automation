@@ -21,13 +21,4 @@ Report actual validation results. Never claim checks passed without running them
 
 ## Feature Development Workflow
 
-For new features, enhancements, and significant refactoring,
-follow `docs/workflow-coding.md`.
-
-Create and maintain:
-- `spec.md`
-- `design.md`
-- `plan.md`
-- `task.md`
-
-Use TDD for behavior-changing implementation.
+For behavior-changing work, follow the canonical workflow in `docs/workflow-coding.md`.

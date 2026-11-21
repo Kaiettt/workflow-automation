@@ -1,11 +1,11 @@
 # Issue tracker: Local Markdown
 
-Issues and specs for this repo live as markdown files in `.scratch/`.
+`.scratch/` holds temporary discovery notes and local issue-tracking files. Approved, implementation-ready feature specifications and their design, plan, and task artifacts live in `specs/<feature-name>/`; promote draft requirements there before implementation. Issue-tracker tickets remain useful for tracking individual work items but do not replace the approved feature specification.
 
 ## Conventions
 
-- One feature per directory: `.scratch/<feature-slug>/`
-- The spec is `.scratch/<feature-slug>/spec.md`
+- One effort per directory: `.scratch/<feature-slug>/`
+- Optional discovery notes may be kept at `.scratch/<feature-slug>/spec.md` while clarifying requirements; once approved, the canonical specification is `specs/<feature-name>/spec.md`.
 - Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading

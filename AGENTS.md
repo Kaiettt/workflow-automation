@@ -65,13 +65,4 @@ Do not claim that a test, build, or validation passed unless it was actually exe
 
 ## Feature Development Workflow
 
-For new features, enhancements, and significant refactoring,
-follow `docs/workflow-coding.md`.
-
-Create and maintain:
-- `spec.md`
-- `design.md`
-- `plan.md`
-- `task.md`
-
-Use TDD for behavior-changing implementation.
+For behavior-changing features, enhancements, significant refactors, and bug fixes, follow `docs/workflow-coding.md`. It defines the grilling confirmation gate, BDD scenario traceability, scaled feature artifacts, and the TDD cycle.
