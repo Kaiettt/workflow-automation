@@ -1,6 +1,8 @@
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  ValidateIf,
+  IsUUID,
   IsBooleanString,
   IsIn,
   IsInt,
@@ -41,6 +43,42 @@ export class ConnectorsDto extends PageDto {
   authType?: 'NONE' | 'API_KEY' | 'OAUTH2' | 'BASIC';
   @IsOptional() @IsBooleanString() isActive?: string;
   @IsOptional() @IsBooleanString() allowNewCredentials?: string;
+}
+export class NodeTypesDto extends PageDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  q?: string;
+  @IsOptional()
+  @IsIn(['TRIGGER', 'LOGIC', 'DATA_PROCESSING', 'INTEGRATION', 'AI'])
+  category?: 'TRIGGER' | 'LOGIC' | 'DATA_PROCESSING' | 'INTEGRATION' | 'AI';
+  @IsOptional() @IsUUID() connectorId?: string;
+  @IsOptional() @IsBooleanString() isCatalogVisible?: string;
+  @IsOptional() @IsBooleanString() isExecutionAllowed?: string;
+  @IsOptional() @IsIn(['displayName', 'updatedAt']) sortBy:
+    'displayName' | 'updatedAt' = 'displayName';
+  @IsOptional() @IsIn(['asc', 'desc']) sortOrder: 'asc' | 'desc' = 'asc';
+}
+export class NodeTypeKeyDto {
+  @IsString() @Length(1, 150) key!: string;
+}
+export class ChangeNodeTypeStatusDto {
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsBoolean()
+  isCatalogVisible?: boolean;
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsBoolean()
+  isExecutionAllowed?: boolean;
+  @IsInt() @Min(0) expectedRevision!: number;
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @Length(5, 500)
+  reason!: string;
 }
 export class ChangeConnectorPolicyDto {
   @IsBoolean() allowNewCredentials!: boolean;

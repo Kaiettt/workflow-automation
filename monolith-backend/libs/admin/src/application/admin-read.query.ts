@@ -6,7 +6,10 @@ import type {
   UserFilter,
 } from './admin-read.port';
 
+import type { NodeTypeFilter } from './node-type-admin.types';
 type AdminReadRequest =
+  | { kind: 'nodeTypes'; filter: NodeTypeFilter }
+  | { kind: 'nodeType'; key: string }
   | { kind: 'users'; filter: UserFilter }
   | { kind: 'user'; id: string }
   | { kind: 'workflows'; id: string; filter: UserFilter }
@@ -22,6 +25,10 @@ export class AdminReadHandler implements IQueryHandler<AdminReadQuery> {
   execute(query: AdminReadQuery): Promise<unknown> {
     const request = query.request;
     switch (request.kind) {
+      case 'nodeTypes':
+        return this.reads.nodeTypes(request.filter);
+      case 'nodeType':
+        return this.reads.nodeType(request.key);
       case 'users':
         return this.reads.users(request.filter);
       case 'user':

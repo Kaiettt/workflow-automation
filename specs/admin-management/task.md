@@ -72,27 +72,29 @@ P0 (G0–G3) đã hoàn thành và nghiệm thu thực tế theo PR #39; P1 (G4�
 
 ---
 
-## G5 — Quản lý Loại Node - Node Types (P1 Mới)
+## G5 — Quản lý Loại Node - Node Types (P1)
 
-- [ ] G5.1 **Database Migration**: Tạo bảng `node_type_policies` (`node_type_key` PK FK, `is_catalog_visible`, `is_execution_allowed`, `revision`, `updated_at`).
-- [ ] G5.2 **Catalog Sync Protection**: Sửa `PackageCatalogSync` để chỉ upsert bảng `node_type_definitions`, không ghi đè cờ trong `node_type_policies`.
-- [ ] G5.3 **Node Type Policy Port & Command**:
+Đã triển khai. Xem [BDD, bằng chứng kiểm tra và giới hạn](5.node-type-management/task.md).
+
+- [x] G5.1 **Database Migration**: Tạo bảng `node_type_policies` (`node_type_key` PK FK, `is_catalog_visible`, `is_execution_allowed`, `revision`, `updated_at`).
+- [x] G5.2 **Catalog Sync Protection**: Giữ nguyên sync metadata và kiểm chứng bằng PostgreSQL thật rằng `node_type_policies` không bị ghi đè.
+- [x] G5.3 **Node Type Policy Port & Command**:
   - Tạo `ChangeNodeTypeStatusCommand` trong `libs/node-library/src/application/commands/`.
   - Triển khai handler: Lấy advisory lock `7261103`, kiểm tra `expectedRevision`, no-op, cập nhật cờ, tăng revision và ghi `admin_audit_events` (`NODE_TYPE_STATUS_CHANGED`) atomic.
-- [ ] G5.4 **Designer Palette Filter Gate**:
+- [x] G5.4 **Designer Palette Filter Gate**:
   - Cập nhật `NodeTypesController.getNodeTypes()` kết hợp truy vấn `node_type_policies` để lọc bỏ các node có `isCatalogVisible === false`.
-- [ ] G5.5 **Runtime Execution Enforcement Gate**:
+- [x] G5.5 **Runtime Execution Enforcement Gate**:
   - Cập nhật `NodeRunner.run()` trong `monolith-backend/libs/execution/src/application/services/node-runner.ts`.
   - Nếu `isExecutionAllowed === false`: Dừng thực thi node, ghi nhận log `FAILED` với mã lỗi `NODE_TYPE_DISABLED`.
-- [ ] G5.6 **Admin Projection & Query**:
+- [x] G5.6 **Admin Projection & Query**:
   - Bổ sung `AdminReadPort.nodeTypes()` và `AdminReadPort.nodeType(key)` tính toán `publishedWorkflowCount` và `draftWorkflowCount`.
   - Thêm endpoint `GET /api/admin/node-types`, `GET /api/admin/node-types/:key`, `PATCH /api/admin/node-types/:key/status` trong `AdminController`.
-- [ ] G5.7 **Frontend Components & Page**:
+- [x] G5.7 **Frontend Components & Page**:
   - Cập nhật `admin.types.ts` và `admin.service.ts` với node type DTOs và API methods.
   - Tạo hook `useAdminNodeTypes.ts`.
   - Tạo `NodeTypeTable.tsx`, `NodeTypeStatusDialog.tsx`, `NodeTypeDetailCard.tsx`.
   - Tạo `NodeTypesPage.tsx` có bộ lọc category, tìm kiếm, phân trang và dialog điều chỉnh trạng thái.
-- [ ] G5.8 **Kiểm thử G5**: Viết unit & integration tests cho AC-20, AC-21, AC-22, AC-23 (palette visibility, runtime execution blocked, workflow backward compatibility).
+- [x] G5.8 **Kiểm thử G5**: Viết unit & integration tests cho AC-20, AC-21, AC-22, AC-23 (palette visibility, runtime execution blocked, workflow backward compatibility).
 
 ---
 

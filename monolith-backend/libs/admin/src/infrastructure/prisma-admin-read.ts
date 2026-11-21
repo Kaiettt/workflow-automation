@@ -9,6 +9,11 @@ import type {
   UserFilter,
 } from '../application/admin-read.port';
 
+import {
+  readAdminNodeTypes,
+  readAdminNodeType,
+} from './prisma-admin-node-types';
+import type { NodeTypeFilter } from '../application/node-type-admin.types';
 const userSelect = {
   id: true,
   name: true,
@@ -23,6 +28,12 @@ const userSelect = {
 export class PrismaAdminRead extends AdminReadPort {
   constructor(private readonly prisma: PrismaService) {
     super();
+  }
+  nodeTypes(filter: NodeTypeFilter) {
+    return readAdminNodeTypes(this.prisma, filter);
+  }
+  nodeType(key: string) {
+    return readAdminNodeType(this.prisma, key);
   }
   async users(filter: UserFilter) {
     const where: Prisma.UserWhereInput = {

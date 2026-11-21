@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { NodeTypePolicyPort } from './application/ports/node-type-policy.port';
+import { ChangeNodeTypeStatusHandler } from './application/commands/change-node-type-status.command';
+import { PrismaNodeTypePolicyRepository } from './infrastructure/persistence/prisma-node-type-policy.repository';
 import { CqrsModule } from '@nestjs/cqrs';
 import { PrismaModule } from '@app/database';
 import { AuthModule } from '@app/auth';
@@ -10,7 +13,12 @@ import { PrismaNodeTypeDefinitionRepository } from './infrastructure/persistence
 import { AppsModule } from '@app/apps';
 import { PackageCatalogSync } from './infrastructure/package-catalog.sync';
 
-const QueryHandlers = [GetNodeTypesHandler, GetNodeConfigSchemasHandler];
+import { GetNodeMetadataHandler } from './application/queries/get-node-metadata.query';
+const QueryHandlers = [
+  GetNodeTypesHandler,
+  GetNodeConfigSchemasHandler,
+  GetNodeMetadataHandler,
+];
 
 const Repositories = [
   {
@@ -22,7 +30,13 @@ const Repositories = [
 @Module({
   imports: [CqrsModule, PrismaModule, AuthModule, AppsModule],
   controllers: [NodeTypesController],
-  providers: [...QueryHandlers, ...Repositories, PackageCatalogSync],
-  exports: [...Repositories],
+  providers: [
+    ...QueryHandlers,
+    ...Repositories,
+    PackageCatalogSync,
+    ChangeNodeTypeStatusHandler,
+    { provide: NodeTypePolicyPort, useClass: PrismaNodeTypePolicyRepository },
+  ],
+  exports: [...Repositories, NodeTypePolicyPort],
 })
 export class NodeLibraryModule {}

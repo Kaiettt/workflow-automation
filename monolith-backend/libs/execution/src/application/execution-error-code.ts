@@ -1,6 +1,7 @@
 // Only these system-owned codes may cross the Admin projection boundary.
 const safeCodes = new Set([
   'NODE_EXECUTION_FAILED',
+  'NODE_TYPE_DISABLED',
   'WORKFLOW_EXECUTION_FAILED',
   'EXECUTION_QUEUE_FAILED',
   'EXECUTION_WORKER_INTERRUPTED',

@@ -12,8 +12,13 @@ export class PrismaNodeTypeDefinitionRepository implements NodeTypeDefinitionRep
     const nodeTypes = await this.prisma.nodeTypeDefinition.findMany({
       where: {
         isActive: true,
+        OR: [
+          { policy: { is: null } },
+          { policy: { is: { isCatalogVisible: true } } },
+        ],
       },
       orderBy: [{ category: 'asc' }, { displayName: 'asc' }],
+      include: { policy: true },
     });
 
     return nodeTypes.map((row) => NodeTypeDefinitionMapper.toDomain(row));
@@ -22,6 +27,7 @@ export class PrismaNodeTypeDefinitionRepository implements NodeTypeDefinitionRep
   async findByKeys(keys: string[]): Promise<NodeTypeDefinition[]> {
     const nodeTypes = await this.prisma.nodeTypeDefinition.findMany({
       where: { key: { in: keys } },
+      include: { policy: true },
     });
 
     return nodeTypes.map((row) => NodeTypeDefinitionMapper.toDomain(row));

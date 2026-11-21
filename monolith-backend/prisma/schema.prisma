@@ -165,6 +165,8 @@ model NodeTypeDefinition {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  policy NodeTypePolicy?
+
   @@index([category])
   @@map("node_type_definitions")
 }
@@ -172,6 +174,17 @@ model NodeTypeDefinition {
 // ----------------------------------------------------------------------------
 // Connector Framework Module — FR-CF-*
 // ----------------------------------------------------------------------------
+
+model NodeTypePolicy {
+  nodeTypeKey        String             @id @map("node_type_key") @db.VarChar(150)
+  nodeType           NodeTypeDefinition @relation(fields: [nodeTypeKey], references: [key], onDelete: Cascade)
+  isCatalogVisible   Boolean            @default(true) @map("is_catalog_visible")
+  isExecutionAllowed Boolean            @default(true) @map("is_execution_allowed")
+  revision           Int                @default(0)
+  updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("node_type_policies")
+}
 
 enum ConnectorAuthType {
   NONE

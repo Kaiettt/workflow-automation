@@ -12,7 +12,8 @@ import {
 } from '../models/workflow-validation.model';
 import { resolveOutputs, outputOfHandle } from '../utils/node-outputs';
 import type { WorkflowTemplate } from '../templates/catalog';
-import { useWorkflowDraft, useNodeTypes } from '../hooks/useWorkflowDraft';
+import { useWorkflowDraft } from '../hooks/useWorkflowDraft';
+import { useDesignerNodeCatalog } from '../hooks/useDesignerNodeCatalog';
 import { useWorkflowMutations } from '../hooks/useWorkflowMutations';
 import { useDraftAutoSave } from '../hooks/useDraftAutoSave';
 import {
@@ -81,8 +82,8 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
 
   // React Query hooks for server state
   const { data: draft, isLoading: isDraftLoading } = useWorkflowDraft(workflowId);
-  const { data: nodeTypes, isLoading: isNodeTypesLoading } = useNodeTypes();
-  const loading = isDraftLoading || isNodeTypesLoading;
+  const { data: nodeTypes, isLoading: isNodeTypesLoading, error: nodeTypesError, refetch: refetchNodeTypes } = useDesignerNodeCatalog([...(draft?.definition?.nodes ?? []), ...nodes]);
+  const loading = isDraftLoading || isNodeTypesLoading || Boolean(nodeTypesError);
 
   const { publishWorkflowMutation } = useWorkflowMutations();
   const isPublishing = publishWorkflowMutation.isPending;
@@ -274,6 +275,12 @@ function DesignerPageInner({ workflowId: propWorkflowId, onBack: propOnBack }: D
     [applyTemplate, nodes.length],
   );
 
+  if (nodeTypesError) {
+    return <div role="alert" className="flex h-screen flex-col items-center justify-center gap-4">
+      <p>Không thể tải thông tin loại node. Vui lòng thử lại để tiếp tục chỉnh sửa.</p>
+      <Button onClick={() => { void refetchNodeTypes(); }}>Thử lại</Button>
+    </div>;
+  }
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-gray-50">

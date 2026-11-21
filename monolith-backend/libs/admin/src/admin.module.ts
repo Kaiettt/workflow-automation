@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NodeLibraryModule } from '@app/node-library';
 import { CqrsModule } from '@nestjs/cqrs';
 import { AuthModule } from '@app/auth';
 import { PrismaModule } from '@app/database';
@@ -10,7 +11,13 @@ import { AdminController } from './presentation/admin.controller';
 import { AdminMutationFieldsGuard } from './presentation/admin-mutation-fields.guard';
 
 @Module({
-  imports: [CqrsModule, AuthModule, PrismaModule, ConnectorModule],
+  imports: [
+    CqrsModule,
+    AuthModule,
+    PrismaModule,
+    ConnectorModule,
+    NodeLibraryModule,
+  ],
   controllers: [AdminController],
   providers: [
     AdminMutationFieldsGuard,

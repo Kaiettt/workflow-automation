@@ -1,6 +1,11 @@
 import { apiClient } from '@/shared/api/http-client';
 import type {
   Account,
+  NodeTypeAdminItem,
+  NodeTypeAdminDetail,
+  NodeTypeFilter,
+  NodeTypePolicySnapshot,
+  ChangeNodeTypeStatusPayload,
   ChangeConnectorPolicyPayload,
   ConnectorAdminDetail,
   ConnectorAdminItem,
@@ -14,6 +19,15 @@ import type {
 
 interface Envelope<T> { success: boolean; data: T; }
 export const adminService = {
+  async nodeTypes(filter: NodeTypeFilter, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<Page<NodeTypeAdminItem>>>('/api/admin/node-types', { params: filter, signal })).data.data;
+  },
+  async nodeType(key: string, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<NodeTypeAdminDetail>>(`/api/admin/node-types/${encodeURIComponent(key)}`, { signal })).data.data;
+  },
+  async changeNodeTypeStatus(key: string, payload: ChangeNodeTypeStatusPayload) {
+    return (await apiClient.patch<Envelope<NodeTypePolicySnapshot>>(`/api/admin/node-types/${encodeURIComponent(key)}/status`, payload)).data.data;
+  },
   async users(filter: UserFilter, signal?: AbortSignal) { return (await apiClient.get<Envelope<Page<Account>>>('/api/admin/users', { params: filter, signal })).data.data; },
   async user(id: string, signal?: AbortSignal) { return (await apiClient.get<Envelope<Account>>(`/api/admin/users/${id}`, { signal })).data.data; },
   async workflows(id: string, page: number, signal?: AbortSignal) { return (await apiClient.get<Envelope<Page<WorkflowSummary>>>(`/api/admin/users/${id}/workflows`, { params: { page, pageSize: 20 }, signal })).data.data; },

@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { ArrowLeft, Cable, LayoutDashboard, Shield, UsersRound } from 'lucide-react';
+import { ArrowLeft, Blocks, Cable, LayoutDashboard, Shield, UsersRound } from 'lucide-react';
 
 import { AppHeader } from '@/components/layout/AppHeader';
 import { FlowPilotBrand } from '@/components/layout/FlowPilotBrand';
@@ -28,13 +28,14 @@ export function AdminLayout() {
       </AppHeader>
 
       <div className="border-b border-border bg-muted/20">
-        <nav aria-label="Admin navigation" className="container mx-auto flex max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
+        <nav aria-label="Admin navigation" className="container mx-auto flex max-w-7xl items-center gap-6 overflow-x-auto px-4 sm:px-6 lg:px-8">
           {[
             { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
             { to: '/admin/users', label: 'Users', icon: UsersRound, end: false },
             { to: '/admin/connectors', label: 'Connectors', icon: Cable, end: false },
+            { to: '/admin/node-types', label: 'Node Types', icon: Blocks, end: false },
           ].map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => cn('inline-flex items-center gap-2 border-b-2 py-3.5 text-xs font-medium transition-colors', isActive ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+            <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => cn('inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 py-3.5 text-xs font-medium transition-colors', isActive ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
               <item.icon className="size-3.5" /> {item.label}
             </NavLink>
           ))}

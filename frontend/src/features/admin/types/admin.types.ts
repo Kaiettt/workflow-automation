@@ -1,5 +1,28 @@
 import type { UserRole } from '../../auth/types/auth.types';
 
+export type NodeTypeCategory = 'TRIGGER' | 'LOGIC' | 'DATA_PROCESSING' | 'INTEGRATION' | 'AI';
+export interface NodeTypeAdminItem {
+  id: string; key: string; displayName: string; icon: string | null; color: string | null; category: NodeTypeCategory;
+  connectorId: string | null; connectorKey: string | null; connectorName: string | null;
+  isCatalogVisible: boolean; isExecutionAllowed: boolean; revision: number;
+  publishedWorkflowCount: number; draftWorkflowCount: number; createdAt: string; updatedAt: string;
+}
+export interface NodeTypeAdminDetail extends NodeTypeAdminItem {
+  configSchema: unknown; inputSchema: unknown; outputSchema: unknown;
+  workflows: { id: string; name: string; ownerEmail: string; status: 'DRAFT' | 'PUBLISHED' }[];
+}
+export interface NodeTypeFilter {
+  page: number; pageSize: number; q?: string; category?: NodeTypeCategory; connectorId?: string;
+  isCatalogVisible?: boolean; isExecutionAllowed?: boolean;
+  sortBy?: 'displayName' | 'updatedAt'; sortOrder?: 'asc' | 'desc';
+}
+export interface ChangeNodeTypeStatusPayload {
+  isCatalogVisible?: boolean; isExecutionAllowed?: boolean; reason: string; expectedRevision: number;
+}
+export interface NodeTypePolicySnapshot {
+  nodeTypeKey: string; isCatalogVisible: boolean; isExecutionAllowed: boolean; revision: number; updatedAt: string;
+}
+
 export type AccountChangeAction = 'active' | 'role';
 
 export interface Account {

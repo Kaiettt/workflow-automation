@@ -8,5 +8,7 @@ export interface NodeTypeDefinition {
     color: string | null;
     description: string | null;
     connectorId: string | null;
+    isCatalogVisible?: boolean;
+    isExecutionAllowed?: boolean;
     configSchema: Record<string, unknown>;
 }

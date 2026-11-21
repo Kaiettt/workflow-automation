@@ -8,10 +8,15 @@ import {
   Patch,
   Query,
   UseGuards,
+  UseFilters,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import {
+  ChangeNodeTypeStatusCommand,
+  NodeTypePolicyExceptionFilter,
+} from '@app/node-library';
 import { JwtAuthGuard } from '@app/auth/infrastructure/guards/jwt-auth.guard';
 import { RolesGuard } from '@app/auth/infrastructure/guards/roles.guard';
 import { Roles } from '@app/auth/infrastructure/decorators/roles.decorator';
@@ -29,6 +34,9 @@ import {
 import { AdminReadQuery } from '../application/admin-read.query';
 import {
   ActiveDto,
+  NodeTypesDto,
+  NodeTypeKeyDto,
+  ChangeNodeTypeStatusDto,
   ChangeConnectorPolicyDto,
   ConnectorsDto,
   DashboardDto,
@@ -38,6 +46,7 @@ import {
 } from './admin.dto';
 
 @Controller('api/admin')
+@UseFilters(NodeTypePolicyExceptionFilter)
 @UseGuards(JwtAuthGuard, RolesGuard, AdminMutationFieldsGuard)
 @Roles(ADMIN_ROLE)
 @UsePipes(
@@ -52,6 +61,60 @@ export class AdminController {
     private readonly queries: QueryBus,
     private readonly commands: CommandBus,
   ) {}
+  @Get('node-types')
+  async nodeTypes(@Query() query: NodeTypesDto) {
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, unknown>(
+        new AdminReadQuery({
+          kind: 'nodeTypes',
+          filter: {
+            ...query,
+            isCatalogVisible:
+              query.isCatalogVisible === undefined
+                ? undefined
+                : query.isCatalogVisible === 'true',
+            isExecutionAllowed:
+              query.isExecutionAllowed === undefined
+                ? undefined
+                : query.isExecutionAllowed === 'true',
+          },
+        }),
+      ),
+    };
+  }
+  @Get('node-types/:key')
+  async nodeType(@Param() params: NodeTypeKeyDto) {
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, unknown>(
+        new AdminReadQuery({ kind: 'nodeType', key: params.key }),
+      ),
+    };
+  }
+  @AdminBodyFields('isCatalogVisible', 'isExecutionAllowed')
+  @Patch('node-types/:key/status')
+  async nodeTypeStatus(
+    @Param() params: NodeTypeKeyDto,
+    @Body() change: ChangeNodeTypeStatusDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (
+      change.isCatalogVisible === undefined &&
+      change.isExecutionAllowed === undefined
+    )
+      throw new BadRequestException('Provide at least one policy flag');
+    return {
+      success: true,
+      data: await this.commands.execute<ChangeNodeTypeStatusCommand, unknown>(
+        new ChangeNodeTypeStatusCommand({
+          ...change,
+          nodeTypeKey: params.key,
+          adminId: user.id,
+        }),
+      ),
+    };
+  }
   @Get('users') async users(@Query() query: UsersDto) {
     return {
       success: true,
