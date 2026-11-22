@@ -167,22 +167,3 @@ jobs:
           ignore-unfixed: true
           # Bắt đầu với "0" để không làm đỏ pipeline, xử lý hết lỗi cũ rồi đổi thành "1"
           exit-code: "0"
-
-  # ---------------------------------------------------------------
-  # 4. Cảnh báo khi CI lỗi trên master (Discord/Slack webhook)
-  # ---------------------------------------------------------------
-  notify:
-    name: Notify on failure
-    if: always() && github.event_name == 'push' && contains(needs.*.result, 'failure')
-    needs: [lint, test-backend, test-frontend, security]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Gửi cảnh báo
-        env:
-          WEBHOOK: ${{ secrets.ALERT_WEBHOOK_URL }}
-        run: |
-          if [ -n "$WEBHOOK" ]; then
-            curl -sS -X POST -H "Content-Type: application/json" \
-              -d "{\"content\":\"CI lỗi: ${{ github.repository }} @ ${{ github.sha }} - ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
-              "$WEBHOOK"
-          fi
