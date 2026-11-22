@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "provider": "claude",
+  "sessionId": "2581f976-58ab-4837-99eb-dd8cae1c2436",
+  "workspace": "D:\\New folder\\workflow-automation",
+  "model": "auto",
+  "events": [
+    {
+      "id": "user:36f2ec7c-0e29-4655-a18f-8678b285e8a5:0",
+      "kind": "user",
+      "content": "xin chao",
+      "timestamp": "2026-10-17T03:49:14.629Z",
+      "order": 2
+    },
+    {
+      "id": "user:fac31716-152e-4253-8a91-f98e0bd08b1b:0",
+      "kind": "user",
+      "content": "[Request interrupted by user]",
+      "timestamp": "2026-10-17T03:51:11.177Z",
+      "order": 25
+    }
+  ],
+  "sources": [
+    "C:\\Users\\bacdo\\.claude\\projects\\d--New-folder-workflow-automation\\2581f976-58ab-4837-99eb-dd8cae1c2436.jsonl"
+  ],
+  "warnings": [],
+  "modifiedAt": "2026-10-29T14:51:00.127Z"
+}

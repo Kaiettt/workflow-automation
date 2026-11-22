@@ -7,7 +7,16 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "logs:collect": "node scripts/ai-sessions/cli.cjs",
+    "logs:status": "node scripts/ai-sessions/cli.cjs --status",
+    "logs:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ai-sessions/manage.ps1 -Start",
+    "logs:stop": "node scripts/ai-sessions/cli.cjs --stop",
+    "logs:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ai-sessions/setup.ps1",
+    "test:ai-sessions": "node --test \"scripts/ai-sessions/*.test.ts\"",
+    "lint:ai-sessions": "node monolith-backend/node_modules/eslint/bin/eslint.js --config scripts/ai-sessions/eslint.config.cjs \"scripts/ai-sessions/*.ts\" \"scripts/ai-sessions/*.cjs\"",
+    "typecheck:ai-sessions": "node frontend/node_modules/typescript/bin/tsc -p scripts/ai-sessions/tsconfig.json",
+    "build:ai-sessions": "node frontend/node_modules/typescript/bin/tsc -p scripts/ai-sessions/tsconfig.build.json && node scripts/ai-sessions/dist/cli.cjs --help"
   },
   "repository": {
     "type": "git",
