@@ -26,7 +26,7 @@ describe('NodeExecutionObserver', () => {
     executionId: 'exec-1',
     items: [{ json: { foo: 'bar' } }],
     runs: [],
-    names: new Map([['Test Node', 'node-1']]),
+    names: new Map([['Test Node', ['node-1']]]),
     configSchema: {},
     credentialOwnerId: 'user-1',
   };

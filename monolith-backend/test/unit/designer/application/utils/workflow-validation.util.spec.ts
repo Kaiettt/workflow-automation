@@ -4,6 +4,7 @@ import {
   getTriggerNodes,
   getActionNodes,
   validateWorkflowDraft,
+  type WorkflowDraftDefinition,
 } from '@app/designer/application/utils/workflow-validation.util';
 
 describe('Workflow Validation Utils', () => {
@@ -161,7 +162,7 @@ describe('Workflow Validation Utils', () => {
       type: key === 'trigger.manual' ? 'triggerNode' : 'actionNode',
       data: { key, config: {} },
     });
-    const codes = (definition: object) =>
+    const codes = (definition: WorkflowDraftDefinition) =>
       validateWorkflowDraft(definition, catalogMap).issues.map(
         (issue) => issue.code,
       );
