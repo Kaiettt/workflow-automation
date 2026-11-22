@@ -136,6 +136,16 @@ Người quản trị hệ thống, chịu trách nhiệm vận hành nền tả
 | **Quản lý người dùng** | Hỗ trợ đăng ký, đăng nhập, quản lý tài khoản và phân quyền với hai vai trò Client và Admin; tài khoản tự đăng ký mặc định là Client. |
 | **Quản lý kết nối** | Client quản lý các tài khoản kết nối của mình; Admin cấu hình và quản lý các kết nối dịch vụ của nền tảng theo quyền quản trị. |
 | **Quản trị nền tảng** | Admin quản lý trạng thái tài khoản và role, xem dashboard, tra cứu metadata execution, kiểm soát việc tạo kết nối mới và theo dõi nhật ký quản trị. |
+| **Subscription và thanh toán** | Người dùng xem gói, thanh toán qua VNPAY Sandbox, theo dõi hạn mức execution và quản lý gia hạn thủ công. Admin quản lý plans, subscriptions, payment orders và doanh thu. |
+
+### 3.1.1 Mô hình kinh doanh
+
+FlowPilot sử dụng mô hình Subscription kết hợp hạn mức execution theo tháng:
+
+- 1 execution bằng 1 lần workflow được kích hoạt.
+- Có các gói Free, Starter, Pro và Business với quota khác nhau.
+- Thanh toán một lần theo chu kỳ, hỗ trợ gia hạn thủ công qua VNPAY Sandbox.
+- Giá và quota là mức đề xuất để demo.
 
 ---
 
@@ -256,6 +266,16 @@ Khu vực dành cho Admin để quản lý và theo dõi toàn nền tảng:
 - Nhật ký ghi nhận các thay đổi quản trị tài khoản và chính sách connector.
 
 Phạm vi, quy tắc tác động và tiêu chí nghiệm thu được đề xuất trong [Admin spec](../specs/admin-management/spec.md).
+
+## 4.9 Subscription và thanh toán
+
+Người dùng có thể xem và chọn subscription plan, thanh toán qua VNPAY Sandbox và theo dõi gói hiện tại, execution quota, ngày hết hạn, cùng lịch sử thanh toán.
+
+Khi hết quota hoặc subscription hết hạn, hệ thống chặn lượt execution mới. Dữ liệu workflow và lịch sử vẫn được giữ lại. MVP hỗ trợ gia hạn thủ công, không hỗ trợ thanh toán định kỳ tự động.
+
+Admin có thể quản lý plans, subscriptions, payment orders và xem doanh thu.
+
+Các tính năng nâng cao như annual plan, auto renewal, AI credits, overage billing và organization plan thuộc giai đoạn sau.
 
 ---
 

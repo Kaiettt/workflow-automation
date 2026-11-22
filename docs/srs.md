@@ -12,7 +12,7 @@ Tài liệu này xác định phạm vi, người dùng và các yêu cầu ch�
 
 ### 1.2 Phạm vi sản phẩm
 
-FlowPilot là nền tảng workflow automation giúp người dùng thiết kế, cấu hình, kiểm tra, publish và vận hành quy trình nghiệp vụ bằng giao diện kéo thả. Phạm vi MVP bao gồm Workflow Designer, Node Library, Connector Framework, Workflow Execution Engine, Execution Monitor, Workflow Logs, Version Management, xác thực người dùng và quản lý kết nối.
+FlowPilot là nền tảng workflow automation giúp người dùng thiết kế, cấu hình, kiểm tra, publish và vận hành quy trình nghiệp vụ bằng giao diện kéo thả. Phạm vi MVP bao gồm Workflow Designer, Node Library, Connector Framework, Workflow Execution Engine, Execution Monitor, Workflow Logs, Version Management, xác thực người dùng, quản lý kết nối, subscription, execution quota và thanh toán VNPAY Sandbox.
 
 MVP hướng tới hỗ trợ connectors: HTTP, Webhook, Gmail, Google Sheets, Google Drive, và OpenAI. Engine cần hỗ trợ thực thi tuần tự, điều kiện và rẽ nhánh, chạy song song, retry, timeout và xử lý lỗi. Người dùng cần theo dõi trạng thái và lịch sử chạy, đồng thời lưu, so sánh và khôi phục các phiên bản workflow.
 
@@ -31,6 +31,9 @@ MVP hướng tới hỗ trợ connectors: HTTP, Webhook, Gmail, Google Sheets, G
 | Execution | Một lần chạy của một workflow version cụ thể |
 | Item | Đơn vị dữ liệu `{ json, pairedItem? }` được truyền giữa các node |
 | Connector | Cấu hình tích hợp tới dịch vụ ngoài; credential thuộc về một user và connector |
+| Subscription | Gói đăng ký xác định quota execution, giá và chu kỳ thanh toán của một tài khoản |
+| Execution quota | Số lần workflow execution được phép trong chu kỳ thanh toán hiện tại |
+| Payment order | Bản ghi giao dịch thanh toán được tạo trước khi chuyển người dùng đến VNPAY |
 | Modular Monolith | Một ứng dụng backend được chia theo bounded context và các lớp rõ ràng |
 
 
@@ -222,6 +225,33 @@ Các yêu cầu Admin MVP được phân tích trong [Admin analysis](../specs/a
 | FR-AD-10 | Theo dõi execution | Admin tra cứu metadata toàn nền tảng; projection không chứa definition, input/output, context hoặc raw error. |
 | FR-AD-11 | Nhật ký quản trị | Ghi actor, action, target, lý do và trạng thái trước/sau cùng transaction với thay đổi; Admin chỉ đọc. |
 
+### 3.11 Subscription, thanh toán và execution quota
+
+| Mã | Yêu cầu | Mô tả |
+| --- | --- | --- |
+| FR-BL-01 | Danh sách và lựa chọn plan | Hệ thống công bố các plan Free, Starter, Pro và Business cùng giá/tháng và quota execution/tháng. Giá và quota trong MVP là cấu hình demo có thể được Admin hoặc seed quản lý, không phải giá thương mại chính thức. |
+| FR-BL-02 | Execution quota | Một execution được tính là một workflow execution được kích hoạt, không tính theo số node. Backend kiểm tra quota trước khi tạo execution mới. Khi quota bằng 0 hoặc đã hết hạn mức, execution mới bị chặn. |
+| FR-BL-03 | Chu kỳ và reset quota | Quota được reset theo chu kỳ thanh toán hàng tháng. Quota chưa dùng không được rollover sang chu kỳ tiếp theo. |
+| FR-BL-04 | Checkout VNPAY | Người dùng chọn plan và tạo payment order; backend xác nhận số tiền, plan, chu kỳ và trạng thái order trước khi redirect đến VNPAY Sandbox. |
+| FR-BL-05 | Xác nhận IPN | Backend xác minh thanh toán VNPAY qua IPN, signature và thông tin order. Chỉ giao dịch đã xác minh thành công mới kích hoạt hoặc gia hạn subscription. |
+| FR-BL-06 | Thanh toán thủ công | Người dùng chủ động tạo đơn thanh toán mới khi đến kỳ gia hạn. MVP không thực hiện automatic recurring payment. |
+| FR-BL-07 | Upgrade và downgrade | Thanh toán upgrade thành công có hiệu lực ngay trên subscription hiện tại. Downgrade có hiệu lực từ chu kỳ tiếp theo. |
+| FR-BL-08 | Cancel và expired | Cancel giữ quyền hiện tại đến hết chu kỳ đã thanh toán. Khi expired, backend tạm dừng execution của workflow mới và giữ dữ liệu workflow. |
+| FR-BL-09 | Hết hạn giữ dữ liệu | Hết hạn hoặc hết quota không được xóa workflow, draft, version, credential hoặc lịch sử execution. |
+| FR-BL-10 | Billing Dashboard | Client xem plan hiện tại, trạng thái subscription, quota đã dùng/còn lại, ngày bắt đầu và ngày hết hạn chu kỳ. |
+| FR-BL-11 | Payment History | Client xem lịch sử payment order thuộc tài khoản của mình, bao gồm plan, số tiền, trạng thái, thời gian tạo và thời gian xác nhận; không hiển thị secret của VNPAY. |
+| FR-BL-12 | Admin Billing | Admin có thể xem và quản lý plans, subscriptions, payment orders và doanh thu. Chỉ Admin mới truy cập endpoint quản trị billing. |
+| FR-BL-13 | Phòng chống ghi nhận trùng | Hệ thống phải xử lý payment/IPN trùng hoặc retry idempotently; một payment success chỉ kích hoạt subscription một lần và không tạo dư quota hoặc chu kỳ trùng. |
+
+### Bảng giá MVP
+
+| Plan | Giá/tháng | Executions/tháng |
+|---|---:|---:|
+| Free | 0đ | 100 |
+| Starter | 99.000đ | 1.000 |
+| Pro | 299.000đ | 5.000 |
+| Business | 799.000đ | 20.000 |
+
 ---
 
 ## 4. Yêu cầu phi chức năng
@@ -238,6 +268,9 @@ Các yêu cầu Admin MVP được phân tích trong [Admin analysis](../specs/a
 | NFR-08 | Khả năng quan sát | Execution/node log có trạng thái, timing, input/output và thông tin lỗi đã redacted. MVP trả trạng thái sau synchronous run, không cam kết monitor realtime cho execution nền. |
 | NFR-09 | Khả năng mở rộng | Catalog/schema cho phép thêm node/connector mà không hardcode từng form hoặc dispatch vào core engine. Tăng trưởng log cần được theo dõi; partition/archive là quyết định vận hành tương lai, chưa phải tính năng MVP. |
 | NFR-10 | Khả năng tương thích | Workflow đã publish phải chạy theo version snapshot. Thay đổi executor/schema phải cân nhắc workflow cũ, gồm legacy expression và default config đã được định nghĩa. |
+| NFR-11 | Bảo mật thanh toán | VNPAY secret, checksum key và credentials chỉ lấy từ cấu hình môi trường; không ghi plaintext, phản hồi hoặc log giao dịch bí mật. Xác nhận thanh toán phải kiểm tra IPN/signature và ownership/order integrity. |
+| NFR-12 | Tính nhất quán subscription | Thay đổi subscription, quota, payment order và chu kỳ phải dùng transaction hoặc cơ chế idempotent khi có thể bị race hoặc retry. Không được ghi nhận hai lần một giao dịch thành công. |
+| NFR-13 | Dữ liệu billing | Backend lưu metadata giao dịch cần thiết để audit nhưng không lưu thông tin nhạy cảm ngoài dữ liệu VNPAY được phép. Quyền truy cập payment history tuân theo ownership và role. |
 
 ---
 
@@ -251,6 +284,7 @@ Các bounded context chính:
 - **Connector:** OAuth/API-key credential, encryption và truy xuất credential.
 - **Execution:** tải version, điều phối node, item/expression engine và executor registry.
 - **Logging/Monitoring:** execution record, node logs và kết quả trả cho client.
+- **Billing/Subscription:** plans, subscriptions, quota, payment orders, VNPAY IPN và lịch sử thanh toán.
 
 Frontend dùng feature-based architecture. Designer canvas dùng React Flow; API/server state đi qua service/client và query hooks theo quy ước frontend. Backend là một deployment modular monolith ở MVP; khả năng tách module thành service sau này là mục tiêu kiến trúc, không phải yêu cầu deploy microservice hiện tại.
 
@@ -266,5 +300,6 @@ Các tính năng ngoài phạm vi hoặc hướng phát triển sau:
 - LLM streaming, chat nhiều lượt, tools, ảnh/file, dynamic model discovery, custom OpenAI-compatible base URL, JSON Schema validation tùy biến và chi phí tiền tệ.
 - FlowPilot AI assistant/generate/explain/review/optimize workflow, Human-in-the-loop, AI Debugger, template gallery, local LLM và nhiều workflow engine qua Workflow IR.
 - Connector marketplace hoặc hàng trăm connector dựng sẵn.
+- Annual plan, automatic recurring payment, AI credits, overage billing, organization plan và enterprise billing thuộc giai đoạn sau.
 
 ---
