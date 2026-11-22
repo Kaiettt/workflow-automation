@@ -79,7 +79,9 @@ describe('NodeConfigResolver', () => {
     });
 
     it('throws Error when credential is not found in repository', async () => {
-      repository.resolveCredential.mockResolvedValue(null);
+      repository.resolveCredential.mockRejectedValue(
+        new Error('credential was not found'),
+      );
       const validUuid = '123e4567-e89b-12d3-a456-426614174000';
 
       await expect(
@@ -94,7 +96,6 @@ describe('NodeConfigResolver', () => {
     it('throws Error when credential belongs to a different connector', async () => {
       const validUuid = '123e4567-e89b-12d3-a456-426614174000';
       repository.resolveCredential.mockResolvedValue({
-        id: validUuid,
         connectorKey: 'gmail', // does not match 'google-sheets'
         secret: { token: 'xyz' },
       });
@@ -113,7 +114,6 @@ describe('NodeConfigResolver', () => {
     it('returns decrypted secret when credential matches connector', async () => {
       const validUuid = '123e4567-e89b-12d3-a456-426614174000';
       repository.resolveCredential.mockResolvedValue({
-        id: validUuid,
         connectorKey: 'google-sheets',
         secret: { token: 'valid-secret-token' },
       });
@@ -137,6 +137,7 @@ describe('NodeConfigResolver', () => {
           parsed: true,
           ...(cfg as object),
         })),
+        executeItem: jest.fn().mockResolvedValue({ json: {} }),
       };
 
       const schema = {

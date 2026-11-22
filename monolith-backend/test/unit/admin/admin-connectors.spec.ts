@@ -108,7 +108,12 @@ describe('Admin Connectors API (Slice 5 & 6)', () => {
           reason: 'Bảo trì connector',
           expectedRevision: 1,
         },
-        { id: 'admin-99', email: 'admin@flow.test', role: 'ADMIN' },
+        {
+          id: 'admin-99',
+          email: 'admin@flow.test',
+          name: 'Admin',
+          role: 'ADMIN',
+        },
       );
 
       expect(res.success).toBe(true);
