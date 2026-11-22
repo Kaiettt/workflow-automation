@@ -39,6 +39,9 @@ export class NodeTypeDefinitionResponseDto {
   @ApiProperty()
   isActive: boolean;
 
+  @ApiProperty() isCatalogVisible: boolean;
+  @ApiProperty() isExecutionAllowed: boolean;
+
   @ApiProperty()
   createdAt: Date;
 
@@ -59,6 +62,8 @@ export class NodeTypeDefinitionResponseDto {
     dto.outputSchema = entity.outputSchema;
     dto.connectorId = entity.connectorId;
     dto.isActive = entity.isActive;
+    dto.isCatalogVisible = entity.isCatalogVisible;
+    dto.isExecutionAllowed = entity.isExecutionAllowed;
     dto.createdAt = entity.createdAt as Date;
     dto.updatedAt = entity.updatedAt as Date;
     return dto;

@@ -33,7 +33,7 @@ export function Sidebar() {
     category,
     nodes: nodeTypes.filter(
       (node) =>
-        node.category === category &&
+        node.isCatalogVisible !== false && node.category === category &&
         `${node.displayName} ${node.description ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()),
     ),
   })).filter((group) => group.nodes.length > 0);
@@ -85,6 +85,7 @@ export function Sidebar() {
                 >
                   <NodeIcon icon={node.icon} name={node.displayName} color={node.color || '#6b7280'} />
                   <span className="min-w-0 font-medium leading-tight text-gray-700">{node.displayName}</span>
+                  {node.isExecutionAllowed === false && <Badge variant="destructive">Execution disabled</Badge>}
                   {isDisabled && (
                     <Badge
                       variant="outline"

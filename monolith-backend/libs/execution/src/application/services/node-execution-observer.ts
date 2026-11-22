@@ -1,4 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
+import { NodeTypeDisabledError } from '@app/node-library';
 import { ExecutionRepository } from '../../domain/repositories/execution.repository';
 import { NodeLogRecord } from '../../domain/models/execution.types';
 import { ExecutionStatus } from '../../domain/constants/execution.constants';
@@ -126,6 +127,8 @@ export class NodeExecutionObserver {
       input: items,
       output: error instanceof ItemRunError ? error.summary : null,
       errorMessage: sanitizeErrorText(message),
+      errorCode:
+        error instanceof NodeTypeDisabledError ? error.code : undefined,
       startedAt,
       finishedAt,
     };

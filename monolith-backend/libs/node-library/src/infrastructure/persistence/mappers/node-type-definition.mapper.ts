@@ -6,7 +6,14 @@ import { NodeTypeDefinition } from '../../../domain/entities/node-type-definitio
 import { NodeCategory } from '../../../domain/enums/node-category.enum';
 
 export class NodeTypeDefinitionMapper {
-  static toDomain(raw: PrismaNodeTypeDefinition): NodeTypeDefinition {
+  static toDomain(
+    raw: PrismaNodeTypeDefinition & {
+      policy?: {
+        isCatalogVisible: boolean;
+        isExecutionAllowed: boolean;
+      } | null;
+    },
+  ): NodeTypeDefinition {
     return new NodeTypeDefinition(
       raw.id,
       raw.key,
@@ -22,6 +29,8 @@ export class NodeTypeDefinitionMapper {
       raw.connectorId,
       raw.createdAt,
       raw.updatedAt,
+      raw.policy?.isCatalogVisible ?? true,
+      raw.policy?.isExecutionAllowed ?? true,
     );
   }
 

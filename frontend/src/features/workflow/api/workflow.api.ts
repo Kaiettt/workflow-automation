@@ -52,6 +52,10 @@ export const workflowApi = {
     return res.data.data;
   },
 
+  getNodeMetadata: async (keys: string[], signal?: AbortSignal): Promise<NodeTypeDefinition[]> => {
+    const res = await apiClient.get<{ data: NodeTypeDefinition[] }>('/api/node-types/metadata', { params: { keys: keys.join(',') }, signal });
+    return res.data.data;
+  },
   getNodeTypes: async (): Promise<NodeTypeDefinition[]> => {
     const res = await apiClient.get<{ data: NodeTypeDefinition[] }>(
       '/api/node-types',

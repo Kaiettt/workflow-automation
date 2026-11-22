@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 
-Tiến độ: P0 (G0–G3: Role, User Management, Dashboard) đã triển khai và nghiệm thu thực tế theo PR #39. P1 (G4: Connector Policy, G5: Node Type Management, G6: Execution Monitoring, G7: Audit Log Viewer) đã hoàn tất đặc tả chi tiết và sẵn sàng triển khai. Xem chi tiết: [analysis](analysis.md), [design](design.md), [plan](plan.md), [task](task.md), [validation](validation.md), [operations](operations.md).
+Tiến độ: P0 (G0–G3: Role, User Management, Dashboard) đã triển khai và nghiệm thu thực tế theo PR #39. G5 (Node Type Management) đã triển khai; xem [bằng chứng kiểm tra và giới hạn](5.node-type-management/task.md). Các đặc tả P1 còn lại (G4, G6, G7) được theo dõi trong checklist riêng. Xem chi tiết: [analysis](analysis.md), [design](design.md), [plan](plan.md), [task](task.md), [validation](validation.md), [operations](operations.md).
 
 ## 1. Mục tiêu và nguồn yêu cầu
 

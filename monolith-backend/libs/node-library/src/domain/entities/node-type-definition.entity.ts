@@ -16,5 +16,7 @@ export class NodeTypeDefinition {
     public readonly connectorId?: string | null,
     public readonly createdAt?: Date,
     public readonly updatedAt?: Date,
+    public readonly isCatalogVisible: boolean = true,
+    public readonly isExecutionAllowed: boolean = true,
   ) {}
 }

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { NodeTypePolicyPort, NodeTypeDisabledError } from '@app/node-library';
 import { ExecutionRepository } from '../../domain/repositories/execution.repository';
 import { NodeLogRecord } from '../../domain/models/execution.types';
 import { ExecutionStatus } from '../../domain/constants/execution.constants';
@@ -64,6 +65,10 @@ export class NodeRunner {
     perItemStrategy?: PerItemExecutionStrategy,
     @Inject('NODE_EXECUTORS_MAP')
     executorsMap?: ReadonlyMap<string, INodeExecutor>,
+    private readonly nodeTypePolicy?: Pick<
+      NodeTypePolicyPort,
+      'isExecutionAllowed'
+    >,
   ) {
     // Injected DI signature: (configResolver, observer, onceStrategy, perItemStrategy, executorsMap)
     if (
@@ -98,6 +103,7 @@ export class NodeRunner {
     repository: ExecutionRepository,
     executors: ReadonlyMap<string, INodeExecutor> | INodeExecutor[],
     eventPublisher?: ExecutionEventPublisher,
+    policy?: Pick<NodeTypePolicyPort, 'isExecutionAllowed'>,
   ): NodeRunner {
     const executorsMap =
       executors instanceof Map
@@ -109,7 +115,14 @@ export class NodeRunner {
     const observer = new NodeExecutionObserver(repository, eventPublisher);
     const once = new OnceExecutionStrategy(resolver);
     const perItem = new PerItemExecutionStrategy(resolver);
-    return new NodeRunner(resolver, observer, once, perItem, executorsMap);
+    return new NodeRunner(
+      resolver,
+      observer,
+      once,
+      perItem,
+      executorsMap,
+      policy,
+    );
   }
 
   async run(params: NodeRunParams): Promise<NodeRunResult> {
@@ -117,6 +130,12 @@ export class NodeRunner {
     await this.observer.notifyStarted(params, startedAt);
 
     try {
+      if (
+        this.nodeTypePolicy &&
+        !(await this.nodeTypePolicy.isExecutionAllowed(params.node.data.key))
+      ) {
+        throw new NodeTypeDisabledError(params.node.data.key);
+      }
       const executor = this.executors.get(params.node.data?.key);
       if (!executor) {
         throw new Error(

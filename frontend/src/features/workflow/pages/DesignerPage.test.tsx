@@ -16,6 +16,10 @@ vi.mock('../services/workflow.service', () => ({
     workflowService: mockWorkflowService,
 }));
 
+vi.mock('../api/workflow.api', () => ({
+    workflowApi: { getNodeMetadata: vi.fn().mockResolvedValue([]) },
+}));
+
 vi.mock('../components/DesignerLayout', () => ({
     DesignerLayout: ({
         nodes,

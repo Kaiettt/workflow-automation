@@ -131,6 +131,7 @@ export function PropertiesPanel({
 
   return (
     <aside className={PANEL_CLASS}>
+      {nodeType.isExecutionAllowed === false && <p role="status" className="bg-amber-50 p-3 text-sm text-amber-900">Loại node này đã bị tạm ngưng thực thi. Bạn vẫn có thể chỉnh sửa cấu hình.</p>}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-primary uppercase tracking-wider">{nodeType.displayName}</p>

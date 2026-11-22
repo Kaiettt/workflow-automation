@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NodeLibraryModule, NodeTypePolicyPort } from '@app/node-library';
 import { CqrsModule } from '@nestjs/cqrs';
 import { PrismaModule } from '@app/database';
 import { AuthModule } from '@app/auth';
@@ -57,6 +58,7 @@ import { NodeRunner } from './application/services/node-runner';
     PrismaModule,
     AuthModule,
     AppsModule,
+    NodeLibraryModule,
     ...executionQueueImports,
   ],
   controllers: [ExecutionController],
@@ -168,6 +170,7 @@ import { NodeRunner } from './application/services/node-runner';
         onceStrategy: OnceExecutionStrategy,
         perItemStrategy: PerItemExecutionStrategy,
         executorsMap: ReadonlyMap<string, INodeExecutor>,
+        policy: NodeTypePolicyPort,
       ) =>
         new NodeRunner(
           configResolver,
@@ -175,6 +178,7 @@ import { NodeRunner } from './application/services/node-runner';
           onceStrategy,
           perItemStrategy,
           executorsMap,
+          policy,
         ),
       inject: [
         NodeConfigResolver,
@@ -182,6 +186,7 @@ import { NodeRunner } from './application/services/node-runner';
         OnceExecutionStrategy,
         PerItemExecutionStrategy,
         'NODE_EXECUTORS_MAP',
+        NodeTypePolicyPort,
       ],
     },
     {

@@ -18,7 +18,14 @@ export interface ConnectorFilter {
   isActive?: boolean;
   allowNewCredentials?: boolean;
 }
+import type {
+  NodeTypeFilter,
+  NodeTypeAdminPage,
+  NodeTypeAdminDetail,
+} from './node-type-admin.types';
 export abstract class AdminReadPort {
+  abstract nodeTypes(filter: NodeTypeFilter): Promise<NodeTypeAdminPage>;
+  abstract nodeType(key: string): Promise<NodeTypeAdminDetail>;
   abstract users(filter: UserFilter): Promise<unknown>;
   abstract user(id: string): Promise<unknown>;
   abstract workflows(id: string, filter: UserFilter): Promise<unknown>;
