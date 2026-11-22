@@ -4,7 +4,6 @@
 #   1. lint + typecheck      (phân tích tĩnh)
 #   2. test                  (unit + integration + coverage)
 #   3. security              (quét secret + quét phụ thuộc)
-#   4. notify                (cảnh báo khi CI lỗi trên master)
 #
 # CD nằm ở file cd.yml và chỉ chạy khi workflow "CI" này xanh trên master.
 # Không đổi `name: CI` nếu chưa sửa `workflows:` trong cd.yml.
