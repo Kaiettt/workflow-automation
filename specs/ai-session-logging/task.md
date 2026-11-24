@@ -123,6 +123,25 @@ Only the separate protected Antigravity hook update remains from the original se
 - Frontend checks passed in the preceding cache-test fix (57 files/186 tests,
   lint/type-check/build); application code was not changed by this tooling fix.
 
+### Follow-up after 91bad74d (fix ci)
+
+- The user committed/pushed the fixes as 91bad74d. CI now skips PR comments,
+  but still scans the earlier a356e231 and 9ec0ad6c commits. REDACTED in the
+  report is scanner output masking, not evidence that those commits are clean.
+- Replayed the exact CI range with Gitleaks 8.24.3 detect, --no-merges,
+  --first-parent and --exit-code=2: 5 commits, 12 findings, exit 2.
+- Updated review/pr44-sanitized to a5af10ad by preserving the complete tree,
+  author/committer metadata and message of 91bad74d, including its committed
+  runtime transcripts, and attaching it to the four sanitized predecessors.
+  The latest commit tree is byte-for-byte identical to 91bad74d.
+- Scanned e045afd3..review/pr44-sanitized with the same CI version/options,
+  default rules and no allowlist: 5 commits, approximately 76.01 MB, no leaks,
+  exit 0. Logging/CI/frontend source and tests match the already validated fixes;
+  lint/type-check/build/unit tests were not repeated for this history-only update.
+- Applying this prepared history to PR #44 still requires approval for a
+  force-with-lease push against remote head 91bad74d. Credential key rotation
+  remains outstanding and is not replaced by history cleanup.
+
 ## Other collection limits
 
 Only output actually exported by clients can be collected. Cursor workspace-folder
