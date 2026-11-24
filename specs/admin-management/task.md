@@ -123,18 +123,18 @@ P0 (G0–G3) đã hoàn thành và nghiệm thu thực tế theo PR #39; P1 (G4�
 
 ## G7 — Trình tra cứu Nhật ký Quản trị - Audit Log Viewer (P1 Mới)
 
-- [ ] G7.1 **Audit Action Alignment**: Đảm bảo tất cả 6 action (`USER_SUSPENDED`, `USER_REACTIVATED`, `USER_ROLE_CHANGED`, `ADMIN_BOOTSTRAPPED`, `CONNECTOR_POLICY_CHANGED`, `NODE_TYPE_STATUS_CHANGED`) ghi nhận đúng format và whitelist fields.
-- [ ] G7.2 **Admin Audit Query Implementation**:
+- [x] G7.1 **Audit Action Alignment**: Writers hiện có cho sáu action; projection whitelist tương thích dữ liệu cũ và coverage rollback/no-op. Bằng chứng: [G7 task](7.audit-log-viewer/task.md).
+- [x] G7.2 **Admin Audit Query Implementation**:
   - Triển khai `AdminReadPort.auditEvents()` và `AdminReadPort.auditEvent(id)` có join thông tin actor (`name`, `email`) và target.
   - Hỗ trợ lọc theo `actorId`, `actorType`, `action`, `targetType`, `targetId`, `from`, `to`. Sắp xếp giảm dần (`createdAt desc`, `id desc`).
-- [ ] G7.3 **Presentation Endpoints**: Thêm `GET /api/admin/audit-events` và `GET /api/admin/audit-events/:id` trong `AdminController`.
-- [ ] G7.4 **Frontend Service & Types**: Cập nhật `admin.types.ts` và `admin.service.ts` với audit DTOs và methods.
-- [ ] G7.5 **Frontend Components**:
+- [x] G7.3 **Presentation Endpoints**: Thêm `GET /api/admin/audit-events` và `GET /api/admin/audit-events/:id` trong `AdminController`.
+- [x] G7.4 **Frontend Service & Types**: Cập nhật `admin.types.ts` và `admin.service.ts` với audit DTOs và methods.
+- [x] G7.5 **Frontend Components**:
   - Tạo `AuditEventFilterBar.tsx` (bộ lọc actor, action, target, thời gian).
   - Tạo `AuditEventTable.tsx` (danh sách sự kiện, badges hành động, thời gian UTC/local).
   - Tạo `AuditDiffDialog.tsx` (hiển thị đối chiếu Before vs After JSON theo định dạng trực quan).
-- [ ] G7.6 **Frontend Page**: Tạo `AuditEventsPage.tsx` tích hợp bảng kiểm toán, bộ lọc, phân trang và dialog xem diff chi tiết.
-- [ ] G7.7 **Kiểm thử G7**: Viết unit & integration tests cho AC-09, AC-27, AC-28 (bất biến dữ liệu, truy vấn diff, atomic rollback).
+- [x] G7.6 **Frontend Page**: Tạo `AuditEventsPage.tsx` tích hợp bảng kiểm toán, bộ lọc, phân trang và dialog xem diff chi tiết.
+- [x] G7.7 **Kiểm thử G7**: API chỉ đọc, projection/diff, auth, lifecycle và atomic rollback đã kiểm tra; phạm vi database immutability và bằng chứng ở [G7 task](7.audit-log-viewer/task.md).
 
 ---
 

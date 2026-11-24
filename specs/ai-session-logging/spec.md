@@ -25,6 +25,11 @@ activity, then explicitly confirmed implementation.
 - AIS-07: Given credentials or unavailable/abbreviated output, when persisted,
   then credentials are masked, hidden reasoning is omitted, and missing native
   data is identified honestly.
+- AIS-08: Given a stale ownership file whose PID now belongs to an unrelated
+  live process, when status/start/stop runs, then the process is not treated as
+  the collector, a new collector can claim the workspace, logs resume and the
+  unrelated process is never stopped. Verify PID, command/workspace and process
+  creation identity rather than PID existence alone.
 
 Support Antigravity, Codex, Claude Code and Cursor through verified hooks or
 readable native transcripts. Closed apps/websites need an export integration.

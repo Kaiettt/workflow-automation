@@ -1,6 +1,9 @@
 import { apiClient } from '@/shared/api/http-client';
 import type {
   Account,
+  AdminAuditFilter,
+  AdminAuditSummary,
+  AdminAuditDetail,
   AdminExecutionFilter,
   AdminExecutionSummary,
   AdminExecutionDetail,
@@ -22,6 +25,12 @@ import type {
 
 interface Envelope<T> { success: boolean; data: T; }
 export const adminService = {
+  async auditEvents(filter: AdminAuditFilter, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<Page<AdminAuditSummary>>>('/api/admin/audit-events', { params: filter, signal })).data.data;
+  },
+  async auditEvent(id: string, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<AdminAuditDetail>>(`/api/admin/audit-events/${encodeURIComponent(id)}`, { signal })).data.data;
+  },
   async executions(filter: AdminExecutionFilter, signal?: AbortSignal) {
     return (await apiClient.get<Envelope<Page<AdminExecutionSummary>>>('/api/admin/executions', { params: filter, signal })).data.data;
   },

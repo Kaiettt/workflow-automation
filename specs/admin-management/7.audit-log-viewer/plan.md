@@ -1,6 +1,6 @@
 # Kế hoạch Triển khai: Trình tra cứu Nhật ký Quản trị (Audit Log Viewer)
 
-Status: ready-for-agent (P1)
+Status: implemented (P1, 2026-11-24)
 
 ## 1. Mục tiêu và Phạm vi
 Giai đoạn G7 triển khai API tra cứu và màn hình giao diện hiển thị lịch sử kiểm toán toàn diện cho Quản trị viên, phục vụ giải trình và giám sát thay đổi hệ thống.
@@ -31,3 +31,11 @@ Giai đoạn G7 triển khai API tra cứu và màn hình giao diện hiển th�
 - Viết unit test cho DTO validation và query filter.
 - Viết integration test xác nhận join actor thông tin và tính bất biến (không có mutation/delete endpoints).
 - Viết frontend test kiểm tra render diff Before vs After và xử lý phân trang.
+
+## 3. Lát cắt BDD/TDD
+
+1. List metadata/filter/owner lookup: Red HTTP/PostgreSQL cho endpoint thiếu, Green typed projection.
+2. Detail: Red privacy/snapshot/missing lookup, Green whitelist projection và 404; auth/validation/read-only tests.
+3. Connector rollback: failure injection trên PostgreSQL riêng, verify state và event qua APIs; chạy lại account/node/bootstrap regressions.
+4. UI: Red polling/list/dialog/diff, Green từng slice; reuse Admin abstractions hiện có.
+5. Lint/type-check/tests/build cả backend/frontend, đồng bộ task evidence; không claim TDD khi setup failure.

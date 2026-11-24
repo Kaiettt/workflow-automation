@@ -8,15 +8,15 @@
     {
       "id": "user:36f2ec7c-0e29-4655-a18f-8678b285e8a5:0",
       "kind": "user",
-      "content": "xin chao",
       "timestamp": "2026-10-17T03:49:14.629Z",
+      "content": "xin chao",
       "order": 2
     },
     {
       "id": "user:fac31716-152e-4253-8a91-f98e0bd08b1b:0",
       "kind": "user",
-      "content": "[Request interrupted by user]",
       "timestamp": "2026-10-17T03:51:11.177Z",
+      "content": "[Request interrupted by user]",
       "order": 25
     }
   ],

@@ -39,12 +39,15 @@ reasoning nội bộ provider. Ảnh tool lưu ở `assets/`.
 
 File mới: `session-<provider>-<full-id>.md/.json`. Hỗ trợ `latest.md` và alias
 Antigravity cũ. Diagnostics, ownership và backup hook ở `.state/`.
-Log mới được Git ignore; file đã tracking trước đây vẫn giữ tracking.
+Trạng thái tracking của log theo cấu hình Git của repo; file đã tracking trước
+đây vẫn giữ tracking.
 
 Kiểm tra: `npm run lint:ai-sessions`, `npm run typecheck:ai-sessions`,
 `npm run test:ai-sessions`, `npm run build:ai-sessions`.
 Runtime không cần package mới; kiểm tra dùng dev dependencies có sẵn.
 
-Trạng thái triển khai: collector hiện đang chạy, hook Claude đã cài.
-Auto-review chặn bước cập nhật `.agents` và đăng ký task Windows; chạy
-`npm run logs:setup` trong terminal của bạn để hoàn tất bước đó.
+Collector đã khôi phục ngày 2026-11-24 và task tự chạy khi đăng nhập Windows đã
+đăng ký/chạy thử. Status/start/stop xác minh PID thuộc đúng collector, command,
+workspace và thời điểm tạo process; PID được Windows tái sử dụng không chặn start.
+Hook Claude đã cài. Bước cập nhật hook Antigravity trong `.agents` từng bị
+auto-review chặn; native transcript collection vẫn hoạt động độc lập với bước đó.

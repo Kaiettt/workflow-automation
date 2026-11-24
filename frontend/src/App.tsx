@@ -9,6 +9,7 @@ import { ConnectorsPage } from './features/admin/pages/ConnectorsPage';
 import { NodeTypesPage } from './features/admin/pages/NodeTypesPage';
 import { ExecutionsPage } from './features/admin/pages/ExecutionsPage';
 import { ExecutionDetailPage } from './features/admin/pages/ExecutionDetailPage';
+import { AuditEventsPage } from './features/admin/pages/AuditEventsPage';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { HomePage } from './features/home/pages/HomePage';
 import { DesignerPage } from './features/workflow/pages/DesignerPage';
@@ -72,6 +73,7 @@ function App() {
             <Route path="node-types" element={<NodeTypesPage />} />
             <Route path="executions" element={<ExecutionsPage />} />
             <Route path="executions/:id" element={<ExecutionDetailPage />} />
+            <Route path="audit-events" element={<AuditEventsPage />} />
           </Route>
         </Route>
         <Route path="/" element={<LegacyWorkflowRedirect />} />

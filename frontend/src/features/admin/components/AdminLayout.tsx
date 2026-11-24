@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { ArrowLeft, Blocks, Cable, LayoutDashboard, Shield, UsersRound, Activity } from 'lucide-react';
+import { ArrowLeft, Blocks, Cable, LayoutDashboard, Shield, UsersRound, Activity, History } from 'lucide-react';
 
 import { AppHeader } from '@/components/layout/AppHeader';
 import { FlowPilotBrand } from '@/components/layout/FlowPilotBrand';
@@ -35,6 +35,7 @@ export function AdminLayout() {
             { to: '/admin/connectors', label: 'Connectors', icon: Cable, end: false },
             { to: '/admin/node-types', label: 'Node Types', icon: Blocks, end: false },
             { to: '/admin/executions', label: 'Executions', icon: Activity, end: false },
+            { to: '/admin/audit-events', label: 'Nhật ký quản trị', icon: History, end: false },
           ].map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => cn('inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 py-3.5 text-xs font-medium transition-colors', isActive ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
               <item.icon className="size-3.5" /> {item.label}

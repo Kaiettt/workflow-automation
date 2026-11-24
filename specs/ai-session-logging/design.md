@@ -38,5 +38,9 @@ This enables exact repo-only discovery before legacy Stop logging. Search both
 modern and IDE brain roots for matched IDs. Keep original databases untouched.
 Background polling caches changed transcript/sidecar signatures. It repairs
 latest.md from the durable canonical Markdown if a legacy writer replaces it.
-User-level scheduled-task installation is prepared but currently blocked by
-automatic escalation-review failure; the current hidden collector is running.
+User-level scheduled task was installed and its action tested on 2026-11-24.
+Collector ownership checks verify the OS process command and creation identity,
+not merely PID existence. A reused PID cannot impersonate the watcher or block
+recovery; stale ownership removal is serialized with the existing store lock.
+If a live process cannot be inspected, preserve its ownership state and report
+the verification failure. Never signal unrelated processes.

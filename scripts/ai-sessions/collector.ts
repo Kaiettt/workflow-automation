@@ -8,6 +8,7 @@ import { atomicWrite, errorText, filename, list, provider, readJson, record, tex
 import { discover } from './discovery.ts';
 import { readSession } from './transcripts.ts';
 import { registerSource, refreshLatest, restoreSavedSession, saveSession, withStoreLock } from './store.ts';
+import { isCollectorProcess } from './collector-process.ts';
 import type { CollectOptions, Provider, Source } from './types.ts';
 
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), path.basename(path.dirname(fileURLToPath(import.meta.url))) === 'dist' ? '../../..' : '../..');
@@ -128,6 +129,9 @@ function alive(pid: number): boolean {
     throw error;
   }
 }
+function activeCollector(value: Owner | undefined, workspace: string): boolean {
+  return !!value && alive(value.pid) && isCollectorProcess(value, workspace);
+}
 
 async function watch(options: CollectOptions, interval: number): Promise<void> {
   const file = ownerFile(options.workspace);
@@ -148,11 +152,13 @@ async function watch(options: CollectOptions, interval: number): Promise<void> {
         await delay(50);
         continue;
       }
-      if (existing && alive(existing.pid)) {
+      if (existing && activeCollector(existing, options.workspace)) {
         process.stdout.write(JSON.stringify({ running: true, alreadyRunning: true, pid: existing.pid }) + '\n');
         return;
       }
-      if (fs.existsSync(file)) fs.unlinkSync(file);
+      await withStoreLock(options.workspace, () => {
+        if (existing && owner(options.workspace)?.token === existing.token && fs.existsSync(file)) fs.unlinkSync(file);
+      });
     }
   }
   if (!ownership) throw new Error('Collector startup is busy; retry later');
@@ -206,13 +212,15 @@ export async function main(args: string[]): Promise<void> {
     const file = path.join(workspace, 'logs/ai-sessions/.state/status.json');
     const saved = fs.existsSync(file) ? readJson(file) : {};
     const active = owner(workspace);
-    process.stdout.write(JSON.stringify({ ...(record(saved) ? saved : {}), workspace, running: !!active && alive(active.pid), collectorPid: active?.pid ?? null }) + '\n');
+    const running = activeCollector(active, workspace);
+    process.stdout.write(JSON.stringify({ ...(record(saved) ? saved : {}), workspace, running, collectorPid: running ? active?.pid ?? null : null, staleOwnership: !!active && !running }) + '\n');
     return;
   }
   if (args.includes('--stop')) {
     const active = owner(workspace);
-    if (active && alive(active.pid)) atomicWrite(path.join(workspace, 'logs/ai-sessions/.state/stop.json'), JSON.stringify({ token: active.token }));
-    process.stdout.write(JSON.stringify({ stopRequested: !!active && alive(active.pid) }) + '\n');
+    const running = activeCollector(active, workspace);
+    if (active && running) atomicWrite(path.join(workspace, 'logs/ai-sessions/.state/stop.json'), JSON.stringify({ token: active.token }));
+    process.stdout.write(JSON.stringify({ stopRequested: running }) + '\n');
     return;
   }
   const sourcePath = option(args, '--source');

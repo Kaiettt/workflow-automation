@@ -25,7 +25,7 @@ Cấu trúc được chia nhỏ thành các thư mục đặc tả thành phần
    - [spec.md](5.node-type-management/spec.md) | [design.md](5.node-type-management/design.md) | [plan.md](5.node-type-management/plan.md) | [task.md](5.node-type-management/task.md)
 6. [6.execution-monitoring/](6.execution-monitoring/): **Đã triển khai (2026-11-24)**; bằng chứng kiểm tra và giới hạn ở [task.md](6.execution-monitoring/task.md). Giám sát thực thi toàn nền tảng, bộ lọc đa chiều, projection metadata an toàn, bảng node logs, giao diện chỉ đọc và visible-only polling 30 giây.
    - [spec.md](6.execution-monitoring/spec.md) | [design.md](6.execution-monitoring/design.md) | [plan.md](6.execution-monitoring/plan.md) | [task.md](6.execution-monitoring/task.md)
-7. [7.audit-log-viewer/](7.audit-log-viewer/): Trình tra cứu nhật ký kiểm toán quản trị, bộ lọc actor/action/target/thời gian, phân trang và sắp xếp mới nhất trước, hiển thị trực quan bảng đối chiếu Diff Before vs After các trường whitelist, tính bất biến 100% (không có API sửa/xóa), ghi nhận atomic cùng transaction mutation.
+7. [7.audit-log-viewer/](7.audit-log-viewer/): **Đã triển khai (2026-11-24)**; bằng chứng và giới hạn ở [task.md](7.audit-log-viewer/task.md). Tra cứu audit theo actor/action/target/thời gian, phân trang, diff whitelist tương thích lịch sử, API chỉ đọc và coverage atomic rollback.
    - [spec.md](7.audit-log-viewer/spec.md) | [design.md](7.audit-log-viewer/design.md) | [plan.md](7.audit-log-viewer/plan.md) | [task.md](7.audit-log-viewer/task.md)
 
 ---

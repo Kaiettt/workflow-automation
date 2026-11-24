@@ -14,11 +14,12 @@ interface DashboardRangeFilterProps {
   filter: DashboardFilter;
   rollingDays?: number;
   updatedAt?: string;
+  activityLabel?: string;
   onPreset: (days: number) => void;
   onApply: (filter: DashboardFilter) => void;
 }
 
-export function DashboardRangeFilter({ filter, rollingDays, updatedAt, onPreset, onApply }: DashboardRangeFilterProps) {
+export function DashboardRangeFilter({ filter, rollingDays, updatedAt, onPreset, onApply, activityLabel = 'Execution activity' }: DashboardRangeFilterProps) {
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState(() => localDateTimeInput(new Date(filter.from)));
   const [to, setTo] = useState(() => localDateTimeInput(new Date(filter.to)));
@@ -42,8 +43,8 @@ export function DashboardRangeFilter({ filter, rollingDays, updatedAt, onPreset,
       <Card className="overflow-hidden shadow-none">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-2 text-xs font-medium"><CalendarRange className="size-4 text-muted-foreground" />Execution activity</span>
-            <div role="group" aria-label="Execution date range" className="flex items-center gap-1 rounded-lg bg-muted p-1">
+            <span className="inline-flex items-center gap-2 text-xs font-medium"><CalendarRange className="size-4 text-muted-foreground" />{activityLabel}</span>
+            <div role="group" aria-label={activityLabel === 'Execution activity' ? 'Execution date range' : `${activityLabel} date range`} className="flex items-center gap-1 rounded-lg bg-muted p-1">
               {[{ label: '24 hours', days: 1 }, { label: '7 days', days: 7 }, { label: '30 days', days: 30 }].map((preset) => (
                 <Button key={preset.days} size="sm" variant={rollingDays === preset.days ? 'default' : 'ghost'} aria-pressed={rollingDays === preset.days} className="h-7 px-3 text-xs" onClick={() => onPreset(preset.days)}>{preset.label}</Button>
               ))}
@@ -67,7 +68,7 @@ export function DashboardRangeFilter({ filter, rollingDays, updatedAt, onPreset,
           <form onSubmit={applyRange} className="space-y-5">
             <DialogHeader>
               <DialogTitle>Custom date range</DialogTitle>
-              <DialogDescription>Select up to 90 days of execution activity. The end time is excluded.</DialogDescription>
+              <DialogDescription>Select a date range of up to 90 days. The end time is excluded.</DialogDescription>
             </DialogHeader>
             <div className="space-y-2"><Label htmlFor="dashboard-from">From</Label><Input id="dashboard-from" type="datetime-local" required value={from} onChange={(event) => setFrom(event.target.value)} /></div>
             <div className="space-y-2"><Label htmlFor="dashboard-to">To</Label><Input id="dashboard-to" type="datetime-local" required value={to} onChange={(event) => setTo(event.target.value)} /></div>
