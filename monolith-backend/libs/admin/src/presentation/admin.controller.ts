@@ -34,11 +34,17 @@ import {
 } from './admin-mutation-fields.guard';
 import { AdminReadQuery } from '../application/admin-read.query';
 import type {
+  AdminAuditPage,
+  AdminAuditDetail,
+} from '../application/admin-audit.types';
+import { adminListRange } from './admin-read-validation';
+import type {
   AdminExecutionPage,
   AdminExecutionDetail,
 } from '../application/admin-execution.types';
 import {
   ActiveDto,
+  AdminAuditFilterDto,
   AdminExecutionFilterDto,
   NodeTypesDto,
   NodeTypeKeyDto,
@@ -67,17 +73,31 @@ export class AdminController {
     private readonly queries: QueryBus,
     private readonly commands: CommandBus,
   ) {}
+  @Get('audit-events')
+  async auditEvents(@Query() query: AdminAuditFilterDto) {
+    const range = adminListRange(query);
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, AdminAuditPage>(
+        new AdminReadQuery({
+          kind: 'auditEvents',
+          filter: { ...query, ...range },
+        }),
+      ),
+    };
+  }
+  @Get('audit-events/:id')
+  async auditEvent(@Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.queries.execute<
+      AdminReadQuery,
+      AdminAuditDetail | null
+    >(new AdminReadQuery({ kind: 'auditEvent', id }));
+    if (!data) throw new NotFoundException('Audit event not found');
+    return { success: true, data };
+  }
   @Get('executions')
   async executions(@Query() query: AdminExecutionFilterDto) {
-    const offset = (query.page - 1) * query.pageSize;
-    if (!Number.isSafeInteger(offset) || offset > 2147483647)
-      throw new BadRequestException('Requested page is too large');
-    const to = query.to ? new Date(query.to) : new Date();
-    const from = query.from
-      ? new Date(query.from)
-      : new Date(to.getTime() - 7 * 86400000);
-    if (from >= to || to.getTime() - from.getTime() > 90 * 86400000)
-      throw new BadRequestException('Select a valid range of up to 90 days');
+    const { from, to } = adminListRange(query);
     return {
       success: true,
       data: await this.queries.execute<AdminReadQuery, AdminExecutionPage>(

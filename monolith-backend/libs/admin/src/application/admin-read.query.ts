@@ -8,7 +8,10 @@ import type {
 
 import type { NodeTypeFilter } from './node-type-admin.types';
 import type { AdminExecutionFilter } from './admin-execution.types';
+import type { AdminAuditFilter } from './admin-audit.types';
 type AdminReadRequest =
+  | { kind: 'auditEvents'; filter: AdminAuditFilter }
+  | { kind: 'auditEvent'; id: string }
   | { kind: 'executions'; filter: AdminExecutionFilter }
   | { kind: 'execution'; id: string }
   | { kind: 'nodeTypes'; filter: NodeTypeFilter }
@@ -28,6 +31,10 @@ export class AdminReadHandler implements IQueryHandler<AdminReadQuery> {
   execute(query: AdminReadQuery): Promise<unknown> {
     const request = query.request;
     switch (request.kind) {
+      case 'auditEvents':
+        return this.reads.auditEvents(request.filter);
+      case 'auditEvent':
+        return this.reads.auditEvent(request.id);
       case 'executions':
         return this.reads.executions(request.filter);
       case 'execution':

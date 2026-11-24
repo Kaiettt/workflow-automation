@@ -28,7 +28,14 @@ import type {
   AdminExecutionPage,
   AdminExecutionDetail,
 } from './admin-execution.types';
+import type {
+  AdminAuditFilter,
+  AdminAuditPage,
+  AdminAuditDetail,
+} from './admin-audit.types';
 export abstract class AdminReadPort {
+  abstract auditEvents(filter: AdminAuditFilter): Promise<AdminAuditPage>;
+  abstract auditEvent(id: string): Promise<AdminAuditDetail | null>;
   abstract executions(
     filter: AdminExecutionFilter,
   ): Promise<AdminExecutionPage>;
