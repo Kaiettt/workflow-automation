@@ -114,7 +114,8 @@ export function saveSession(session: Session): { changed: boolean; file: string;
   const output = path.join(session.workspace, 'logs/ai-sessions');
   const base = 'session-' + session.provider + '-' + filename(session.sessionId);
   const dataPath = path.join(output, base + '.json');
-  const previous = fs.existsSync(dataPath) ? storedSession(readJson(dataPath)) : undefined;
+  const previousRaw = fs.existsSync(dataPath) ? readJson(dataPath) : undefined;
+  const previous = previousRaw === undefined ? undefined : storedSession(previousRaw);
   const merged = new Map(previous?.events.map(event => [event.id, event]) ?? []);
   for (const event of session.events) {
     const old = merged.get(event.id);
@@ -123,14 +124,16 @@ export function saveSession(session: Session): { changed: boolean; file: string;
       ...(mergeData(old.data, event.data) !== undefined ? { data: mergeData(old.data, event.data) } : {}) } : event);
   }
   const result: Session = { ...session, model: session.model === 'auto' ? previous?.model ?? session.model : session.model,
-    events: [...merged.values()].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), sources: [...new Set([...(previous?.sources ?? []), ...session.sources])],
+    events: [...merged.values()].map(event => ({ ...event, content: redactText(event.content) })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), sources: [...new Set([...(previous?.sources ?? []), ...session.sources])],
     warnings: [...new Set(session.warnings)],
     modifiedAt: session.modifiedAt > (previous?.modifiedAt ?? '') ? session.modifiedAt : previous?.modifiedAt ?? session.modifiedAt };
   if (result.events.length === 0) return { changed: false, file: dataPath, events: 0 };
   const encoded = JSON.stringify(result, null, 2) + '\n';
-  const changed = !previous || JSON.stringify(previous, null, 2) + '\n' !== encoded;
+  const changed = !previous || JSON.stringify(previousRaw, null, 2) + '\n' !== encoded;
   const md = markdown(result);
-  if (changed) { atomicWrite(dataPath, encoded); atomicWrite(path.join(output, base + '.md'), md); }
+  if (changed) atomicWrite(dataPath, encoded);
+  const markdownPath = path.join(output, base + '.md');
+  if (!fs.existsSync(markdownPath) || fs.readFileSync(markdownPath, 'utf8') !== md) atomicWrite(markdownPath, md);
   if (result.provider === 'antigravity') {
     const alias = path.join(output, 'session-' + filename(result.sessionId.slice(0, 8)) + '.md');
     const oldAlias = fs.existsSync(alias) ? fs.readFileSync(alias, 'utf8') : '';

@@ -14,3 +14,13 @@ Status: completed (PR #39)
 - [x] G2.10 Xây dựng `UsersPage.tsx` có bộ lọc, tìm kiếm, phân trang và badge trạng thái.
 - [x] G2.11 Xây dựng `UserDetailPage.tsx` và `AccountChangeDialog.tsx` có form lý do (5–500 ký tự), xác nhận và xử lý xung đột `409`.
 - [x] G2.12 Viết unit và integration tests kiểm chứng AC-UM-01 đến AC-UM-07 (tra cứu, counts, concurrency, cancellation gate, audit atomic).
+
+## Kiểm chứng bổ sung: đồng bộ test với cập nhật cache (2026-11-25)
+
+- [x] Tái hiện lỗi thiếu nút `Change to Client` bằng cập nhật cache trong `act` đồng bộ và assertion tức thời; test thất bại đúng với `TestingLibraryElementError`.
+- [x] Chờ các nút sau cập nhật cache bằng `findByRole`; giữ các assertion chặn tự sửa tài khoản và nâng quyền tài khoản inactive, cùng assertion cho phép hạ quyền Admin inactive. Không thay đổi logic ứng dụng.
+- [x] Test hồi quy: `node node_modules/vitest/vitest.mjs run --environment jsdom --maxWorkers=1 src/features/admin/pages/UserDetailPage.test.tsx -t 'blocks self changes and promotion of an inactive account'` — 1 passed, 3 skipped.
+- [x] `npm run build` trong `frontend` — lint (`prebuild`), type-check (`tsc -b`) và Vite build đều qua; còn cảnh báo chunk lớn hơn 500 kB.
+- [x] `npm run test` trong `frontend`, chạy riêng sau khi build kết thúc — 57 test files passed, 186 tests passed, giữ `--maxWorkers=2` và timeout mặc định.
+
+Lượt chạy test đồng thời với build có 4 lỗi timeout: 3 test vượt 5 giây và 1 truy vấn DOM hết hạn khi trang còn loading. Lượt chạy riêng phía trên qua toàn bộ; lỗi `Change to Client` không xuất hiện ở cả hai lượt.

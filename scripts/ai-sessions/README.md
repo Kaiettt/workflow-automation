@@ -37,6 +37,12 @@ tích hợp/export riêng. Không thể khôi phục output mà tool không xu�
 cắt mất. Che trường credential và mẫu credential phổ biến trong text; bỏ
 reasoning nội bộ provider. Ảnh tool lưu ở `assets/`.
 
+`ENCRYPTION_KEY` được che trong output môi trường, tham số CLI và dữ liệu tool.
+Khi lưu lại phiên, collector che cả khóa trong lịch sử đã lưu và sửa bản Markdown.
+Nếu khóa đã có trong commit, cần làm sạch lịch sử Git và thay khóa cùng với việc
+mã hóa lại credential; chỉ sửa file hiện tại hoặc thêm `.gitignore` không xóa
+khóa khỏi commit cũ. Gitleaks báo qua job summary và SARIF artifact trong CI.
+
 File mới: `session-<provider>-<full-id>.md/.json`. Hỗ trợ `latest.md` và alias
 Antigravity cũ. Diagnostics, ownership và backup hook ở `.state/`.
 Trạng thái tracking của log theo cấu hình Git của repo; file đã tracking trước

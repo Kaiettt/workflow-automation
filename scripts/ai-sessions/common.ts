@@ -35,11 +35,11 @@ export function redactText(value: string): string {
     .replace(/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g, '<REDACTED PRIVATE KEY>')
     .replace(/\b(?:sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, '<REDACTED>')
     .replace(/(\b(?:Authorization\s*:\s*(?:Bearer|Basic)|Bearer)\s+)[^\s"'\x60]+/gi, '$1<REDACTED>')
-    .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|client[_-]?secret|secret|token|cookie|AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID)\s*["']?\s*[:=]\s*)(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[^\s"'\x60,;]+)/gi, '$1<REDACTED>')
-    .replace(/(--(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|client[_-]?secret|secret|token)\s+)(?:"[^"]*"|'[^']*'|[^\s]+)/gi, '$1<REDACTED>')
+    .replace(/((?:api[_-]?key|encryption[_-]?key|access[_-]?token|refresh[_-]?token|password|client[_-]?secret|secret|token|cookie|AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID)\s*["']?\s*[:=]\s*)(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[^\s"'\x60,;]+)/gi, '$1<REDACTED>')
+    .replace(/(--(?:api[_-]?key|encryption[_-]?key|access[_-]?token|refresh[_-]?token|password|client[_-]?secret|secret|token)\s+)(?:"[^"]*"|'[^']*'|[^\s]+)/gi, '$1<REDACTED>')
     .replace(/(https?:\/\/)[^\s/:@]+:[^\s/@]+@/gi, '$1<REDACTED>@');
 }
-const sensitiveKey = /^(?:api[_-]?key|authorization|password|client[_-]?secret|private[_-]?key|secret|token|access[_-]?token|refresh[_-]?token|cookie|set-cookie|aws_secret_access_key|aws_access_key_id)$/i;
+const sensitiveKey = /^(?:api[_-]?key|encryption[_-]?key|authorization|password|client[_-]?secret|private[_-]?key|secret|token|access[_-]?token|refresh[_-]?token|cookie|set-cookie|aws_secret_access_key|aws_access_key_id)$/i;
 export function json(value: unknown): Json {
   if (value === null || typeof value === 'boolean') return value;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;

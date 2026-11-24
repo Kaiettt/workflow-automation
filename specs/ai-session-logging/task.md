@@ -85,7 +85,45 @@ Only the separate protected Antigravity hook update remains from the original se
 - App lint/type-check/tests/build were not repeated for this fix; only the
   scripts/ai-sessions project changed.
 
-## Limits
+## 2026-11-25: encryption-key redaction and PR #44 security scan (AIS-07)
+
+- Reproduced the CI findings with Gitleaks 8.30.1:
+  `gitleaks git --log-opts=-4 --report-format=json --report-path=<temporary report>`.
+  Exit 1, 12 findings across 5 AI log files in two of the four PR commits.
+  All findings contain the same encryption key; it matches the local backend
+  environment. No secret value is included in this document or diagnostic output.
+- Added four public saveSession regressions for new text/structured keys,
+  retained historical output, structured-only saved keys and stale Markdown.
+  Red exposed unmasked keys or no rewrite. Adding the missing key pattern alone
+  fixed new logs while the saved-file regressions remained Red.
+- Green: mask ENCRYPTION_KEY variants, sanitize after merging, compare against
+  the raw saved JSON and repair Markdown independently of JSON changes.
+  `node --test scripts/ai-sessions/redaction.test.ts`: 4 passed.
+- `npm run test:ai-sessions`: 15 passed. `npm run lint:ai-sessions`,
+  `npm run typecheck:ai-sessions` and `npm run build:ai-sessions`: exit 0.
+- Parsed CI YAML and verified GITLEAKS_ENABLE_COMMENTS=false. Job summary/SARIF
+  reporting and the existing contents:read permissions remain enabled.
+- Stopped the owned collector, masked the exposed key in 5 current log files
+  without losing JSON events, then restarted it with the fixed implementation.
+- Gitleaks scan of the current public logs: exit 0, no leaks. The temporary local
+  check excludes the already-gitignored .state runtime directory; no CI scanner
+  allowlist was added. Full local directory scanning also sees the untracked
+  collector ownership nonce in .state/collector.json.
+- Prepared review/pr44-sanitized in a separate checkout. The four rewritten
+  commits differ only in the 5 affected AI log blobs; authors, dates and messages
+  are preserved. A fifth commit includes the tested logging/CI fixes and the
+  preceding frontend cache-test fix, without adding current runtime transcripts.
+- Gitleaks 8.24.3 (the CI version) scanned all 5 prepared commits with the default
+  rules and no allowlist: exit 0, no leaks, approximately 70.51 MB scanned.
+- Updating the existing admin/logs branch and force-pushing PR #44 requires
+  approval because this replaces shared Git history. Key rotation is independent
+  of this history cleanup; old copies and cached commit URLs can still exist.
+- Key rotation and re-encryption of stored credentials are still required;
+  application encryption configuration and stored credentials were not changed.
+- Frontend checks passed in the preceding cache-test fix (57 files/186 tests,
+  lint/type-check/build); application code was not changed by this tooling fix.
+
+## Other collection limits
 
 Only output actually exported by clients can be collected. Cursor workspace-folder
 encoding for spaces was not independently verified; explicit --source registration

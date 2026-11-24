@@ -11714,7 +11714,7 @@ Showing lines 1-307 of 307
 49:     recipientId: string,
 50:     action: SenderAction,
 51:   ): Promise<void>;
-52:   // App webhook subscription (app token = <REDACTED>).
+52:   // App webhook subscription (app token = <REDACTED>
 53:   listAppSubscriptions(
 54:     appId: string,
 55:     appToken: <REDACTED>,
@@ -16450,7 +16450,7 @@ Showing lines 1-172 of 172
 69:       throw new Error('credential does not belong to this workflow owner');
 70:     }
 71: 
-72:     const encryptionKey = process.env['ENCRYPTION_KEY'];
+72:     const encryptionKey = <REDACTED>'ENCRYPTION_KEY'];
 73:     if (!encryptionKey) {
 74:       throw new Error('Credential decryption key is not configured');
 75:     }
