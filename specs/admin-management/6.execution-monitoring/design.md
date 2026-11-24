@@ -1,6 +1,6 @@
 # Thiết kế: Giám sát Execution Toàn Nền Tảng (Execution Monitoring)
 
-Status: ready-for-agent (P1)
+Status: implemented (P1, 2026-11-24)
 
 ## 1. Ranh giới Module và Phân tầng Kiến trúc
 
@@ -17,18 +17,7 @@ Status: ready-for-agent (P1)
 
 ### DTO Bộ lọc Execution
 ```typescript
-export class AdminExecutionFilterDto {
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  page: number = 1;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  pageSize: number = 20;
-
+export class AdminExecutionFilterDto extends PageDto {
   @IsOptional()
   @IsUUID()
   ownerId?: string;
@@ -42,19 +31,21 @@ export class AdminExecutionFilterDto {
   executionId?: string;
 
   @IsOptional()
-  @IsEnum(['QUEUED', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED'])
+  @IsIn(['QUEUED', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED'])
   status?: 'QUEUED' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
 
   @IsOptional()
-  @IsEnum(['MANUAL', 'WEBHOOK', 'SCHEDULE'])
+  @IsIn(['MANUAL', 'WEBHOOK', 'SCHEDULE'])
   triggerType?: 'MANUAL' | 'WEBHOOK' | 'SCHEDULE';
 
   @IsOptional()
-  @IsISO8601()
+  @IsISO8601({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
   from?: string;
 
   @IsOptional()
-  @IsISO8601()
+  @IsISO8601({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
   to?: string;
 }
 ```
@@ -71,8 +62,8 @@ const executionListSelect = {
       owner: { select: { name: true, email: true } },
     },
   },
-  versionId: true,
-  version: { select: { versionNumber: true } },
+  workflowVersionId: true,
+  workflowVersion: { select: { versionNumber: true } },
   triggerType: true,
   status: true,
   queuedAt: true,
@@ -101,9 +92,8 @@ Trong `prisma/schema.prisma`, bổ sung các chỉ mục phục vụ tìm kiếm
 ```prisma
 model Execution {
   ...
-  @@index([queuedAt, status])
-  @@index([workflowId, queuedAt])
-  @@index([status, queuedAt])
+  @@index([queuedAt(sort: Desc), id(sort: Desc)])
+  @@index([status, queuedAt(sort: Desc), id(sort: Desc)])
 }
 ```
 
@@ -111,7 +101,8 @@ model Execution {
 
 - `ExecutionsPage.tsx`:
   - `ExecutionFilterBar.tsx`:
-    - Ô nhập `Owner Email` / ID.
+    - Tìm owner bằng tên/email qua API users và chọn ownerId UUID.
+    - Ô nhập `Workflow ID` UUID.
     - Ô nhập `Execution ID`.
     - Dropdown chọn `Status` (All, Queued, Running, Success, Failed, Cancelled).
     - Dropdown chọn `Trigger Type` (All, Manual, Webhook, Schedule).
@@ -125,3 +116,15 @@ model Execution {
     - Bảng danh sách các node log đã chạy: Node Key, Trạng thái, Bắt đầu, Hoàn tất, Thời gian chạy, Retry count, Mã lỗi an toàn.
     - Không hiển thị custom label của node, không có nút xem raw JSON hay stack trace.
 - Visible-only Polling Hook: `useAdminExecutions.ts` tự động refetch mỗi 30 giây khi tab active.
+
+## 5. Contract và seams
+
+- DTO extends PageDto tái sử dụng numeric transform; timestamp có timezone, validate range trước dispatch.
+- ReadPort trả types cụ thể. Prisma select whitelist tĩnh, map ORM sang response; sanitize error/cancellation codes.
+- Reuse index workflow/queuedAt/id hiện có; hai index mới phục vụ global list/sort, không thêm workflow index trùng.
+- Owner picker dùng API users; workflow UUID có control riêng. Filters/page ở URL; routes nằm dưới AdminGuard.
+- Visibility hook tắt query khi hidden, refetch khi visible, cleanup khi unmount; AbortSignal đến HTTP client.
+- HTTP tests dùng JWT/role thật và PostgreSQL riêng. Database-boundary test kiểm tra không chọn cột cấm; UI/hook dùng mock HTTP và fake browser/clock.
+- Quy tắc và BDD xem [spec.md](spec.md). retryCount hiển thị dữ liệu đã lưu, không suy đoán retry provider.
+- List/count và detail/node logs đọc trong transaction RepeatableRead để có snapshot nhất quán. Admin read projection là boundary đọc dùng chung database đã có trong thiết kế Admin; runtime vẫn thuộc Execution module. Hàm chuẩn hóa mã lỗi được export qua public entry point của Execution.
+- Query offset vượt giới hạn signed 32-bit của Prisma bị từ chối với 400; tránh truy vấn phân trang quá lớn gây lỗi database.

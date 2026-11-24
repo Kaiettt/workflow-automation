@@ -1,6 +1,9 @@
 import { apiClient } from '@/shared/api/http-client';
 import type {
   Account,
+  AdminExecutionFilter,
+  AdminExecutionSummary,
+  AdminExecutionDetail,
   NodeTypeAdminItem,
   NodeTypeAdminDetail,
   NodeTypeFilter,
@@ -19,6 +22,12 @@ import type {
 
 interface Envelope<T> { success: boolean; data: T; }
 export const adminService = {
+  async executions(filter: AdminExecutionFilter, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<Page<AdminExecutionSummary>>>('/api/admin/executions', { params: filter, signal })).data.data;
+  },
+  async execution(id: string, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<AdminExecutionDetail>>(`/api/admin/executions/${encodeURIComponent(id)}`, { signal })).data.data;
+  },
   async nodeTypes(filter: NodeTypeFilter, signal?: AbortSignal) {
     return (await apiClient.get<Envelope<Page<NodeTypeAdminItem>>>('/api/admin/node-types', { params: filter, signal })).data.data;
   },

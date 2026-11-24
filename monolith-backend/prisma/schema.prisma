@@ -298,6 +298,8 @@ model Execution {
 
   @@index([workflowId, startedAt(sort: Desc)]) // FR-EM-04 danh sách execution gần nhất
   @@index([workflowId, queuedAt(sort: Desc), id(sort: Desc)])
+  @@index([queuedAt(sort: Desc), id(sort: Desc)])
+  @@index([status, queuedAt(sort: Desc), id(sort: Desc)])
   @@unique([triggeredById, idempotencyKey])
   @@index([status])
   @@map("executions")

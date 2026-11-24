@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 
-Tiến độ: P0 (G0–G3: Role, User Management, Dashboard) đã triển khai và nghiệm thu thực tế theo PR #39. G5 (Node Type Management) đã triển khai; xem [bằng chứng kiểm tra và giới hạn](5.node-type-management/task.md). Các đặc tả P1 còn lại (G4, G6, G7) được theo dõi trong checklist riêng. Xem chi tiết: [analysis](analysis.md), [design](design.md), [plan](plan.md), [task](task.md), [validation](validation.md), [operations](operations.md).
+Tiến độ: P0 (G0–G3: Role, User Management, Dashboard) đã triển khai và nghiệm thu thực tế theo PR #39. G5 (Node Type Management) và G6 (Execution Monitoring) đã triển khai; xem bằng chứng ở [G5 task](5.node-type-management/task.md) và [G6 task](6.execution-monitoring/task.md). Các đặc tả P1 còn lại (G4, G7) được theo dõi trong checklist riêng. Xem chi tiết: [analysis](analysis.md), [design](design.md), [plan](plan.md), [task](task.md), [validation](validation.md), [operations](operations.md).
 
 ## 1. Mục tiêu và nguồn yêu cầu
 
@@ -26,7 +26,7 @@ Nguồn yêu cầu:
 | Dashboard vận hành | G3 (P0) | Đã hoàn thành | Snapshot tài khoản/workflow, aggregate execution 90 ngày, tỷ lệ thành công, xu hướng ngày, nhóm lỗi an toàn |
 | Quản lý Connector | G4 (P1) | Đặc tả sẵn sàng | Catalog connector, thống kê sử dụng, chính sách `allowNewCredentials`, hỗ trợ API Key/OAuth2, chống race condition |
 | Quản lý Node Type | G5 (P1) | Đặc tả sẵn sàng | Catalog node type, thống kê sử dụng workflow, tách bạch `isCatalogVisible` và `isExecutionAllowed`, bảo toàn workflow cũ |
-| Giám sát Execution | G6 (P1) | Đặc tả sẵn sàng | Tra cứu danh sách & chi tiết execution toàn nền tảng, bộ lọc đa chiều, projection an toàn tuyệt đối (không lộ secret/payload) |
+| Giám sát Execution | G6 (P1) | Đã triển khai; xem G6 task | Tra cứu danh sách & chi tiết execution toàn nền tảng, bộ lọc đa chiều, projection an toàn tuyệt đối (không lộ secret/payload) |
 | Tra cứu Nhật ký quản trị | G7 (P1) | Đặc tả sẵn sàng | Giao diện danh sách và chi tiết audit event, bộ lọc actor/action/resource/thời gian, hiển thị diff before/after whitelist |
 | Nghiệm thu tổng thể & Rollout | G8 (P1) | Đặc tả sẵn sàng | Kiểm thử tự động end-to-end, rehearsal migration, quy trình vận hành và tài liệu bàn giao |
 
@@ -163,7 +163,7 @@ Dashboard cung cấp cái nhìn tổng quan về quy mô và sức khỏe hệ t
   - **Safe Projection Danh sách**: Trả về ID, workflowId, tên workflow, ownerId, tên owner, email owner, versionId, số phiên bản (`versionNumber`), triggerType, status, queuedAt, startedAt, finishedAt, durationMs, mã lỗi an toàn (`errorCode`), lý do hủy (`cancellationReason`).
 - **Chi tiết Execution và Bảng Node Execution Logs**:
   - Hiển thị metadata tổng thể của execution (như trên).
-  - Bảng danh sách các node log đã thực thi: `nodeId`, `nodeKey` (ví dụ `integration.slack.postMessage`), `status` (`SUCCESS`, `FAILED`, `SKIPPED`, `RUNNING`), thời điểm bắt đầu (`startedAt`), thời điểm kết thúc (`finishedAt`), thời gian chạy (`durationMs`), số lần thử lại (`retryCount`), mã lỗi an toàn (`errorCode`).
+  - Bảng danh sách các node log đã thực thi: `nodeId`, `nodeKey` (ví dụ `integration.slack.postMessage`), `status` (`SUCCESS`, `FAILED`, `SKIPPED`, `RUNNING`, `TIMEOUT`), thời điểm bắt đầu (`startedAt`), thời điểm kết thúc (`finishedAt`), thời gian chạy (`durationMs`), số lần thử lại đã lưu (`retryCount`), mã lỗi an toàn (`errorCode`). Quy tắc lookup, mapping, polling và nghiệm thu chi tiết nằm trong [G6 spec](6.execution-monitoring/spec.md).
 - **Nguyên tắc Bảo mật và Quyền riêng tư Tuyệt đối (Strict Privacy Whitelist)**:
   - **CẤM HOÀN TOÀN**: Không bao giờ trả về input JSON, output JSON, context thực thi, AI prompt, nội dung tin nhắn, webhook payload thô, stack trace lỗi, token, API key hoặc custom label/name do người dùng đặt cho node (vì custom label có thể chứa thông tin nhạy cảm như "Gửi email mật cho khách hàng X").
   - Nếu execution hoặc node bị lỗi mà chưa có mã lỗi phân loại, trả về mã fallback `UNCLASSIFIED_ERROR`; tuyệt đối không lấy chuỗi `errorMessage` thô từ exception của dịch vụ để làm fallback.

@@ -100,24 +100,24 @@ P0 (G0–G3) đã hoàn thành và nghiệm thu thực tế theo PR #39; P1 (G4�
 
 ## G6 — Giám sát Execution Toàn Nền Tảng (P1 Mới)
 
-- [ ] G6.1 **Database Indexing**: Thêm composite index trong `prisma/schema.prisma`: `executions(queued_at, status)` và `executions(workflow_id, queued_at)`.
-- [ ] G6.2 **Admin Execution Projection (Safe Whitelist)**:
+- [x] G6.1 **Database Indexing**: Giữ workflow index; thêm global queued_at/id và status/queued_at/id theo G6 design.
+- [x] G6.2 **Admin Execution Projection (Safe Whitelist)**:
   - Triển khai `AdminReadPort.executions()` và `AdminReadPort.execution(id)`.
   - Triển khai `select` tĩnh chỉ lấy metadata an toàn: `id`, `workflowId`, `workflowName`, `ownerId`, `ownerName`, `ownerEmail`, `versionNumber`, `triggerType`, `status`, `queuedAt`, `startedAt`, `finishedAt`, `durationMs`, `errorCode`, `cancellationReason`.
   - Triển khai `nodeLogs` an toàn: `nodeId`, `nodeKey`, `status`, `startedAt`, `finishedAt`, `durationMs`, `retryCount`, `errorCode`.
   - **Bảo mật**: Tuyệt đối không chọn `input`, `output`, `context`, `errorMessage`, `errorStack`, hay node custom label.
-- [ ] G6.3 **Presentation Endpoints**: Thêm `GET /api/admin/executions` và `GET /api/admin/executions/:id` trong `AdminController` có validation pipe bộ lọc và khoảng thời gian.
-- [ ] G6.4 **Frontend Service & Types**: Cập nhật `admin.types.ts` và `admin.service.ts` với `executions()` và `execution()`.
-- [ ] G6.5 **Visible Polling Hook**: Tạo hook `useAdminExecutions.ts` tự động polling mỗi 30 giây khi trang hiển thị, dừng khi tab bị ẩn.
-- [ ] G6.6 **Frontend Components**:
+- [x] G6.3 **Presentation Endpoints**: Thêm `GET /api/admin/executions` và `GET /api/admin/executions/:id` trong `AdminController` có validation pipe bộ lọc và khoảng thời gian.
+- [x] G6.4 **Frontend Service & Types**: Cập nhật `admin.types.ts` và `admin.service.ts` với `executions()` và `execution()`.
+- [x] G6.5 **Visible Polling Hook**: Tạo hook `useAdminExecutions.ts` tự động polling mỗi 30 giây khi trang hiển thị, dừng khi tab bị ẩn.
+- [x] G6.6 **Frontend Components**:
   - Tạo `ExecutionFilterBar.tsx` (bộ lọc owner, workflow, execution ID, status, trigger, time range).
   - Tạo `ExecutionTable.tsx` (danh sách execution, badges trạng thái, timing, nút xem chi tiết).
   - Tạo `NodeLogsTimeline.tsx` (bảng tiến trình node, timing, safe error code; không payload).
-- [ ] G6.7 **Frontend Pages**:
+- [x] G6.7 **Frontend Pages**:
   - Tạo `ExecutionsPage.tsx` (danh sách và bộ lọc).
   - Tạo `ExecutionDetailPage.tsx` (thông tin chi tiết execution và bảng node execution logs).
   - Đảm bảo giao diện 100% Read-only (không có nút Run, Retry, Cancel hay link mở canvas của Client).
-- [ ] G6.8 **Kiểm thử G6**: Viết unit & integration tests cho AC-12, AC-24, AC-25, AC-26 (kiểm tra không rò rỉ secret/prompt/payload, kiểm tra bộ lọc, phân trang và null semantics).
+- [x] G6.8 **Kiểm thử G6**: Viết unit & integration tests cho AC-12, AC-24, AC-25, AC-26 (kiểm tra không rò rỉ secret/prompt/payload, kiểm tra bộ lọc, phân trang và null semantics). Bằng chứng và giới hạn: [G6 task](6.execution-monitoring/task.md).
 
 ---
 

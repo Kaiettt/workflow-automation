@@ -13,11 +13,35 @@ import {
   Max,
   MaxLength,
   Min,
+  Matches,
 } from 'class-validator';
+import {
+  ADMIN_EXECUTION_STATUSES,
+  ADMIN_TRIGGER_TYPES,
+} from '../application/admin-execution.types';
+import type {
+  AdminExecutionStatus,
+  AdminTriggerType,
+} from '../application/admin-execution.types';
 
 export class PageDto {
   @Type(() => Number) @IsInt() @Min(1) page = 1;
   @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize = 20;
+}
+export class AdminExecutionFilterDto extends PageDto {
+  @IsOptional() @IsUUID() ownerId?: string;
+  @IsOptional() @IsUUID() workflowId?: string;
+  @IsOptional() @IsUUID() executionId?: string;
+  @IsOptional() @IsIn(ADMIN_EXECUTION_STATUSES) status?: AdminExecutionStatus;
+  @IsOptional() @IsIn(ADMIN_TRIGGER_TYPES) triggerType?: AdminTriggerType;
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
+  from?: string;
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
+  to?: string;
 }
 export class UsersDto extends PageDto {
   @IsOptional()

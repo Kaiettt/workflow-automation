@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  NotFoundException,
   Body,
   Controller,
   Get,
@@ -32,8 +33,13 @@ import {
   AdminMutationFieldsGuard,
 } from './admin-mutation-fields.guard';
 import { AdminReadQuery } from '../application/admin-read.query';
+import type {
+  AdminExecutionPage,
+  AdminExecutionDetail,
+} from '../application/admin-execution.types';
 import {
   ActiveDto,
+  AdminExecutionFilterDto,
   NodeTypesDto,
   NodeTypeKeyDto,
   ChangeNodeTypeStatusDto,
@@ -61,6 +67,36 @@ export class AdminController {
     private readonly queries: QueryBus,
     private readonly commands: CommandBus,
   ) {}
+  @Get('executions')
+  async executions(@Query() query: AdminExecutionFilterDto) {
+    const offset = (query.page - 1) * query.pageSize;
+    if (!Number.isSafeInteger(offset) || offset > 2147483647)
+      throw new BadRequestException('Requested page is too large');
+    const to = query.to ? new Date(query.to) : new Date();
+    const from = query.from
+      ? new Date(query.from)
+      : new Date(to.getTime() - 7 * 86400000);
+    if (from >= to || to.getTime() - from.getTime() > 90 * 86400000)
+      throw new BadRequestException('Select a valid range of up to 90 days');
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, AdminExecutionPage>(
+        new AdminReadQuery({
+          kind: 'executions',
+          filter: { ...query, from, to },
+        }),
+      ),
+    };
+  }
+  @Get('executions/:id')
+  async execution(@Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.queries.execute<
+      AdminReadQuery,
+      AdminExecutionDetail | null
+    >(new AdminReadQuery({ kind: 'execution', id }));
+    if (!data) throw new NotFoundException('Execution not found');
+    return { success: true, data };
+  }
   @Get('node-types')
   async nodeTypes(@Query() query: NodeTypesDto) {
     return {
