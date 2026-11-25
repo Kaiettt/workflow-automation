@@ -93,7 +93,7 @@ Cung cấp khả năng theo dõi tình hình thực thi workflow toàn hệ th�
 
 ### 4.2. Nhiệm vụ Backend & Cơ sở Dữ liệu
 1. **Đánh chỉ mục Tối ưu**:
-   - Bổ sung composite index: `executions(queued_at, status)`, `executions(workflow_id, queued_at)`.
+   - Giữ workflow/queued_at/id index; bổ sung global queued_at/id và status/queued_at/id theo [G6 design](6.execution-monitoring/design.md).
 2. **Admin Execution Projection**:
    - Triển khai `AdminReadPort.executions()` hỗ trợ bộ lọc: `ownerId`, `workflowId`, `executionId`, `status`, `triggerType`, thời gian `[from, to)`.
    - Triển khai `AdminReadPort.execution(id)` lấy thông tin tổng quan và danh sách `nodeLogs` an toàn.

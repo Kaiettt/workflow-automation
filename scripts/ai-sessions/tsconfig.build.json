@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist"
+  },
+  "exclude": [
+    "dist",
+    "*.test.ts",
+    "test-helpers.ts"
+  ]
+}

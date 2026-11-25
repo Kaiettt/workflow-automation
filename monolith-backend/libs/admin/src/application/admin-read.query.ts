@@ -7,7 +7,13 @@ import type {
 } from './admin-read.port';
 
 import type { NodeTypeFilter } from './node-type-admin.types';
+import type { AdminExecutionFilter } from './admin-execution.types';
+import type { AdminAuditFilter } from './admin-audit.types';
 type AdminReadRequest =
+  | { kind: 'auditEvents'; filter: AdminAuditFilter }
+  | { kind: 'auditEvent'; id: string }
+  | { kind: 'executions'; filter: AdminExecutionFilter }
+  | { kind: 'execution'; id: string }
   | { kind: 'nodeTypes'; filter: NodeTypeFilter }
   | { kind: 'nodeType'; key: string }
   | { kind: 'users'; filter: UserFilter }
@@ -25,6 +31,14 @@ export class AdminReadHandler implements IQueryHandler<AdminReadQuery> {
   execute(query: AdminReadQuery): Promise<unknown> {
     const request = query.request;
     switch (request.kind) {
+      case 'auditEvents':
+        return this.reads.auditEvents(request.filter);
+      case 'auditEvent':
+        return this.reads.auditEvent(request.id);
+      case 'executions':
+        return this.reads.executions(request.filter);
+      case 'execution':
+        return this.reads.execution(request.id);
       case 'nodeTypes':
         return this.reads.nodeTypes(request.filter);
       case 'nodeType':

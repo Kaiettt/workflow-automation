@@ -1,4 +1,6 @@
 import type { UserRole } from '../../auth/types/auth.types';
+export type { AdminAuditFilter, AdminAuditSummary, AdminAuditDetail } from './admin-audit.types';
+export type { AdminExecutionFilter, AdminExecutionSummary, AdminExecutionDetail } from './admin-execution.types';
 
 export type NodeTypeCategory = 'TRIGGER' | 'LOGIC' | 'DATA_PROCESSING' | 'INTEGRATION' | 'AI';
 export interface NodeTypeAdminItem {

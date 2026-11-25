@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 
-Tiến độ: P0 (G0–G3: Role, User Management, Dashboard) đã triển khai và nghiệm thu thực tế theo PR #39. G5 (Node Type Management) đã triển khai; xem [bằng chứng kiểm tra và giới hạn](5.node-type-management/task.md). Các đặc tả P1 còn lại (G4, G6, G7) được theo dõi trong checklist riêng. Xem chi tiết: [analysis](analysis.md), [design](design.md), [plan](plan.md), [task](task.md), [validation](validation.md), [operations](operations.md).
+Tiến độ: P0 (G0–G3: Role, User Management, Dashboard) đã triển khai và nghiệm thu thực tế theo PR #39. G5 (Node Type Management), G6 (Execution Monitoring) và G7 (Audit Log Viewer) đã triển khai; xem bằng chứng ở [G5 task](5.node-type-management/task.md), [G6 task](6.execution-monitoring/task.md) và [G7 task](7.audit-log-viewer/task.md). G4 được theo dõi trong checklist riêng. Xem chi tiết: [analysis](analysis.md), [design](design.md), [plan](plan.md), [task](task.md), [validation](validation.md), [operations](operations.md).
 
 ## 1. Mục tiêu và nguồn yêu cầu
 
@@ -26,8 +26,8 @@ Nguồn yêu cầu:
 | Dashboard vận hành | G3 (P0) | Đã hoàn thành | Snapshot tài khoản/workflow, aggregate execution 90 ngày, tỷ lệ thành công, xu hướng ngày, nhóm lỗi an toàn |
 | Quản lý Connector | G4 (P1) | Đặc tả sẵn sàng | Catalog connector, thống kê sử dụng, chính sách `allowNewCredentials`, hỗ trợ API Key/OAuth2, chống race condition |
 | Quản lý Node Type | G5 (P1) | Đặc tả sẵn sàng | Catalog node type, thống kê sử dụng workflow, tách bạch `isCatalogVisible` và `isExecutionAllowed`, bảo toàn workflow cũ |
-| Giám sát Execution | G6 (P1) | Đặc tả sẵn sàng | Tra cứu danh sách & chi tiết execution toàn nền tảng, bộ lọc đa chiều, projection an toàn tuyệt đối (không lộ secret/payload) |
-| Tra cứu Nhật ký quản trị | G7 (P1) | Đặc tả sẵn sàng | Giao diện danh sách và chi tiết audit event, bộ lọc actor/action/resource/thời gian, hiển thị diff before/after whitelist |
+| Giám sát Execution | G6 (P1) | Đã triển khai; xem G6 task | Tra cứu danh sách & chi tiết execution toàn nền tảng, bộ lọc đa chiều, projection an toàn tuyệt đối (không lộ secret/payload) |
+| Tra cứu Nhật ký quản trị | G7 (P1) | Đã triển khai; xem G7 task | Giao diện danh sách và chi tiết audit event, bộ lọc actor/action/resource/thời gian, hiển thị diff before/after whitelist |
 | Nghiệm thu tổng thể & Rollout | G8 (P1) | Đặc tả sẵn sàng | Kiểm thử tự động end-to-end, rehearsal migration, quy trình vận hành và tài liệu bàn giao |
 
 Ngoài phạm vi: Xóa tài khoản hoặc xóa dữ liệu Client; giả lập đăng nhập Client (impersonation); đọc/chỉnh sửa nội dung canvas, snapshot version, JSON input/output, biến môi trường, webhook payload thô, AI prompt hoặc credential/secret của Client; thực hiện Run, Retry hoặc Cancel execution từ khu vực Admin; thêm connector bằng mã nguồn trực tiếp từ giao diện web; thay đổi auth type hoặc JSON config schema của connector trên UI; quản lý secret hạ tầng (database, Redis, JWT keys); hệ thống thanh toán/billing; mô hình đa tổ chức (multi-tenancy/teams); giám sát CPU/RAM máy chủ.
@@ -163,7 +163,7 @@ Dashboard cung cấp cái nhìn tổng quan về quy mô và sức khỏe hệ t
   - **Safe Projection Danh sách**: Trả về ID, workflowId, tên workflow, ownerId, tên owner, email owner, versionId, số phiên bản (`versionNumber`), triggerType, status, queuedAt, startedAt, finishedAt, durationMs, mã lỗi an toàn (`errorCode`), lý do hủy (`cancellationReason`).
 - **Chi tiết Execution và Bảng Node Execution Logs**:
   - Hiển thị metadata tổng thể của execution (như trên).
-  - Bảng danh sách các node log đã thực thi: `nodeId`, `nodeKey` (ví dụ `integration.slack.postMessage`), `status` (`SUCCESS`, `FAILED`, `SKIPPED`, `RUNNING`), thời điểm bắt đầu (`startedAt`), thời điểm kết thúc (`finishedAt`), thời gian chạy (`durationMs`), số lần thử lại (`retryCount`), mã lỗi an toàn (`errorCode`).
+  - Bảng danh sách các node log đã thực thi: `nodeId`, `nodeKey` (ví dụ `integration.slack.postMessage`), `status` (`SUCCESS`, `FAILED`, `SKIPPED`, `RUNNING`, `TIMEOUT`), thời điểm bắt đầu (`startedAt`), thời điểm kết thúc (`finishedAt`), thời gian chạy (`durationMs`), số lần thử lại đã lưu (`retryCount`), mã lỗi an toàn (`errorCode`). Quy tắc lookup, mapping, polling và nghiệm thu chi tiết nằm trong [G6 spec](6.execution-monitoring/spec.md).
 - **Nguyên tắc Bảo mật và Quyền riêng tư Tuyệt đối (Strict Privacy Whitelist)**:
   - **CẤM HOÀN TOÀN**: Không bao giờ trả về input JSON, output JSON, context thực thi, AI prompt, nội dung tin nhắn, webhook payload thô, stack trace lỗi, token, API key hoặc custom label/name do người dùng đặt cho node (vì custom label có thể chứa thông tin nhạy cảm như "Gửi email mật cho khách hàng X").
   - Nếu execution hoặc node bị lỗi mà chưa có mã lỗi phân loại, trả về mã fallback `UNCLASSIFIED_ERROR`; tuyệt đối không lấy chuỗi `errorMessage` thô từ exception của dịch vụ để làm fallback.
@@ -190,7 +190,7 @@ Dashboard cung cấp cái nhìn tổng quan về quy mô và sức khỏe hệ t
   - `actorId`: ID của Admin thực hiện (hoặc `null` nếu là `SYSTEM`).
   - `action`: Tên hành động chuẩn hóa.
   - `targetType`: Loại tài nguyên bị tác động (`USER`, `CONNECTOR`, `NODE_TYPE`).
-  - `targetId`: ID hoặc Key của tài nguyên mục tiêu.
+  - `targetId`: UUID của tài nguyên mục tiêu; node type dùng definition.id.
   - `reason`: Lý do bắt buộc, đã được chuẩn hóa cắt khoảng trắng (trim), độ dài từ 5 đến 500 ký tự.
   - `before` / `after`: Đối tượng JSON chỉ chứa các trường trạng thái được whitelist (ví dụ `{ isActive: false }` -> `{ isActive: true }`); không lưu mật khẩu, token, secret.
   - `createdAt`: Thời điểm phát sinh sự kiện (UTC).
@@ -202,6 +202,7 @@ Dashboard cung cấp cái nhìn tổng quan về quy mô và sức khỏe hệ t
   - Bảng audit hoàn toàn chỉ đọc; backend không cung cấp bất kỳ API nào để cập nhật (`PUT`/`PATCH`) hay xóa (`DELETE`) bản ghi audit.
   - Nếu việc ghi audit thất bại, toàn bộ transaction của mutation đó phải bị rollback; hệ thống không bao giờ ghi nhận thay đổi thành công mà thiếu bản ghi audit tương ứng.
   - Các request bị từ chối do phân quyền, sai revision (`409`), hoặc các thao tác no-op không làm phát sinh bản ghi audit.
+  - G7 bảo vệ bất biến qua API chỉ đọc; hiện không có trigger/quyền database ngăn direct UPDATE/DELETE bằng SQL. Contract về whitelist tương thích lịch sử, mặc định range/polling và metadata lookup xem [G7 spec](7.audit-log-viewer/spec.md).
 
 ---
 

@@ -14,6 +14,16 @@ import {
   readAdminNodeType,
 } from './prisma-admin-node-types';
 import type { NodeTypeFilter } from '../application/node-type-admin.types';
+import type { AdminExecutionFilter } from '../application/admin-execution.types';
+import {
+  readAdminExecutions,
+  readAdminExecution,
+} from './prisma-admin-executions';
+import type { AdminAuditFilter } from '../application/admin-audit.types';
+import {
+  readAdminAuditEvents,
+  readAdminAuditEvent,
+} from './prisma-admin-audit';
 const userSelect = {
   id: true,
   name: true,
@@ -28,6 +38,18 @@ const userSelect = {
 export class PrismaAdminRead extends AdminReadPort {
   constructor(private readonly prisma: PrismaService) {
     super();
+  }
+  auditEvents(filter: AdminAuditFilter) {
+    return readAdminAuditEvents(this.prisma, filter);
+  }
+  auditEvent(id: string) {
+    return readAdminAuditEvent(this.prisma, id);
+  }
+  executions(filter: AdminExecutionFilter) {
+    return readAdminExecutions(this.prisma, filter);
+  }
+  execution(id: string) {
+    return readAdminExecution(this.prisma, id);
   }
   nodeTypes(filter: NodeTypeFilter) {
     return readAdminNodeTypes(this.prisma, filter);

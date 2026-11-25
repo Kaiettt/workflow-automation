@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  NotFoundException,
   Body,
   Controller,
   Get,
@@ -32,8 +33,19 @@ import {
   AdminMutationFieldsGuard,
 } from './admin-mutation-fields.guard';
 import { AdminReadQuery } from '../application/admin-read.query';
+import type {
+  AdminAuditPage,
+  AdminAuditDetail,
+} from '../application/admin-audit.types';
+import { adminListRange } from './admin-read-validation';
+import type {
+  AdminExecutionPage,
+  AdminExecutionDetail,
+} from '../application/admin-execution.types';
 import {
   ActiveDto,
+  AdminAuditFilterDto,
+  AdminExecutionFilterDto,
   NodeTypesDto,
   NodeTypeKeyDto,
   ChangeNodeTypeStatusDto,
@@ -61,6 +73,50 @@ export class AdminController {
     private readonly queries: QueryBus,
     private readonly commands: CommandBus,
   ) {}
+  @Get('audit-events')
+  async auditEvents(@Query() query: AdminAuditFilterDto) {
+    const range = adminListRange(query);
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, AdminAuditPage>(
+        new AdminReadQuery({
+          kind: 'auditEvents',
+          filter: { ...query, ...range },
+        }),
+      ),
+    };
+  }
+  @Get('audit-events/:id')
+  async auditEvent(@Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.queries.execute<
+      AdminReadQuery,
+      AdminAuditDetail | null
+    >(new AdminReadQuery({ kind: 'auditEvent', id }));
+    if (!data) throw new NotFoundException('Audit event not found');
+    return { success: true, data };
+  }
+  @Get('executions')
+  async executions(@Query() query: AdminExecutionFilterDto) {
+    const { from, to } = adminListRange(query);
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, AdminExecutionPage>(
+        new AdminReadQuery({
+          kind: 'executions',
+          filter: { ...query, from, to },
+        }),
+      ),
+    };
+  }
+  @Get('executions/:id')
+  async execution(@Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.queries.execute<
+      AdminReadQuery,
+      AdminExecutionDetail | null
+    >(new AdminReadQuery({ kind: 'execution', id }));
+    if (!data) throw new NotFoundException('Execution not found');
+    return { success: true, data };
+  }
   @Get('node-types')
   async nodeTypes(@Query() query: NodeTypesDto) {
     return {

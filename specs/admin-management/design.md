@@ -248,7 +248,7 @@ model NodeTypePolicy {
         "startedAt": "2026-11-15T08:30:01.000Z",
         "finishedAt": "2026-11-15T08:30:05.000Z",
         "durationMs": 4000,
-        "errorCode": "CONNECTOR_TIMEOUT",
+        "errorCode": "UNCLASSIFIED_ERROR",
         "cancellationReason": null
       }
     ],
@@ -271,6 +271,7 @@ model NodeTypePolicy {
     "ownerId": "u456-...",
     "ownerName": "Nguyen Van A",
     "ownerEmail": "vana@example.com",
+    "versionId": "v789-...",
     "versionNumber": 3,
     "triggerType": "WEBHOOK",
     "status": "FAILED",
@@ -278,7 +279,7 @@ model NodeTypePolicy {
     "startedAt": "2026-11-15T08:30:01.000Z",
     "finishedAt": "2026-11-15T08:30:05.000Z",
     "durationMs": 4000,
-    "errorCode": "CONNECTOR_TIMEOUT",
+    "errorCode": "UNCLASSIFIED_ERROR",
     "cancellationReason": null,
     "nodeLogs": [
       {
@@ -299,7 +300,7 @@ model NodeTypePolicy {
         "finishedAt": "2026-11-15T08:30:05.000Z",
         "durationMs": 3800,
         "retryCount": 3,
-        "errorCode": "CONNECTOR_TIMEOUT"
+        "errorCode": "UNCLASSIFIED_ERROR"
       }
     ]
   }

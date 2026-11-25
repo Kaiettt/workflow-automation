@@ -67,13 +67,13 @@ describe('Account administration', () => {
     mount();
     expect((await screen.findByRole('button', { name: 'Suspend account' })).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: 'Change to Admin' }).hasAttribute('disabled')).toBe(true);
-    await act(async () => {
+    act(() => {
       useAuthStore.getState().updateUser({ id: 'admin', name: 'Admin', email: 'admin@example.test', role: 'ADMIN' });
       queryClient.setQueryData(['admin', 'user', 'client'], { ...account, isActive: false });
     });
-    expect(screen.getByRole('button', { name: 'Reactivate account' }).hasAttribute('disabled')).toBe(false);
+    expect((await screen.findByRole('button', { name: 'Reactivate account' })).hasAttribute('disabled')).toBe(false);
     expect(screen.getByRole('button', { name: 'Change to Admin' }).hasAttribute('disabled')).toBe(true);
-    await act(async () => { queryClient.setQueryData(['admin', 'user', 'client'], { ...account, role: 'ADMIN', isActive: false }); });
-    expect(screen.getByRole('button', { name: 'Change to Client' }).hasAttribute('disabled')).toBe(false);
+    act(() => { queryClient.setQueryData(['admin', 'user', 'client'], { ...account, role: 'ADMIN', isActive: false }); });
+    expect((await screen.findByRole('button', { name: 'Change to Client' })).hasAttribute('disabled')).toBe(false);
   });
 });

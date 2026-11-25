@@ -1,0 +1,24 @@
+{
+    "hooks":  {
+                  "PostToolUse":  {
+                                      "matcher":  "*",
+                                      "hooks":  [
+                                                    {
+                                                        "type":  "command",
+                                                        "command":  "node \"D:/New folder/workflow-automation/scripts/ai-sessions/hook.cjs\" --provider claude --workspace \"D:/New folder/workflow-automation\"",
+                                                        "timeout":  15
+                                                    }
+                                                ]
+                                  },
+                  "Stop":  {
+                               "matcher":  "*",
+                               "hooks":  [
+                                             {
+                                                 "type":  "command",
+                                                 "command":  "node \"D:/New folder/workflow-automation/scripts/ai-sessions/hook.cjs\" --provider claude --workspace \"D:/New folder/workflow-automation\"",
+                                                 "timeout":  15
+                                             }
+                                         ]
+                           }
+              }
+}
