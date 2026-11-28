@@ -8,6 +8,11 @@ import type {
   DashboardFilter,
   UserFilter,
 } from '../application/admin-read.port';
+import type {
+  AdminBillingPaymentFilter,
+  AdminBillingRevenueFilter,
+  AdminBillingSubscriptionFilter,
+} from '../application/admin-billing.types';
 
 import {
   readAdminNodeTypes,
@@ -404,5 +409,162 @@ export class PrismaAdminRead extends AdminReadPort {
       createdAt: connector.createdAt,
       updatedAt: connector.policy?.updatedAt ?? connector.createdAt,
     };
+  }
+
+  async billingPlans() {
+    return this.prisma.subscriptionPlan.findMany({
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        priceVnd: true,
+        monthlyQuota: true,
+        isActive: true,
+        revision: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { code: 'asc' },
+    });
+  }
+
+  async billingSubscriptions(filter: AdminBillingSubscriptionFilter) {
+    const where: Prisma.SubscriptionWhereInput = {
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.planId ? { planId: filter.planId } : {}),
+      ...(filter.q
+        ? { user: { email: { contains: filter.q, mode: 'insensitive' } } }
+        : {}),
+    };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.subscription.findMany({
+        where,
+        select: {
+          id: true,
+          status: true,
+          currentPeriodStart: true,
+          currentPeriodEnd: true,
+          autoRenew: true,
+          user: { select: { email: true } },
+          plan: {
+            select: { id: true, code: true, name: true, monthlyQuota: true },
+          },
+          usages: {
+            select: { totalQuota: true, usedQuota: true },
+            orderBy: { periodStart: 'desc' },
+            take: 1,
+          },
+        },
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        skip: (filter.page - 1) * filter.pageSize,
+        take: filter.pageSize,
+      }),
+      this.prisma.subscription.count({ where }),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        userEmail: row.user.email,
+        status: row.status,
+        planId: row.plan.id,
+        planCode: row.plan.code,
+        planName: row.plan.name,
+        monthlyQuota: row.usages[0]?.totalQuota ?? row.plan.monthlyQuota,
+        usedQuota: row.usages[0]?.usedQuota ?? 0,
+        currentPeriodStart: row.currentPeriodStart,
+        currentPeriodEnd: row.currentPeriodEnd,
+        autoRenew: row.autoRenew,
+      })),
+      total,
+      page: filter.page,
+      pageSize: filter.pageSize,
+    };
+  }
+
+  async billingPayments(filter: AdminBillingPaymentFilter) {
+    const where: Prisma.PaymentOrderWhereInput = {
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.from || filter.to
+        ? {
+            createdAt: {
+              ...(filter.from ? { gte: filter.from } : {}),
+              ...(filter.to ? { lt: filter.to } : {}),
+            },
+          }
+        : {}),
+    };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.paymentOrder.findMany({
+        where,
+        select: {
+          id: true,
+          orderCode: true,
+          amountVnd: true,
+          status: true,
+          transactionNo: true,
+          bankCode: true,
+          payDate: true,
+          createdAt: true,
+          user: { select: { email: true } },
+          plan: { select: { code: true, name: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (filter.page - 1) * filter.pageSize,
+        take: filter.pageSize,
+      }),
+      this.prisma.paymentOrder.count({ where }),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        orderCode: row.orderCode,
+        userEmail: row.user.email,
+        planCode: row.plan.code,
+        planName: row.plan.name,
+        amountVnd: row.amountVnd,
+        status: row.status,
+        transactionNo: row.transactionNo,
+        bankCode: row.bankCode,
+        payDate: row.payDate,
+        createdAt: row.createdAt,
+      })),
+      total,
+      page: filter.page,
+      pageSize: filter.pageSize,
+    };
+  }
+
+  async billingRevenue(filter: AdminBillingRevenueFilter) {
+    const groups = await this.prisma.paymentOrder.groupBy({
+      by: ['planId'],
+      where: {
+        status: 'COMPLETED',
+        payDate: { gte: filter.from, lt: filter.to },
+      },
+      _sum: { amountVnd: true },
+      _count: { _all: true },
+    });
+    if (groups.length === 0) return [];
+    const plans = await this.prisma.subscriptionPlan.findMany({
+      where: { id: { in: groups.map((group) => group.planId) } },
+      select: { id: true, code: true, name: true },
+    });
+    const planById = new Map(plans.map((plan) => [plan.id, plan]));
+    return groups
+      .flatMap((group) => {
+        const plan = planById.get(group.planId);
+        return plan
+          ? [
+              {
+                planId: plan.id,
+                planCode: plan.code,
+                planName: plan.name,
+                orderCount: group._count._all,
+                revenueVnd: group._sum.amountVnd ?? 0,
+              },
+            ]
+          : [];
+      })
+      .sort((left, right) => left.planCode.localeCompare(right.planCode));
   }
 }

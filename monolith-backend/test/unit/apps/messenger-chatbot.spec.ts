@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { createHmac } from 'node:crypto';
 import {
   ActionNode,

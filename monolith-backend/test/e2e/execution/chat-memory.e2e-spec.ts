@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 // Real HTTP, Postgres, Redis and BullMQ worker: a webhook workflow that loads
 // the conversation of a sender and saves each turn, so the second message of
 // the same sender finds the first one, and another sender does not.

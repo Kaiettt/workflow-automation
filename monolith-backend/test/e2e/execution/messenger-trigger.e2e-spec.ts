@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 // Messenger end to end with a real HTTP server, Postgres, Redis and BullMQ.
 // Only Facebook is replaced (META_GRAPH_API). Everything is configured the way
 // a user does it in the UI: credential with their own App ID / Secret →

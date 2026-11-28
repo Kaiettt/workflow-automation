@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { createHmac } from 'node:crypto';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { CommandBus } from '@nestjs/cqrs';

@@ -28,6 +28,7 @@ import { GeminiLlmAdapter } from './infrastructure/llm/gemini-llm.adapter';
 import { ManualTriggerExecutor } from './application/executors/manual-trigger-executor';
 import { packageExecutors } from './application/executors/package-action-executor';
 import { AppsModule, PackageRegistry } from '@app/apps';
+import { SubscriptionModule } from '@app/subscription';
 import { GoogleSheetReadRowsExecutor } from './application/executors/google-sheet-read-rows-executor';
 import { FilterExecutor } from './application/executors/filter-executor';
 import { IfExecutor } from './application/executors/if-executor';
@@ -56,6 +57,7 @@ import { NodeRunner } from './application/services/node-runner';
   imports: [
     CqrsModule,
     PrismaModule,
+    SubscriptionModule,
     AuthModule,
     AppsModule,
     NodeLibraryModule,

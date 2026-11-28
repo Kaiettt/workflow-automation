@@ -163,4 +163,70 @@ describe('ExecutionStarter', () => {
     ).rejects.toThrow('Idempotency key was already used');
     expect(queue.jobs).toHaveLength(1);
   });
+
+  it('reserves execution quota from workflowOwnerId before creating execution [SCENARIO-SUB-02], [SCENARIO-SUB-03]', async () => {
+    const { repository, queue } = setup();
+    const quotaReservation = {
+      reserveExecutionQuota: jest.fn().mockResolvedValue(undefined),
+    };
+    const starter = new ExecutionStarter(
+      repository,
+      queue,
+      undefined,
+      quotaReservation,
+    );
+    const version = await repository.findVersion('version-1');
+    if (!version) throw new Error('test workflow version is missing');
+
+    const result = await starter.start({
+      version,
+      triggerType: TriggerType.MANUAL,
+      triggeredById: 'actor-1',
+      triggerItems: [],
+    });
+
+    expect(result.status).toBe(ExecutionStatus.QUEUED);
+    expect(quotaReservation.reserveExecutionQuota).toHaveBeenCalledWith(
+      'actor-1',
+      'MANUAL',
+    );
+    expect(repository.created).toHaveLength(1);
+  });
+
+  it('rejects execution with 429 when quota is exceeded and does not create execution [SCENARIO-SUB-04]', async () => {
+    const { repository, queue } = setup();
+    const quotaReservation = {
+      reserveExecutionQuota: jest
+        .fn()
+        .mockRejectedValue(
+          new Error(
+            'Monthly execution quota exceeded. Please upgrade your plan.',
+          ),
+        ),
+    };
+    const starter = new ExecutionStarter(
+      repository,
+      queue,
+      undefined,
+      quotaReservation,
+    );
+    const version = await repository.findVersion('version-1');
+    if (!version) throw new Error('test workflow version is missing');
+
+    await expect(
+      starter.start({
+        version,
+        triggerType: TriggerType.WEBHOOK,
+        triggeredById: null,
+        triggerItems: [],
+      }),
+    ).rejects.toThrow('Monthly execution quota exceeded');
+
+    expect(quotaReservation.reserveExecutionQuota).toHaveBeenCalledWith(
+      'actor-1',
+      'WEBHOOK',
+    );
+    expect(repository.created).toHaveLength(0);
+    expect(queue.jobs).toHaveLength(0);
+  });
 });

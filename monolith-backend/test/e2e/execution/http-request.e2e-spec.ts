@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 // Real HTTP, Postgres, Redis and BullMQ worker: a webhook workflow calls a web
 // API with a bearer credential, and the same call to an internal address is
 // refused unless private addresses are allowed.

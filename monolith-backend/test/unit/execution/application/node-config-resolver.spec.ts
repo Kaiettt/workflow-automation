@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { BadRequestException } from '@nestjs/common';
 import { NodeConfigResolver } from '@app/execution/application/services/node-config-resolver';
 import { ExecutionRepository } from '@app/execution/domain/repositories/execution.repository';

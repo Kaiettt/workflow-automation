@@ -1,4 +1,11 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
+import { QUOTA_RESERVATION_PORT } from '@app/subscription';
+import type { QuotaReservationPort } from '@app/subscription';
 import { ExecutionQueuePort } from '../ports/execution-queue.port';
 import { ExecutionRepository } from '../../domain/repositories/execution.repository';
 import {
@@ -40,6 +47,9 @@ export class ExecutionStarter {
     private readonly repository: ExecutionRepository,
     @Inject(ExecutionQueuePort) private readonly queue: ExecutionQueuePort,
     private readonly eventPublisher?: ExecutionEventPublisher,
+    @Optional()
+    @Inject(QUOTA_RESERVATION_PORT)
+    private readonly quotaReservation?: QuotaReservationPort,
   ) {}
 
   async start(
@@ -47,6 +57,20 @@ export class ExecutionStarter {
   ): Promise<QueuedExecutionAcceptance> {
     const existing = await this.findExisting(input);
     if (existing) return this.acceptExisting(existing, input.version.id);
+
+    // Reserve quota atomically from workflow owner [SCENARIO-SUB-02], [SCENARIO-SUB-03], [SCENARIO-SUB-04]
+    if (this.quotaReservation) {
+      const trigger =
+        input.triggerType === TriggerType.MANUAL
+          ? 'MANUAL'
+          : input.triggerType === TriggerType.WEBHOOK
+            ? 'WEBHOOK'
+            : 'SCHEDULE';
+      await this.quotaReservation.reserveExecutionQuota(
+        input.version.workflowOwnerId,
+        trigger,
+      );
+    }
 
     const queuedAt = new Date();
     let executionId: string;

@@ -155,3 +155,58 @@ export class DashboardDto {
   @IsOptional() @IsISO8601() to?: string;
   @IsOptional() @IsString() @MaxLength(100) timezone = 'UTC';
 }
+
+export class AdminBillingSubscriptionsDto extends PageDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  q?: string;
+  @IsOptional() @IsIn(['ACTIVE', 'EXPIRED', 'CANCELLED']) status?:
+    'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+  @IsOptional() @IsUUID() planId?: string;
+}
+export class AdminBillingPaymentsDto extends PageDto {
+  @IsOptional() @IsIn(['PENDING', 'COMPLETED', 'FAILED']) status?:
+    'PENDING' | 'COMPLETED' | 'FAILED';
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
+  from?: string;
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
+  to?: string;
+}
+export class AdminBillingRevenueDto {
+  @IsISO8601({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
+  from!: string;
+  @IsISO8601({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
+  to!: string;
+}
+export class UpdateBillingPlanDto {
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsInt()
+  @Min(0)
+  @Max(1000000000)
+  priceVnd?: number;
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsInt()
+  @Min(0)
+  @Max(1000000000)
+  monthlyQuota?: number;
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsBoolean()
+  isActive?: boolean;
+  @IsInt() @Min(0) expectedRevision!: number;
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @Length(5, 500)
+  reason!: string;
+}

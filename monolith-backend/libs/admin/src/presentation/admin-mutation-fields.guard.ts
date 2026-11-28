@@ -15,6 +15,8 @@ export const AdminBodyFields = (
     | 'allowNewCredentials'
     | 'isCatalogVisible'
     | 'isExecutionAllowed'
+    | 'priceVnd'
+    | 'monthlyQuota'
   )[]
 ) => SetMetadata(BODY_FIELDS, ['expectedRevision', 'reason', ...fields]);
 

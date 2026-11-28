@@ -25,22 +25,24 @@ enum UserRole {
 }
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique @db.VarChar(255)
-  passwordHash String   @map("password_hash") @db.VarChar(255)
-  name         String   @db.VarChar(255)
-  role         UserRole @default(CLIENT)
-  revision     Int      @default(0)
-  sessionVersion Int    @default(0) @map("session_version")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  email          String   @unique @db.VarChar(255)
+  passwordHash   String   @map("password_hash") @db.VarChar(255)
+  name           String   @db.VarChar(255)
+  role           UserRole @default(CLIENT)
+  revision       Int      @default(0)
+  sessionVersion Int      @default(0) @map("session_version")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   ownedWorkflows       Workflow[]            @relation("WorkflowOwner")
   publishedVersions    WorkflowVersion[]     @relation("PublishedBy")
   lockedDrafts         WorkflowDraft[]       @relation("DraftLockedBy")
   connectorCredentials ConnectorCredential[] @relation("CredentialOwner")
   triggeredExecutions  Execution[]           @relation("TriggeredBy")
+  subscription         Subscription?
+  paymentOrders        PaymentOrder[]
 
   @@map("users")
 }
@@ -282,25 +284,25 @@ model Execution {
   triggerType TriggerType     @map("trigger_type") // FR-EX-07
   status      ExecutionStatus @default(RUNNING) // FR-EM-01
 
-  triggeredById String? @map("triggered_by_id") @db.Uuid // null với schedule/webhook
-  triggeredBy   User?   @relation("TriggeredBy", fields: [triggeredById], references: [id])
+  triggeredById  String? @map("triggered_by_id") @db.Uuid // null với schedule/webhook
+  triggeredBy    User?   @relation("TriggeredBy", fields: [triggeredById], references: [id])
   idempotencyKey String? @map("idempotency_key") @db.VarChar(128)
 
-  queuedAt   DateTime  @default(now()) @map("queued_at") @db.Timestamptz
-  startedAt  DateTime? @map("started_at") @db.Timestamptz
-  finishedAt DateTime? @map("finished_at") @db.Timestamptz
-  durationMs Int?      @map("duration_ms") // FR-EM-02, tính sẵn khi finish
-  context    Json? // Biến môi trường hoặc context đầu vào của execution
-  errorCode  String? @map("error_code") @db.VarChar(100)
-  cancellationReason String? @map("cancellation_reason") @db.VarChar(100)
+  queuedAt           DateTime  @default(now()) @map("queued_at") @db.Timestamptz
+  startedAt          DateTime? @map("started_at") @db.Timestamptz
+  finishedAt         DateTime? @map("finished_at") @db.Timestamptz
+  durationMs         Int?      @map("duration_ms") // FR-EM-02, tính sẵn khi finish
+  context            Json? // Biến môi trường hoặc context đầu vào của execution
+  errorCode          String?   @map("error_code") @db.VarChar(100)
+  cancellationReason String?   @map("cancellation_reason") @db.VarChar(100)
 
   nodeLogs ExecutionNodeLog[]
 
+  @@unique([triggeredById, idempotencyKey])
   @@index([workflowId, startedAt(sort: Desc)]) // FR-EM-04 danh sách execution gần nhất
   @@index([workflowId, queuedAt(sort: Desc), id(sort: Desc)])
   @@index([queuedAt(sort: Desc), id(sort: Desc)])
   @@index([status, queuedAt(sort: Desc), id(sort: Desc)])
-  @@unique([triggeredById, idempotencyKey])
   @@index([status])
   @@map("executions")
 }
@@ -395,23 +397,23 @@ model ExecutionNodeLog {
   finishedAt DateTime? @map("finished_at") @db.Timestamptz // FR-LG-03
   durationMs Int?      @map("duration_ms")
 
+  @@unique([executionId, nodeId])
   @@index([executionId])
   @@index([executionId, status]) // FR-LG-05 tra cứu/lọc log
-  @@unique([executionId, nodeId])
   @@map("execution_node_logs")
 }
 
 model AdminAuditEvent {
-  id        String   @id @default(uuid()) @db.Uuid
-  actorType String   @map("actor_type") @db.VarChar(20)
-  actorId   String?  @map("actor_id") @db.Uuid
-  action    String   @db.VarChar(100)
-  targetId  String   @map("target_id") @db.Uuid
-  targetType String  @map("target_type") @db.VarChar(40)
-  reason    String   @db.VarChar(500)
-  before    Json
-  after     Json
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  actorType  String   @map("actor_type") @db.VarChar(20)
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String   @db.VarChar(100)
+  targetId   String   @map("target_id") @db.Uuid
+  targetType String   @map("target_type") @db.VarChar(40)
+  reason     String   @db.VarChar(500)
+  before     Json
+  after      Json
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([createdAt, id])
   @@index([targetId, createdAt])
@@ -419,14 +421,140 @@ model AdminAuditEvent {
 }
 
 model SessionRevocation {
-  id             String   @id @default(uuid()) @db.Uuid
-  userId         String   @map("user_id") @db.Uuid
-  sessionVersion Int      @map("session_version")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  sessionVersion Int       @map("session_version")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   completedAt    DateTime? @map("completed_at") @db.Timestamptz
 
   @@index([completedAt, createdAt])
   @@map("session_revocations")
+}
+
+// ----------------------------------------------------------------------------
+// Subscription & Billing Module
+// ----------------------------------------------------------------------------
+
+enum PlanCode {
+  FREE
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum PaymentOrderStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum PaymentProvider {
+  VNPAY
+}
+
+model SubscriptionPlan {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         PlanCode @unique
+  name         String   @db.VarChar(100)
+  priceVnd     Int      @map("price_vnd")
+  monthlyQuota Int      @map("monthly_quota")
+  isActive     Boolean  @default(true) @map("is_active")
+  revision     Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  subscriptions Subscription[]
+  paymentOrders PaymentOrder[]
+
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id                 String             @id @default(uuid()) @db.Uuid
+  userId             String             @unique @map("user_id") @db.Uuid
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId             String             @map("plan_id") @db.Uuid
+  plan               SubscriptionPlan   @relation(fields: [planId], references: [id])
+  status             SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime           @map("current_period_start") @db.Timestamptz
+  currentPeriodEnd   DateTime           @map("current_period_end") @db.Timestamptz
+  nextPlanId         String?            @map("next_plan_id") @db.Uuid
+  autoRenew          Boolean            @default(true) @map("auto_renew")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  usages SubscriptionUsage[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model SubscriptionUsage {
+  id             String       @id @default(uuid()) @db.Uuid
+  subscriptionId String       @map("subscription_id") @db.Uuid
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  periodStart    DateTime     @map("period_start") @db.Timestamptz
+  periodEnd      DateTime     @map("period_end") @db.Timestamptz
+  totalQuota     Int          @map("total_quota")
+  usedQuota      Int          @default(0) @map("used_quota")
+  manualUsage    Int          @default(0) @map("manual_usage")
+  webhookUsage   Int          @default(0) @map("webhook_usage")
+  scheduleUsage  Int          @default(0) @map("schedule_usage")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([subscriptionId, periodStart, periodEnd])
+  @@map("subscription_usages")
+}
+
+model PaymentOrder {
+  id            String             @id @default(uuid()) @db.Uuid
+  orderCode     String             @unique @map("order_code") @db.VarChar(64) // vnp_TxnRef
+  userId        String             @map("user_id") @db.Uuid
+  user          User               @relation(fields: [userId], references: [id])
+  planId        String             @map("plan_id") @db.Uuid
+  plan          SubscriptionPlan   @relation(fields: [planId], references: [id])
+  amountVnd     Int                @map("amount_vnd")
+  status        PaymentOrderStatus @default(PENDING)
+  provider      PaymentProvider    @default(VNPAY)
+  transactionNo String?            @map("transaction_no") @db.VarChar(64) // vnp_TransactionNo
+  bankCode      String?            @map("bank_code") @db.VarChar(32) // vnp_BankCode
+  responseCode  String?            @map("response_code") @db.VarChar(16) // vnp_ResponseCode
+  payDate       DateTime?          @map("pay_date") @db.Timestamptz
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([userId])
+  @@index([orderCode])
+  @@index([status])
+  @@map("payment_orders")
+}
+
+model BillingOutboxEvent {
+  id             String    @id @default(uuid()) @db.Uuid
+  idempotencyKey String    @unique @map("idempotency_key") @db.VarChar(128)
+  eventType      String    @map("event_type") @db.VarChar(100)
+  payload        Json
+  processedAt    DateTime? @map("processed_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([processedAt, createdAt])
+  @@map("billing_outbox_events")
+}
+
+model SubscriptionPaymentFulfillment {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderCode String   @unique @map("order_code") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("subscription_payment_fulfillments")
 }
 
 // ----------------------------------------------------------------------------

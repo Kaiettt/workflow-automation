@@ -9,6 +9,11 @@ import { AdminReadHandler } from './application/admin-read.query';
 import { PrismaAdminRead } from './infrastructure/prisma-admin-read';
 import { AdminController } from './presentation/admin.controller';
 import { AdminMutationFieldsGuard } from './presentation/admin-mutation-fields.guard';
+import {
+  UpdateSubscriptionPlanHandler,
+  SubscriptionPlanAdminPort,
+} from './application/update-subscription-plan.command';
+import { PrismaSubscriptionPlanAdminRepository } from './infrastructure/prisma-subscription-plan-admin.repository';
 
 @Module({
   imports: [
@@ -22,7 +27,12 @@ import { AdminMutationFieldsGuard } from './presentation/admin-mutation-fields.g
   providers: [
     AdminMutationFieldsGuard,
     AdminReadHandler,
+    UpdateSubscriptionPlanHandler,
     { provide: AdminReadPort, useClass: PrismaAdminRead },
+    {
+      provide: SubscriptionPlanAdminPort,
+      useClass: PrismaSubscriptionPlanAdminRepository,
+    },
   ],
 })
 export class AdminModule {}

@@ -29,11 +29,13 @@ async function metadata(
   const userIds = new Set<string>();
   const connectorIds = new Set<string>();
   const nodeIds = new Set<string>();
+  const planIds = new Set<string>();
   for (const row of rows) {
     if (row.actorId) userIds.add(row.actorId);
     if (row.targetType === 'USER') userIds.add(row.targetId);
     if (row.targetType === 'CONNECTOR') connectorIds.add(row.targetId);
     if (row.targetType === 'NODE_TYPE') nodeIds.add(row.targetId);
+    if (row.targetType === 'SUBSCRIPTION_PLAN') planIds.add(row.targetId);
   }
   const users = userIds.size
     ? await tx.user.findMany({
@@ -53,11 +55,18 @@ async function metadata(
         select: { id: true, displayName: true },
       })
     : [];
+  const plans = planIds.size
+    ? await tx.subscriptionPlan.findMany({
+        where: { id: { in: [...planIds] } },
+        select: { id: true, name: true },
+      })
+    : [];
   const userById = new Map(users.map((user) => [user.id, user]));
   const connectorById = new Map(
     connectors.map((connector) => [connector.id, connector.name]),
   );
   const nodeById = new Map(nodes.map((node) => [node.id, node.displayName]));
+  const planById = new Map(plans.map((plan) => [plan.id, plan.name]));
   return rows.map((row) => ({
     id: row.id,
     actorType:
@@ -71,7 +80,8 @@ async function metadata(
     targetType:
       row.targetType === 'USER' ||
       row.targetType === 'CONNECTOR' ||
-      row.targetType === 'NODE_TYPE'
+      row.targetType === 'NODE_TYPE' ||
+      row.targetType === 'SUBSCRIPTION_PLAN'
         ? row.targetType
         : 'UNKNOWN',
     targetId: row.targetId,
@@ -82,7 +92,9 @@ async function metadata(
           ? (connectorById.get(row.targetId) ?? null)
           : row.targetType === 'NODE_TYPE'
             ? (nodeById.get(row.targetId) ?? null)
-            : null,
+            : row.targetType === 'SUBSCRIPTION_PLAN'
+              ? (planById.get(row.targetId) ?? null)
+              : null,
     reason: row.reason,
     createdAt: row.createdAt,
   }));

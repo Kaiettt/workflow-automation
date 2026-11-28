@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { OnceExecutionStrategy } from '@app/execution/application/services/strategies/once-execution.strategy';
 import { PerItemExecutionStrategy } from '@app/execution/application/services/strategies/per-item-execution.strategy';
 import { NodeConfigResolver } from '@app/execution/application/services/node-config-resolver';

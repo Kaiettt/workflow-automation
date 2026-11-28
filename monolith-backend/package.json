@@ -18,7 +18,7 @@
     "test": "jest",
     "test:integration": "jest --config ./test/jest-integration.json --runInBand",
     "admin:bootstrap": "ts-node -r tsconfig-paths/register scripts/bootstrap-admin.ts",
-    "test:unit": "jest --testPathPattern=test/unit",
+    "test:unit": "jest test/unit",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
@@ -122,6 +122,9 @@
       "^@app/apps(|/.*)$": "<rootDir>/libs/apps/src/$1",
       "^@app/triggers(|/.*)$": "<rootDir>/libs/triggers/src/$1",
       "^@app/admin(|/.*)$": "<rootDir>/libs/admin/src/$1",
+      "^@app/subscription(|/.*)$": "<rootDir>/libs/subscription/src/$1",
+      "^@app/payment(|/.*)$": "<rootDir>/libs/payment/src/$1",
+      "^@app/billing(|/.*)$": "<rootDir>/libs/payment/src/$1",
       "^@test/(.*)$": "<rootDir>/test/$1"
     },
     "testPathIgnorePatterns": [

@@ -21,6 +21,13 @@ import type {
   Page,
   UserFilter,
   WorkflowSummary,
+  BillingPlanAdmin,
+  BillingPaymentAdmin,
+  BillingRevenueAdmin,
+  BillingSubscriptionAdmin,
+  BillingSubscriptionFilter,
+  BillingPaymentFilter,
+  UpdateBillingPlanPayload,
 } from '../types/admin.types';
 
 interface Envelope<T> { success: boolean; data: T; }
@@ -62,5 +69,20 @@ export const adminService = {
   },
   async changeConnectorPolicy(id: string, payload: ChangeConnectorPolicyPayload) {
     return (await apiClient.patch<Envelope<ConnectorAdminItem>>(`/api/admin/connectors/${id}/credential-policy`, payload)).data.data;
+  },
+  async billingPlans(signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<BillingPlanAdmin[]>>('/api/admin/billing/plans', { signal })).data.data;
+  },
+  async updateBillingPlan(id: string, payload: UpdateBillingPlanPayload) {
+    return (await apiClient.patch<Envelope<BillingPlanAdmin>>(`/api/admin/billing/plans/${encodeURIComponent(id)}`, payload)).data.data;
+  },
+  async billingSubscriptions(filter: BillingSubscriptionFilter, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<Page<BillingSubscriptionAdmin>>>('/api/admin/billing/subscriptions', { params: filter, signal })).data.data;
+  },
+  async billingPayments(filter: BillingPaymentFilter, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<Page<BillingPaymentAdmin>>>('/api/admin/billing/payments', { params: filter, signal })).data.data;
+  },
+  async billingRevenue(from: string, to: string, signal?: AbortSignal) {
+    return (await apiClient.get<Envelope<BillingRevenueAdmin[]>>('/api/admin/billing/revenue', { params: { from, to }, signal })).data.data;
   },
 };
