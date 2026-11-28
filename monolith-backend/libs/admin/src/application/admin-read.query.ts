@@ -9,6 +9,11 @@ import type {
 import type { NodeTypeFilter } from './node-type-admin.types';
 import type { AdminExecutionFilter } from './admin-execution.types';
 import type { AdminAuditFilter } from './admin-audit.types';
+import type {
+  AdminBillingPaymentFilter,
+  AdminBillingRevenueFilter,
+  AdminBillingSubscriptionFilter,
+} from './admin-billing.types';
 type AdminReadRequest =
   | { kind: 'auditEvents'; filter: AdminAuditFilter }
   | { kind: 'auditEvent'; id: string }
@@ -21,7 +26,11 @@ type AdminReadRequest =
   | { kind: 'workflows'; id: string; filter: UserFilter }
   | { kind: 'dashboard'; filter: DashboardFilter }
   | { kind: 'connectors'; filter: ConnectorFilter }
-  | { kind: 'connector'; id: string };
+  | { kind: 'connector'; id: string }
+  | { kind: 'billingPlans' }
+  | { kind: 'billingSubscriptions'; filter: AdminBillingSubscriptionFilter }
+  | { kind: 'billingPayments'; filter: AdminBillingPaymentFilter }
+  | { kind: 'billingRevenue'; filter: AdminBillingRevenueFilter };
 export class AdminReadQuery {
   constructor(readonly request: AdminReadRequest) {}
 }
@@ -55,6 +64,14 @@ export class AdminReadHandler implements IQueryHandler<AdminReadQuery> {
         return this.reads.connectors(request.filter);
       case 'connector':
         return this.reads.connector(request.id);
+      case 'billingPlans':
+        return this.reads.billingPlans();
+      case 'billingSubscriptions':
+        return this.reads.billingSubscriptions(request.filter);
+      case 'billingPayments':
+        return this.reads.billingPayments(request.filter);
+      case 'billingRevenue':
+        return this.reads.billingRevenue(request.filter);
     }
   }
 }

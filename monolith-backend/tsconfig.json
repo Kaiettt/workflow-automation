@@ -43,6 +43,12 @@
       "@app/triggers/*": ["libs/triggers/src/*"],
       "@app/admin": ["libs/admin/src"],
       "@app/admin/*": ["libs/admin/src/*"],
+      "@app/subscription": ["libs/subscription/src"],
+      "@app/subscription/*": ["libs/subscription/src/*"],
+      "@app/payment": ["libs/payment/src"],
+      "@app/payment/*": ["libs/payment/src/*"],
+      "@app/billing": ["libs/payment/src"],
+      "@app/billing/*": ["libs/payment/src/*"],
       "@test/*": ["test/*"]
     },
     "incremental": true,

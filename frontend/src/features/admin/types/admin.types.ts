@@ -45,6 +45,28 @@ export interface Dashboard {
   errors: { code: string; count: number }[];
 }
 
+export interface BillingPlanAdmin {
+  id: string; code: 'FREE' | 'STARTER' | 'PRO' | 'BUSINESS'; name: string;
+  priceVnd: number; monthlyQuota: number; isActive: boolean; revision: number;
+  createdAt: string; updatedAt: string;
+}
+export interface BillingSubscriptionAdmin {
+  id: string; userEmail: string; status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED'; planId: string;
+  planCode: string; planName: string; monthlyQuota: number; usedQuota: number;
+  currentPeriodStart: string; currentPeriodEnd: string; autoRenew: boolean;
+}
+export interface BillingPaymentAdmin {
+  id: string; orderCode: string; userEmail: string; planCode: string; planName: string;
+  amountVnd: number; status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  transactionNo: string | null; bankCode: string | null; payDate: string | null; createdAt: string;
+}
+export interface BillingRevenueAdmin {
+  planId: string; planCode: string; planName: string; orderCount: number; revenueVnd: number;
+}
+export interface BillingSubscriptionFilter { page: number; pageSize: number; q?: string; status?: BillingSubscriptionAdmin['status']; planId?: string; }
+export interface BillingPaymentFilter { page: number; pageSize: number; status?: BillingPaymentAdmin['status']; from?: string; to?: string; }
+export interface UpdateBillingPlanPayload { priceVnd?: number; monthlyQuota?: number; isActive?: boolean; expectedRevision: number; reason: string; }
+
 export type ConnectorAuthType = 'NONE' | 'API_KEY' | 'OAUTH2' | 'BASIC';
 
 export interface ConnectorAdminItem {

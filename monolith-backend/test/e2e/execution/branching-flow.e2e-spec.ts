@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 // Real HTTP, Postgres, Redis and BullMQ worker: a workflow with a Switch is
 // saved with its output connections, published and run; only the branch the
 // message matches runs, the other ones are logged as skipped.

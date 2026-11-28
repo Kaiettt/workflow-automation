@@ -16,6 +16,12 @@ const fieldsByAction: Record<AdminAuditAction, readonly AdminAuditField[]> = {
     'isExecutionAllowed',
     'revision',
   ],
+  SUBSCRIPTION_PLAN_CHANGED: [
+    'priceVnd',
+    'monthlyQuota',
+    'isActive',
+    'revision',
+  ],
 };
 const targetByAction = {
   USER_SUSPENDED: 'USER',
@@ -24,6 +30,7 @@ const targetByAction = {
   ADMIN_BOOTSTRAPPED: 'USER',
   CONNECTOR_POLICY_CHANGED: 'CONNECTOR',
   NODE_TYPE_STATUS_CHANGED: 'NODE_TYPE',
+  SUBSCRIPTION_PLAN_CHANGED: 'SUBSCRIPTION_PLAN',
 } satisfies Record<AdminAuditAction, string>;
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -47,6 +54,13 @@ export function projectAdminAuditSnapshot(
     else if (field === 'role') {
       if (entry === 'ADMIN' || entry === 'CLIENT') result[field] = entry;
     } else if (field === 'revision') {
+      if (
+        typeof entry === 'number' &&
+        Number.isSafeInteger(entry) &&
+        entry >= 0
+      )
+        result[field] = entry;
+    } else if (field === 'priceVnd' || field === 'monthlyQuota') {
       if (
         typeof entry === 'number' &&
         Number.isSafeInteger(entry) &&

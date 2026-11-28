@@ -1,7 +1,14 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  ConflictException,
+  BadRequestException,
+  Inject,
+  Optional,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { SUBSCRIPTION_PROVISIONING_PORT } from '@app/subscription';
+import type { SubscriptionProvisioningPort } from '@app/subscription';
 import { UserRole } from '../../domain/enums/user-role.enum';
 import { User } from '../../domain/entities/user.entity';
 import { UserRepository } from '../../domain/repositories/user.repository';
@@ -30,6 +37,9 @@ export class RegisterHandler implements ICommandHandler<
     private readonly otpRepository: OtpRepository,
     private readonly refreshTokenRepository: RefreshTokenRepository,
     private readonly jwtService: JwtService,
+    @Optional()
+    @Inject(SUBSCRIPTION_PROVISIONING_PORT)
+    private readonly subscriptionProvisioning?: SubscriptionProvisioningPort,
   ) {}
 
   async execute(command: RegisterCommand): Promise<AuthResultDto> {
@@ -78,6 +88,13 @@ export class RegisterHandler implements ICommandHandler<
     });
 
     const userId = await this.userRepository.create(user);
+
+    // Auto-allocate FREE subscription tier for CLIENT users [SCENARIO-SUB-01]
+    if (user.role === UserRole.CLIENT && this.subscriptionProvisioning) {
+      await this.subscriptionProvisioning.allocateDefaultFreeSubscription(
+        userId,
+      );
+    }
 
     // 4. Generate JWT tokens
     const payload = {

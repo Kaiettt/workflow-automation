@@ -96,6 +96,7 @@ export class ReceiveWebhookHandler implements ICommandHandler<ReceiveWebhookComm
     ) => trigger.webhook.accepts?.(event, parameters) ?? true;
     const started: string[] = [];
     let ignored = 0;
+    let anyQuotaExceeded = false;
     const pendingTests = [...tests];
 
     for (const event of result.events) {
@@ -118,7 +119,24 @@ export class ReceiveWebhookHandler implements ICommandHandler<ReceiveWebhookComm
         ignored += 1;
         continue;
       }
-      started.push(...(await this.run(matching, event)));
+      const runResult = await this.run(matching, event);
+      started.push(...runResult.started);
+      if (runResult.hadQuotaExceeded) {
+        anyQuotaExceeded = true;
+      }
+    }
+
+    if (started.length === 0 && anyQuotaExceeded) {
+      return {
+        outcome: 'handled',
+        status: 429,
+        body: {
+          statusCode: 429,
+          error: 'QUOTA_EXCEEDED',
+          message:
+            'Monthly execution quota exceeded. Please upgrade your plan.',
+        },
+      };
     }
 
     return {
@@ -153,8 +171,12 @@ export class ReceiveWebhookHandler implements ICommandHandler<ReceiveWebhookComm
     }
   }
 
-  private async run(listeners: Listener[], event: TriggerEvent) {
+  private async run(
+    listeners: Listener[],
+    event: TriggerEvent,
+  ): Promise<{ started: string[]; hadQuotaExceeded: boolean }> {
     const started: string[] = [];
+    let hadQuotaExceeded = false;
     for (const listener of listeners) {
       const workflow = await this.repository.findWorkflow(listener.workflowId);
       if (!workflow || !(await this.access.isActive(workflow.ownerId)))
@@ -168,6 +190,21 @@ export class ReceiveWebhookHandler implements ICommandHandler<ReceiveWebhookComm
           ),
         );
       } catch (error) {
+        if (
+          (error instanceof Error &&
+            error.message.includes('Monthly execution quota exceeded')) ||
+          (typeof error === 'object' &&
+            error !== null &&
+            'status' in error &&
+            (error as { status: unknown }).status === 429) ||
+          (typeof error === 'object' &&
+            error !== null &&
+            'getStatus' in error &&
+            typeof (error as { getStatus: unknown }).getStatus === 'function' &&
+            (error as { getStatus: () => number }).getStatus() === 429)
+        ) {
+          hadQuotaExceeded = true;
+        }
         // One workflow failing to start must not stop the others.
         this.logger.error(
           `Could not start workflow ${listener.workflowId}: ${
@@ -176,6 +213,6 @@ export class ReceiveWebhookHandler implements ICommandHandler<ReceiveWebhookComm
         );
       }
     }
-    return started;
+    return { started, hadQuotaExceeded };
   }
 }

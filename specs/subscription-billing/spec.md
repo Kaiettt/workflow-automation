@@ -1,157 +1,173 @@
-## **1. Objective**
+# Specification: Subscription & Billing with VNPAY
 
-Build a **Freemium + Monthly Subscription** system for FlowPilot, allowing users to purchase plans, pay through VNPAY, and manage workflow execution limits (Execution Quota).
+## 1. Overview & Objective
 
-Core billing principle:
+FlowPilot implements a **Freemium + Monthly Subscription** model, allowing clients to run automated workflows within defined execution quotas, purchase or upgrade subscription plans via **VNPAY Sandbox**, and monitor their quota consumption. Administrators manage pricing plans and oversee subscriptions and transactions.
 
+### Core Billing Principle
 > **1 accepted workflow execution = 1 quota unit**, regardless of the number of nodes or trigger type.
+> Node retries within an execution do not consume extra quota. Failed executions still consume quota once accepted.
 
-## **2. Subscription Plans**
+---
 
-| Plan    | Monthly Price | Execution Quota |
-| ------- | ------------- | --------------- |
-| Free    | 0 VND         | 100             |
-| Starter | 99,000 VND    | 1,000           |
-| Pro     | 299,000 VND   | 5,000           |
-| Power   | 799,000 VND   | 20,000          |
+## 2. Subscription Plans
 
-These are configurable demo values for the MVP, not official commercial pricing.
+| Plan | Code | Monthly Price | Monthly Execution Quota | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Free** | `FREE` | 0 VND | 100 | Default plan granted upon successful user registration |
+| **Starter** | `STARTER` | 99,000 VND | 1,000 | For individuals with growing automation needs |
+| **Pro** | `PRO` | 299,000 VND | 5,000 | For power users running daily automations |
+| **Business** | `BUSINESS` | 799,000 VND | 20,000 | For high-volume business workflows |
 
-- All plans provide the same core features.
-- Plans differ only in execution quota.
-- There is no limit on the number of workflows.
-- Every newly registered user automatically receives the Free Plan.
+*Note: Pricing and quotas are configurable by Admin.*
 
-## **3. Execution Quota Management**
+---
 
-All three trigger types share the same execution quota:
+## 3. Execution Quota Management
 
-| Trigger Type          | Quota Consumption                         |
-| --------------------- | ----------------------------------------- |
-| Manual                | 1 quota per accepted execution            |
-| Webhook               | 1 quota per accepted webhook event        |
-| Background / Schedule | 1 quota per accepted scheduled occurrence |
+All trigger types share the monthly quota pool:
+- `MANUAL`: Consumes 1 quota unit upon execution acceptance.
+- `WEBHOOK`: Consumes 1 quota unit upon webhook reception and execution dispatch.
+- `SCHEDULE`: Forward-compatible; consumes 1 quota unit when scheduled trigger runs.
 
-**Key rules:**
+### Quota Rules:
+1. **Atomic Quota Reservation:** Quota check and decrement/usage increment must occur atomically via PostgreSQL row locking (`SELECT FOR UPDATE` on `SubscriptionUsage`) before an execution is enqueued.
+2. **Quota Exhaustion Enforcement:** When remaining quota is 0:
+   - Manual executions are rejected with error code `QUOTA_EXCEEDED` (HTTP 429/402).
+   - Webhook trigger calls are rejected with HTTP 429 and error code `QUOTA_EXCEEDED`.
+   - In-flight executions already accepted continue until completion.
+3. **Monthly Reset:** Quotas reset at the start of each billing cycle without rollover.
 
-- Accepted executions consume quota, even if execution later fails.
-- Node retries within the same execution do not consume additional quota.
-- Manually rerunning a workflow creates a new execution and consumes another quota.
-- Invalid or rejected requests do not consume quota.
-- Quota resets monthly according to the billing cycle, with no rollover.
-- The backend must perform quota checks and consumption atomically to prevent exceeding limits under concurrent requests.
+---
 
-When the quota is exhausted:
+## 4. Subscription Lifecycle
 
-- Manual and Webhook triggers cannot create new executions.
-- Background/Schedule triggers temporarily pause new scheduled executions.
-- Scheduled executions resume after quota reset.
-- Missed scheduled occurrences are not replayed.
-- Previously accepted executions are allowed to finish.
+| Event | Trigger | Effect |
+| :--- | :--- | :--- |
+| **Auto Free Allocation** | User registers as `CLIENT` | Immediately creates an `ACTIVE` subscription on `FREE` plan with 1-month rolling cycle |
+| **Upgrade** | Successful VNPAY payment for higher tier | Takes effect **immediately**. Starts a new 1-month billing cycle, resets quota to new plan limit. Prior unused quota does not roll over. |
+| **Downgrade** | User chooses lower tier | Retains current plan and remaining quota until current cycle ends. At next billing cycle start, activates the downgraded plan. |
+| **Cancel Renewal** | User cancels active paid subscription | Keeps current plan and quota until current cycle ends. Sets `autoRenew = false`. |
+| **Expire** | Paid cycle ends without payment renewal | Subscription status changes to `EXPIRED`. Executions are blocked. User can renew or click **Switch to Free Plan**. |
+| **Switch to Free** | User manually switches from `EXPIRED` to Free | Immediately activates `FREE` plan with standard 100 quota for a new 1-month cycle. |
 
-## **4. Subscription Lifecycle**
+---
 
-| Action    | Behavior                                                                                      |
-| --------- | --------------------------------------------------------------------------------------------- |
-| Upgrade   | Full payment for the new plan; takes effect immediately after successful payment verification |
-| Downgrade | Takes effect at the beginning of the next billing cycle                                       |
-| Cancel    | Stops renewal while preserving access until the current cycle ends                            |
-| Renew     | Requires manual payment                                                                       |
-| Expire    | Blocks new executions while preserving existing data                                          |
+## 5. Payment Integration (VNPAY Sandbox)
 
-**Upgrade rules:**
+Follows `docs/integration/vnpay-integration.md`:
+1. Client selects a plan to upgrade/renew.
+2. Backend creates a `PaymentOrder` in `PENDING` status with a price snapshot.
+3. Backend generates a signed VNPAY URL (`vnp_Command=pay`, `vnp_CurrCode=VND`, `vnp_Amount = price * 100`, HMAC-SHA512 checksum).
+4. User completes payment on VNPAY Sandbox and is redirected to `Return URL` (Frontend display only).
+5. VNPAY invokes backend `IPN URL` (Server-to-Server):
+   - Backend validates HMAC-SHA512 checksum.
+   - Checks order existence, matching amount, and current status.
+   - If valid and `vnp_ResponseCode == "00"`, marks `PaymentOrder` as `COMPLETED`, applies subscription upgrade, and returns `{"RspCode":"00","Message":"Confirm Success"}`.
+   - If duplicate IPN arrives, returns `{"RspCode":"02","Message":"Order already confirmed"}` without double-crediting quota.
 
-- A new billing cycle starts immediately.
-- Quota resets according to the new plan.
-- Unused quota and remaining time from the previous plan are not carried over.
-- If payment fails, the current subscription remains unchanged.
+---
 
-The MVP does not automatically downgrade expired subscriptions to the Free Plan.
+## 6. Acceptance Criteria & BDD Scenarios
 
-## **5. Payment Integration**
+### Feature: User Registration & Default Free Plan Allocation
 
-Integrate **VNPAY Sandbox** for payment processing.
+#### Scenario [SCENARIO-SUB-01]: Auto-assign Free plan upon registration
+- **Given** a new user registers with role `CLIENT` and verifies their OTP
+- **When** the account creation transaction completes
+- **Then** a `Subscription` record is created for this user with plan `FREE` and status `ACTIVE`
+- **And** a `SubscriptionUsage` record is initialized with `totalQuota = 100`, `usedQuota = 0`, and a 30-day billing period.
 
-Payment flow:
+---
 
-1. The user selects a subscription plan.
-2. The backend retrieves the plan price from the database.
-3. The backend creates a Payment Order.
-4. The user is redirected to VNPAY.
-5. VNPAY processes the transaction.
-6. The backend receives an IPN notification and verifies its signature, transaction reference, and amount.
-7. If verification succeeds, the Payment Order and Subscription are updated.
+### Feature: Atomic Quota Reservation & Enforcement
 
-**Important rules:**
+#### Scenario [SCENARIO-SUB-02]: Manual execution consumes 1 quota
+- **Given** a user has an active subscription with 10 remaining quota
+- **When** the user manually triggers a workflow execution
+- **Then** 1 quota unit is reserved atomically from their subscription
+- **And** the execution is queued successfully with status `QUEUED`
+- **And** the user's remaining quota becomes 9, with `manualUsage` incremented by 1.
 
-- Never trust payment amounts submitted by the frontend.
-- Only a valid IPN notification can confirm successful payment.
-- The Return URL is only for displaying payment results, not confirming payment.
-- Duplicate IPN notifications must not activate subscriptions or grant quota multiple times.
-- Store a snapshot of the plan and price when the Payment Order is created.
+#### Scenario [SCENARIO-SUB-03]: Webhook trigger consumes 1 quota
+- **Given** a workflow owned by a user with 5 remaining quota receives an incoming webhook event
+- **When** the webhook endpoint processes the event
+- **Then** 1 quota unit is reserved atomically
+- **And** the workflow execution is enqueued
+- **And** the user's remaining quota becomes 4, with `webhookUsage` incremented by 1.
 
-## **6. Main Interfaces**
+#### Scenario [SCENARIO-SUB-04]: Execution rejected when quota is exhausted
+- **Given** a user has an active subscription with 0 remaining quota
+- **When** the user attempts to run a workflow manually or a webhook arrives
+- **Then** the system rejects the execution with status code 429 and error `QUOTA_EXCEEDED`
+- **And** no new `Execution` record is created
+- **And** quota usage remains unchanged.
 
-### **Client Billing Dashboard**
+---
 
-Users can:
+### Feature: Payment Creation & VNPay Checkout
 
-- View their current plan and billing cycle.
-- Check total, used, and remaining execution quota.
-- View usage breakdown by Manual / Webhook / Background.
-- Browse available subscription plans.
-- Upgrade, downgrade, or cancel subscriptions.
-- View payment history.
+#### Scenario [SCENARIO-SUB-05]: Initiate payment order and generate payment URL
+- **Given** an authenticated user on the `FREE` plan
+- **When** the user selects the `PRO` plan (price 299,000 VND) and requests checkout
+- **Then** a `PaymentOrder` is created with status `PENDING`, amount `299000`, and a unique `orderCode`
+- **And** the backend returns a signed VNPay URL containing correct `vnp_Amount=29900000`, `vnp_TxnRef`, and valid `vnp_SecureHash`.
 
-### **Admin Billing**
+---
 
-Administrators can:
+### Feature: IPN Webhook & Idempotent Payment Fulfillment
 
-- Create, update, and enable/disable subscription plans.
-- Search and view subscriptions.
-- Search and view Payment Orders.
-- Monitor revenue and subscription statistics by plan.
+#### Scenario [SCENARIO-SUB-06]: Successful IPN activates subscription upgrade immediately
+- **Given** a `PaymentOrder` in `PENDING` status for plan `PRO`
+- **When** VNPay sends a valid IPN request with `vnp_ResponseCode="00"`, valid checksum, and matching amount
+- **Then** the backend responds with `{"RspCode":"00","Message":"Confirm Success"}`
+- **And** the `PaymentOrder` status is updated to `COMPLETED`
+- **And** the user's subscription is updated to `PRO` with a new 30-day cycle
+- **And** the quota is reset to 5,000 with `usedQuota = 0`.
 
-Admin Billing does not grant access to workflow definitions, execution payloads, or credentials.
+#### Scenario [SCENARIO-SUB-07]: Duplicate IPN does not re-apply quota
+- **Given** a `PaymentOrder` that has already been marked `COMPLETED`
+- **When** VNPay sends an identical duplicate IPN request
+- **Then** the backend returns `{"RspCode":"02","Message":"Order already confirmed"}`
+- **And** the user's subscription and quota remain unchanged.
 
-## **7. MVP Scope**
+#### Scenario [SCENARIO-SUB-08]: Failed payment IPN leaves subscription unchanged
+- **Given** a `PaymentOrder` in `PENDING` status
+- **When** VNPay sends an IPN with `vnp_ResponseCode != "00"` (e.g. user cancelled)
+- **Then** the `PaymentOrder` status is marked `FAILED`
+- **And** the user's existing subscription and quota remain unchanged.
 
-In Scope
+---
 
-- Free and paid subscription plans.
-- Subscription lifecycle management.
-- Monthly billing cycles and quota resets.
-- Execution quota enforcement.
-- VNPAY Sandbox integration and IPN verification.
-- Upgrade, downgrade, cancellation, and manual renewal.
-- Client Billing Dashboard.
-- Payment History.
-- Admin Billing.
+### Feature: Subscription Lifecycle (Downgrade, Cancel, Expiration)
 
-Out of Scope
+#### Scenario [SCENARIO-SUB-09]: Downgrade takes effect at next billing cycle
+- **Given** a user with an active `PRO` subscription
+- **When** the user requests a downgrade to `STARTER`
+- **Then** the subscription's `nextPlanId` is set to `STARTER`
+- **And** the user remains on `PRO` with current quota until `currentPeriodEnd`.
 
-- Automatic recurring payments.
-- Annual subscriptions.
-- AI credits.
-- Overage billing.
-- Team / Organization plans.
-- Enterprise billing.
-- Weighted execution pricing.
-- Workflow count limits.
+#### Scenario [SCENARIO-SUB-10]: Expired subscription blocks execution and allows switch to Free
+- **Given** a user whose paid subscription has passed `currentPeriodEnd` without renewal
+- **When** the expiration scheduler runs
+- **Then** the subscription status becomes `EXPIRED`
+- **And** subsequent executions are blocked with `SUBSCRIPTION_EXPIRED`
+- **When** the user clicks "Switch to Free Plan"
+- **Then** their subscription transitions to `FREE` status `ACTIVE` with 100 fresh quota.
 
-## **8. Important Technical Requirements**
+---
 
-The following areas require particular attention during implementation:
+### Feature: Client & Admin Interfaces
 
-1. **Atomic Quota Reservation:** Prevent concurrent requests from exceeding the quota limit.
-2. **Payment Idempotency:** Duplicate IPN notifications must not grant subscriptions or quota multiple times.
-3. **Data Consistency:** Payment Orders and Subscriptions must be updated consistently.
-4. **Security:** Verify VNPAY signatures, enforce Client/Admin authorization, and protect VNPAY secrets.
-5. **Auditability:** Maintain traceable records of payment and subscription lifecycle changes.
-6. **Reliability:** Handle duplicate callbacks and transient processing failures safely.
+#### Scenario [SCENARIO-SUB-11]: Client views billing dashboard and breakdown
+- **Given** an authenticated user
+- **When** the user opens the Billing Dashboard
+- **Then** they see their current plan, billing period start/end, total/used/remaining quota
+- **And** a breakdown of quota used by `MANUAL`, `WEBHOOK`, and `SCHEDULE`
+- **And** a list of past payment transactions with status and date.
 
-## **9. Items to Confirm Before Implementation**
-
-- The current SRS uses `Business` as the fourth plan, while this specification uses `Power`. These should be aligned.
-- The existing technical notes confirm Manual and Webhook execution flows. The actual implementation status of Schedule execution still needs verification.
-- Subscription and Payment Order statuses proposed in this specification should be validated against the database design during implementation.
+#### Scenario [SCENARIO-SUB-12]: Admin views transactions and updates plan prices
+- **Given** an authenticated user with role `ADMIN`
+- **When** the admin updates the price or quota of a subscription plan
+- **Then** new payment orders use the updated price
+- **And** existing active subscriptions retain their current cycle terms until renewal.

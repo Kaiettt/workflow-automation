@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 // Real HTTP, Postgres, Redis and BullMQ worker: the Webhook package's node has
 // its own URL, listens only while the workflow is active, and a POST returns
 // at once while the run finishes in the background.

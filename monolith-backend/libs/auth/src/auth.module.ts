@@ -9,6 +9,7 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from '@app/database';
+import { SubscriptionModule } from '@app/subscription';
 
 import { UserRepository } from './domain/repositories/user.repository';
 import { PrismaUserRepository } from './infrastructure/persistence/prisma-user.repository';
@@ -49,6 +50,7 @@ const QueryHandlers = [GetCurrentUserHandler];
   imports: [
     CqrsModule,
     PrismaModule,
+    SubscriptionModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret:

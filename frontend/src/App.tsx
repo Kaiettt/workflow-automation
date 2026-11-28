@@ -10,6 +10,8 @@ import { NodeTypesPage } from './features/admin/pages/NodeTypesPage';
 import { ExecutionsPage } from './features/admin/pages/ExecutionsPage';
 import { ExecutionDetailPage } from './features/admin/pages/ExecutionDetailPage';
 import { AuditEventsPage } from './features/admin/pages/AuditEventsPage';
+import { AdminBillingPage } from './features/admin/billing/AdminBillingPage';
+import { BillingDashboardPage, PaymentResultPage } from './features/billing';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { HomePage } from './features/home/pages/HomePage';
 import { DesignerPage } from './features/workflow/pages/DesignerPage';
@@ -74,10 +76,13 @@ function App() {
             <Route path="executions" element={<ExecutionsPage />} />
             <Route path="executions/:id" element={<ExecutionDetailPage />} />
             <Route path="audit-events" element={<AuditEventsPage />} />
+            <Route path="billing" element={<AdminBillingPage />} />
           </Route>
         </Route>
         <Route path="/" element={<LegacyWorkflowRedirect />} />
         <Route path="/workflows" element={<WorkflowListPage />} />
+        <Route path="/billing" element={<BillingDashboardPage />} />
+        <Route path="/billing/payment-result" element={<PaymentResultPage />} />
         <Route path="/workflows/:workflowId" element={<DesignerPage />} />
         <Route path="/workflows/:workflowId/versions" element={<VersionListPage />} />
         <Route path="/workflows/:workflowId/versions/:versionId" element={<VersionDetailPage />} />

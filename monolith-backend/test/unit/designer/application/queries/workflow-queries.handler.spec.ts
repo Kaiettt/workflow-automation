@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { NotFoundException } from '@nestjs/common';
 import { WorkflowRepository } from '@app/designer/domain/repositories/workflow.repository';
 import { WorkflowVersionRepository } from '@app/designer/domain/repositories/workflow-version.repository';

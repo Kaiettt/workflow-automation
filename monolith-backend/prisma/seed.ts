@@ -2,6 +2,8 @@ import { PrismaClient, UserRole } from '@prisma/client';
 import { seedMvp } from './seed-mvp';
 import { seedAi } from './seed-ai';
 import { seedDevelopmentAdmin } from './seed-development-admin';
+import { seedSubscriptionPlans } from './seed-subscription-plans';
+import { seedMissingFreeSubscriptions } from './seed-missing-free-subscriptions';
 
 const prisma = new PrismaClient();
 
@@ -42,7 +44,12 @@ async function main() {
   // Run MVP execution data seeding
   await seedMvp(prisma);
   await seedAi(prisma);
+  await seedSubscriptionPlans(prisma);
   const admin = await seedDevelopmentAdmin(prisma);
+  const backfilledSubscriptions = await seedMissingFreeSubscriptions(prisma);
+  console.log(
+    `Assigned the Free plan to ${backfilledSubscriptions} user(s) without a subscription`,
+  );
   if (admin?.role === 'ADMIN' && admin.isActive)
     console.log(`Local Admin ready: ${admin.email}`);
 }

@@ -10,6 +10,8 @@ import { ConnectorModule } from '../../../libs/connector/src';
 import { IntegrationsModule } from '@app/integrations';
 import { ExecutionModule } from '@app/execution';
 import { TriggersModule } from '@app/triggers';
+import { SubscriptionModule } from '@app/subscription';
+import { PaymentModule } from '@app/payment';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { TriggersModule } from '@app/triggers';
     IntegrationsModule,
     ExecutionModule,
     TriggersModule,
+    SubscriptionModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

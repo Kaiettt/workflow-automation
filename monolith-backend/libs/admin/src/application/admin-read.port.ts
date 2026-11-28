@@ -33,6 +33,16 @@ import type {
   AdminAuditPage,
   AdminAuditDetail,
 } from './admin-audit.types';
+import type {
+  AdminBillingPayment,
+  AdminBillingPlan,
+  AdminBillingRevenue,
+  AdminBillingRevenueFilter,
+  AdminBillingSubscription,
+  AdminBillingSubscriptionFilter,
+  AdminBillingPaymentFilter,
+  AdminBillingPage,
+} from './admin-billing.types';
 export abstract class AdminReadPort {
   abstract auditEvents(filter: AdminAuditFilter): Promise<AdminAuditPage>;
   abstract auditEvent(id: string): Promise<AdminAuditDetail | null>;
@@ -48,4 +58,14 @@ export abstract class AdminReadPort {
   abstract dashboard(filter: DashboardFilter): Promise<unknown>;
   abstract connectors(filter: ConnectorFilter): Promise<unknown>;
   abstract connector(id: string): Promise<unknown>;
+  abstract billingPlans(): Promise<AdminBillingPlan[]>;
+  abstract billingSubscriptions(
+    filter: AdminBillingSubscriptionFilter,
+  ): Promise<AdminBillingPage<AdminBillingSubscription>>;
+  abstract billingPayments(
+    filter: AdminBillingPaymentFilter,
+  ): Promise<AdminBillingPage<AdminBillingPayment>>;
+  abstract billingRevenue(
+    filter: AdminBillingRevenueFilter,
+  ): Promise<AdminBillingRevenue[]>;
 }

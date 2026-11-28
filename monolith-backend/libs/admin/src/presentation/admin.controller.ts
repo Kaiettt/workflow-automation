@@ -33,6 +33,7 @@ import {
   AdminMutationFieldsGuard,
 } from './admin-mutation-fields.guard';
 import { AdminReadQuery } from '../application/admin-read.query';
+import { UpdateSubscriptionPlanCommand } from '../application/update-subscription-plan.command';
 import type {
   AdminAuditPage,
   AdminAuditDetail,
@@ -55,6 +56,10 @@ import {
   PageDto,
   RoleDto,
   UsersDto,
+  AdminBillingSubscriptionsDto,
+  AdminBillingPaymentsDto,
+  AdminBillingRevenueDto,
+  UpdateBillingPlanDto,
 } from './admin.dto';
 
 @Controller('api/admin')
@@ -310,5 +315,101 @@ export class AdminController {
         }),
       ),
     };
+  }
+
+  @Get('billing/plans')
+  async billingPlans() {
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, unknown>(
+        new AdminReadQuery({ kind: 'billingPlans' }),
+      ),
+    };
+  }
+
+  @AdminBodyFields('priceVnd', 'monthlyQuota', 'isActive')
+  @Patch('billing/plans/:id')
+  async updateBillingPlan(
+    @Param('id', ParseUUIDPipe) planId: string,
+    @Body() change: UpdateBillingPlanDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (
+      change.priceVnd === undefined &&
+      change.monthlyQuota === undefined &&
+      change.isActive === undefined
+    ) {
+      throw new BadRequestException('Provide at least one plan field');
+    }
+    return {
+      success: true,
+      data: await this.commands.execute<UpdateSubscriptionPlanCommand, unknown>(
+        new UpdateSubscriptionPlanCommand({
+          ...change,
+          planId,
+          adminId: user.id,
+        }),
+      ),
+    };
+  }
+
+  @Get('billing/subscriptions')
+  async billingSubscriptions(@Query() query: AdminBillingSubscriptionsDto) {
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, unknown>(
+        new AdminReadQuery({
+          kind: 'billingSubscriptions',
+          filter: { ...query, q: query.q?.trim() || undefined },
+        }),
+      ),
+    };
+  }
+
+  @Get('billing/payments')
+  async billingPayments(@Query() query: AdminBillingPaymentsDto) {
+    const from = query.from ? new Date(query.from) : undefined;
+    const to = query.to ? new Date(query.to) : undefined;
+    validateBillingRange(from, to, false);
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, unknown>(
+        new AdminReadQuery({
+          kind: 'billingPayments',
+          filter: { ...query, from, to },
+        }),
+      ),
+    };
+  }
+
+  @Get('billing/revenue')
+  async billingRevenue(@Query() query: AdminBillingRevenueDto) {
+    const from = new Date(query.from);
+    const to = new Date(query.to);
+    validateBillingRange(from, to, true);
+    return {
+      success: true,
+      data: await this.queries.execute<AdminReadQuery, unknown>(
+        new AdminReadQuery({ kind: 'billingRevenue', filter: { from, to } }),
+      ),
+    };
+  }
+}
+
+function validateBillingRange(
+  from: Date | undefined,
+  to: Date | undefined,
+  required: boolean,
+): void {
+  if ((!from || !to) && required)
+    throw new BadRequestException('Both date bounds are required');
+  if (
+    from &&
+    to &&
+    (from >= to || to.getTime() - from.getTime() > 366 * 86400000)
+  ) {
+    throw new BadRequestException(
+      'Select a valid date range of up to 366 days',
+    );
   }
 }

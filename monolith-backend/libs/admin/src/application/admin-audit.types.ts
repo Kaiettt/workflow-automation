@@ -5,12 +5,14 @@ export const ADMIN_AUDIT_ACTIONS = [
   'ADMIN_BOOTSTRAPPED',
   'CONNECTOR_POLICY_CHANGED',
   'NODE_TYPE_STATUS_CHANGED',
+  'SUBSCRIPTION_PLAN_CHANGED',
 ] as const;
 export const ADMIN_AUDIT_ACTOR_TYPES = ['ADMIN', 'SYSTEM'] as const;
 export const ADMIN_AUDIT_TARGET_TYPES = [
   'USER',
   'CONNECTOR',
   'NODE_TYPE',
+  'SUBSCRIPTION_PLAN',
 ] as const;
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];
 export type AdminAuditActorType = (typeof ADMIN_AUDIT_ACTOR_TYPES)[number];
@@ -51,7 +53,9 @@ export type AdminAuditField =
   | 'revision'
   | 'allowNewCredentials'
   | 'isCatalogVisible'
-  | 'isExecutionAllowed';
+  | 'isExecutionAllowed'
+  | 'priceVnd'
+  | 'monthlyQuota';
 export type AdminAuditValue = 'ADMIN' | 'CLIENT' | boolean | number | null;
 export type AdminAuditSnapshot = Partial<
   Record<AdminAuditField, AdminAuditValue>
